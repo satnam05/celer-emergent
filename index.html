@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JPM Interview Prep App v2.0</title>
+    
+    <!-- Core Dependencies -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- JPM Styling Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        jpm: { primary: '#0f4c81', dark: '#1e3a5f', light: '#e0f2fe', accent: '#00a1de' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #f3f4f6; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+        .card-perspective { perspective: 1000px; }
+        .card-inner { position: relative; width: 100%; height: 100%; transition: transform 0.6s; transform-style: preserve-3d; }
+        .card-front, .card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 1rem; }
+        .card-back { transform: rotateY(180deg); }
+        .flipped .card-inner { transform: rotateY(180deg); }
+        .slide-in { animation: slideIn 0.3s ease-out forwards; }
+        @keyframes slideIn { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // --- UTILS ---
+        const parseCSV = (text) => {
+            if (!text) return [];
+            const lines = text.trim().split('\n');
+            const headers = lines[0].split(',').map(h => h.trim());
+            return lines.slice(1).map((line, idx) => {
+                const values = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
+                const entry = { id: `row-${idx}` };
+                headers.forEach((h, i) => {
+                    let val = values[i] || '';
+                    entry[h] = val.replace(/^"|"$/g, '').trim();
+                });
+                return entry;
+            });
+        };
+
+        const calculateSimilarity = (s1, s2) => {
+            if (!s1 || !s2) return 0;
+            const longer = s1.length > s2.length ? s1.toLowerCase() : s2.toLowerCase();
+            const shorter = s1.length > s2.length ? s2.toLowerCase() : s1.toLowerCase();
+            if (longer.length === 0) return 100;
+            
+            const costs = new Array();
+            for (let i = 0; i <= longer.length; i++) {
+                let lastValue = i;
+                for (let j = 0; j <= shorter.length; j++) {
+                    if (i == 0) costs[j] = j;
+                    else {
+                        if (j > 0) {
+                            let newValue = costs[j - 1];
+                            if (longer.charAt(i - 1) != shorter.charAt(j - 1)) newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+                            costs[j - 1] = lastValue;
+                            lastValue = newValue;
+                        }
+                    }
+                }
+                if (i > 0) costs[shorter.length] = lastValue;
+            }
+            return Math.round(((longer.length - costs[shorter.length]) / longer.length) * 100);
+        };
+
+        // --- DATA LOADERS ---
+        const FALLBACK_DATA = {
+            flashcards: [{ Deck: "Demo", Question: "Local Mode Active", Answer: "Upload to GitHub to see real data." }],
+            type: [{ Deck: "Demo", Question: "Type 'Hello'", ModelAnswer: "Hello" }],
+            mcq: [{ Deck: "Demo", Question: "Is this local?", OptionA: "Yes", OptionB: "No", OptionC: "Maybe", OptionD: "Unsure", Correct: "Yes" }]
+        };
+
+        // --- COMPONENTS ---
+
+        const Dashboard = ({ active, stats, timer }) => {
+            const accuracy = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
+            const formatTime = (s) => {
+                const mins = Math.floor(s / 60).toString().padStart(2, '0');
+                const secs = (s % 60).toString().padStart(2, '0');
+                return `${mins}:${secs}`;
+            };
+
+            return (
+                <div className={`fixed inset-y-0 left-0 w-64 bg-white shadow-2xl z-20 flex flex-col transition-transform duration-300 border-r border-gray-200 ${active ? 'translate-x-0' : '-translate-x-full'}`}>
+                    <div className="p-6 bg-jpm-primary text-white">
+                        <h2 className="text-xl font-bold flex items-center"><i className="fas fa-chart-pie mr-2"></i> Dashboard</h2>
+                    </div>
+                    <div className="p-6 space-y-6">
+                        <div className="bg-gray-50 p-4 rounded-lg border">
+                            <p className="text-xs text-gray-500 font-bold uppercase">Session Time</p>
+                            <p className="text-3xl font-mono text-jpm-dark">{formatTime(timer)}</p>
+                        </div>
+                        <div>
+                            <div className="flex justify-between text-sm mb-1 font-bold text-gray-700">
+                                <span>Accuracy</span>
+                                <span>{accuracy}%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                <div className={`h-2.5 rounded-full transition-all duration-500 ${accuracy > 70 ? 'bg-green-500' : 'bg-orange-500'}`} style={{width: `${accuracy}%`}}></div>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="bg-green-50 p-2 rounded text-center border border-green-100">
+                                <span className="block text-xl font-bold text-green-600">{stats.correct}</span>
+                                <span className="text-xs uppercase font-bold text-green-700">Correct</span>
+                            </div>
+                            <div className="bg-blue-50 p-2 rounded text-center border border-blue-100">
+                                <span className="block text-xl font-bold text-blue-600">{stats.completed}</span>
+                                <span className="text-xs uppercase font-bold text-blue-700">Done</span>
+                            </div>
+                        </div>
+                        {active && (
+                            <div className="mt-8 pt-6 border-t border-gray-100">
+                                <h3 className="text-xs font-bold text-gray-400 uppercase mb-2">Session Info</h3>
+                                <p className="text-sm text-gray-600"><i className="fas fa-calendar mr-2"></i> {new Date().toLocaleDateString()}</p>
+                                <p className="text-sm text-gray-600"><i className="fas fa-clock mr-2"></i> {new Date().toLocaleTimeString()}</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const FlashcardMode = ({ deckData, onEnd, onStatsUpdate }) => {
+            const [queue, setQueue] = useState(deckData);
+            const [current, setCurrent] = useState(deckData[0]);
+            const [flipped, setFlipped] = useState(false);
+            const [reviewPile, setReviewPile] = useState([]);
+            const [isReviewing, setIsReviewing] = useState(false);
+
+            useEffect(() => { setCurrent(queue[0]); setFlipped(false); }, [queue]);
+
+            const handleRate = (rating) => {
+                if (rating === 'hard') {
+                    setReviewPile([...reviewPile, current]);
+                    onStatsUpdate(false);
+                } else {
+                    onStatsUpdate(true);
+                }
+
+                const remaining = queue.slice(1);
+                if (remaining.length > 0) {
+                    setQueue(remaining);
+                } else {
+                    // End of batch
+                    if (reviewPile.length > 0 || rating === 'hard') {
+                        // Ask to review or finish
+                        // For simplicity in this UI, we show a summary state handled by the render
+                        setQueue([]); 
+                    } else {
+                        setQueue([]);
+                    }
+                }
+            };
+
+            const startReview = () => {
+                setQueue(reviewPile);
+                setReviewPile([]);
+                setIsReviewing(true);
+            };
+
+            if (!current) {
+                return (
+                    <div className="flex flex-col items-center justify-center h-full p-8 text-center animate-slide-in">
+                        <i className={`fas ${reviewPile.length === 0 ? 'fa-check-circle text-green-500' : 'fa-exclamation-circle text-orange-500'} text-6xl mb-4`}></i>
+                        <h2 className="text-3xl font-bold text-gray-800 mb-2">{reviewPile.length === 0 ? "Session Mastered!" : "Session Complete"}</h2>
+                        <p className="text-gray-600 mb-8">{reviewPile.length === 0 ? "You marked all cards as Easy." : `You have ${reviewPile.length} cards marked for review.`}</p>
+                        <div className="flex gap-4">
+                            {reviewPile.length > 0 && (
+                                <button onClick={startReview} className="bg-jpm-primary text-white px-6 py-3 rounded-lg font-bold shadow hover:bg-jpm-dark transition">
+                                    Review Hard Cards
+                                </button>
+                            )}
+                            <button onClick={onEnd} className="bg-gray-500 text-white px-6 py-3 rounded-lg font-bold shadow hover:bg-gray-600 transition">
+                                Return to Menu
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="flex flex-col items-center justify-center h-full max-w-2xl mx-auto w-full px-4">
+                    <div className="w-full flex justify-between mb-4 text-gray-500 font-bold text-sm">
+                        <span>{isReviewing ? "Review Mode" : "Standard Mode"}</span>
+                        <span>Queue: {queue.length} | Review: {reviewPile.length}</span>
+                    </div>
+                    <div className="w-full h-80 card-perspective cursor-pointer group mb-8" onClick={() => setFlipped(!flipped)}>
+                        <div className={`card-inner ${flipped ? 'flipped' : ''}`}>
+                            <div className="card-front bg-white border-2 border-gray-100 shadow-xl flex items-center justify-center p-8 text-center">
+                                <h3 className="text-2xl font-bold text-gray-800">{current.Question}</h3>
+                                <div className="absolute bottom-4 text-gray-400 text-xs uppercase tracking-widest">Click to Flip</div>
+                            </div>
+                            <div className="card-back bg-green-50 border-2 border-green-200 shadow-xl flex items-center justify-center p-8 text-center">
+                                <p className="text-xl text-gray-800">{current.Answer}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {flipped ? (
+                        <div className="flex gap-4 w-full">
+                            <button onClick={() => handleRate('hard')} className="flex-1 bg-red-500 hover:bg-red-600 text-white py-4 rounded-xl font-bold shadow transition"><i className="fas fa-times mr-2"></i> Hard</button>
+                            <button onClick={() => handleRate('easy')} className="flex-1 bg-green-500 hover:bg-green-600 text-white py-4 rounded-xl font-bold shadow transition"><i className="fas fa-check mr-2"></i> Easy</button>
+                        </div>
+                    ) : (
+                        <button onClick={() => setFlipped(true)} className="px-8 py-3 bg-jpm-primary text-white rounded-lg font-bold shadow hover:bg-jpm-dark transition">Show Answer</button>
+                    )}
+                </div>
+            );
+        };
+
+        const TypeMode = ({ deckData, onEnd, onStatsUpdate }) => {
+            const [index, setIndex] = useState(0);
+            const [input, setInput] = useState("");
+            const [submitted, setSubmitted] = useState(false);
+            const [matchScore, setMatchScore] = useState(0);
+            
+            const current = deckData[index];
+
+            const handleSubmit = () => {
+                if(!input.trim()) return;
+                const score = calculateSimilarity(input, current.ModelAnswer);
+                setMatchScore(score);
+                setSubmitted(true);
+                onStatsUpdate(score >= 70);
+            };
+
+            const handleNext = () => {
+                if(index < deckData.length - 1) {
+                    setIndex(index + 1);
+                    setInput("");
+                    setSubmitted(false);
+                } else {
+                    onEnd();
+                }
+            };
+
+            return (
+                <div className="max-w-3xl mx-auto w-full pt-10 px-6">
+                    <div className="bg-white rounded-xl shadow-xl p-8">
+                        <span className="text-jpm-accent font-bold text-xs uppercase tracking-widest mb-2 block">Question {index + 1} of {deckData.length}</span>
+                        <h2 className="text-2xl font-bold text-gray-800 mb-6">{current.Question}</h2>
+                        <textarea className={`w-full p-4 border-2 rounded-lg mb-4 focus:outline-none focus:border-jpm-primary transition h-32 resize-none ${submitted ? 'bg-gray-100 text-gray-500' : 'bg-white'}`}
+                            placeholder="Type your answer here..."
+                            value={input}
+                            onChange={(e) => !submitted && setInput(e.target.value)}
+                            readOnly={submitted}
+                        />
+                        {!submitted ? (
+                            <button onClick={handleSubmit} className="w-full bg-jpm-primary text-white py-3 rounded-lg font-bold hover:bg-jpm-dark transition">Submit</button>
+                        ) : (
+                            <div className="animate-slide-in">
+                                <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-4">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="font-bold text-gray-700">Model Answer:</span>
+                                        <span className={`px-2 py-1 rounded text-xs font-bold text-white ${matchScore >= 70 ? 'bg-green-500' : 'bg-orange-500'}`}>{matchScore}% Match</span>
+                                    </div>
+                                    <p className="text-gray-800">{current.ModelAnswer}</p>
+                                </div>
+                                <button onClick={handleNext} className="w-full bg-gray-800 text-white py-3 rounded-lg font-bold hover:bg-black transition">Next</button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const MCQMode = ({ deckData, onEnd, onStatsUpdate }) => {
+            const [index, setIndex] = useState(0);
+            const [selected, setSelected] = useState(null);
+            const [submitted, setSubmitted] = useState(false);
+            const current = deckData[index];
+
+            const handleSubmit = () => {
+                if(!selected) return;
+                setSubmitted(true);
+                onStatsUpdate(selected === current.Correct);
+            };
+
+            const handleNext = () => {
+                if(index < deckData.length - 1) {
+                    setIndex(index + 1);
+                    setSelected(null);
+                    setSubmitted(false);
+                } else {
+                    onEnd();
+                }
+            };
+
+            return (
+                <div className="max-w-2xl mx-auto w-full pt-10 px-6">
+                    <div className="bg-white rounded-xl shadow-xl p-8">
+                        <h2 className="text-2xl font-bold text-gray-800 mb-6">{current.Question}</h2>
+                        <div className="space-y-3 mb-6">
+                            {[current.OptionA, current.OptionB, current.OptionC, current.OptionD].map((opt, i) => {
+                                let style = "w-full text-left p-4 rounded-lg border-2 transition font-medium ";
+                                if(submitted) {
+                                    if(opt === current.Correct) style += "bg-green-50 border-green-500 text-green-700 font-bold";
+                                    else if(opt === selected) style += "bg-red-50 border-red-500 text-red-700";
+                                    else style += "border-gray-100 text-gray-300";
+                                } else {
+                                    if(opt === selected) style += "bg-blue-50 border-jpm-primary text-jpm-primary";
+                                    else style += "border-gray-200 hover:border-blue-300";
+                                }
+                                return <button key={i} onClick={() => !submitted && setSelected(opt)} className={style}>{opt}</button>;
+                            })}
+                        </div>
+                        {!submitted ? (
+                            <button onClick={handleSubmit} disabled={!selected} className="w-full bg-jpm-primary text-white py-3 rounded-lg font-bold hover:bg-jpm-dark disabled:opacity-50">Check Answer</button>
+                        ) : (
+                            <button onClick={handleNext} className="w-full bg-gray-800 text-white py-3 rounded-lg font-bold hover:bg-black">Next</button>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- MAIN APP ---
+        const App = () => {
+            const [data, setData] = useState({ flashcards: [], type: [], mcq: [] });
+            const [mode, setMode] = useState('menu'); 
+            const [activeDeck, setActiveDeck] = useState(null);
+            const [stats, setStats] = useState({ correct: 0, completed: 0, total: 0 });
+            const [timer, setTimer] = useState(0);
+            const [progress, setProgress] = useState({});
+
+            useEffect(() => {
+                // Load CSVs
+                const load = async () => {
+                    try {
+                        const [f, t, m] = await Promise.all([
+                            fetch('flashcards.csv').then(r => r.ok ? r.text() : null),
+                            fetch('type_answer.csv').then(r => r.ok ? r.text() : null),
+                            fetch('mcq.csv').then(r => r.ok ? r.text() : null)
+                        ]);
+                        
+                        if(!f && !t && !m) throw new Error("Local fallback");
+
+                        setData({
+                            flashcards: f ? parseCSV(f) : [],
+                            type: t ? parseCSV(t) : [],
+                            mcq: m ? parseCSV(m) : []
+                        });
+                    } catch(e) {
+                        console.warn("Using Fallback Data (CORS or missing files)");
+                        setData(FALLBACK_DATA);
+                    }
+                    
+                    const saved = localStorage.getItem('jpm_prep_progress');
+                    if(saved) setProgress(JSON.parse(saved));
+                };
+                load();
+            }, []);
+
+            useEffect(() => {
+                let interval;
+                if(mode !== 'menu') interval = setInterval(() => setTimer(t => t + 1), 1000);
+                else setTimer(0);
+                return () => clearInterval(interval);
+            }, [mode]);
+
+            const startSession = (m, deckName) => {
+                const deck = data[m === 'flashcard' ? 'flashcards' : m === 'type' ? 'type' : 'mcq'].filter(d => d.Deck === deckName);
+                if(deck.length === 0) return;
+                
+                setActiveDeck({ name: deckName, items: deck });
+                setMode(m);
+                setStats({ correct: 0, completed: 0, total: 0 });
+                saveProgress(m, deckName, 'In Progress');
+            };
+
+            const endSession = () => {
+                setMode('menu');
+                setActiveDeck(null);
+            };
+
+            const saveProgress = (m, d, status) => {
+                const newP = { ...progress, [`${m}-${d}`]: { status, date: new Date().toISOString() } };
+                setProgress(newP);
+                localStorage.setItem('jpm_prep_progress', JSON.stringify(newP));
+            };
+
+            const updateStats = (isCorrect) => {
+                setStats(s => ({
+                    total: s.total + 1,
+                    completed: s.completed + 1,
+                    correct: isCorrect ? s.correct + 1 : s.correct
+                }));
+            };
+
+            const getDecks = (items) => [...new Set(items.map(i => i.Deck))];
+
+            return (
+                <div className="flex flex-col h-screen bg-gray-100">
+                    <header className="flex-shrink-0 bg-jpm-primary text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
+                        <div className="flex items-center gap-3">
+                            <i className="fas fa-university text-2xl"></i>
+                            <div>
+                                <h1 className="text-lg font-bold leading-tight">JPM Prep App</h1>
+                                <span className="text-xs text-blue-200">v2.0 | Enterprise Edition</span>
+                            </div>
+                        </div>
+                        {mode !== 'menu' && <button onClick={endSession} className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded text-sm font-bold transition">End Session</button>}
+                    </header>
+                    
+                    <div className="flex flex-grow overflow-hidden relative">
+                        <Dashboard active={mode !== 'menu'} stats={stats} timer={timer} />
+                        
+                        <main className={`flex-grow overflow-y-auto transition-all duration-300 relative ${mode !== 'menu' ? 'ml-64' : ''}`}>
+                            {mode === 'menu' && (
+                                <div className="p-10 max-w-7xl mx-auto flex flex-col items-center justify-center h-full">
+                                    <h2 className="text-3xl font-bold text-gray-800 mb-10">Select Learning Mode</h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full">
+                                        {[
+                                            { id: 'flashcard', title: 'Flashcards', icon: 'fa-layer-group', color: 'bg-orange-500', items: data.flashcards },
+                                            { id: 'type', title: 'Type Answer', icon: 'fa-keyboard', color: 'bg-blue-600', items: data.type },
+                                            { id: 'mcq', title: 'MCQ Mode', icon: 'fa-tasks', color: 'bg-purple-600', items: data.mcq }
+                                        ].map(m => (
+                                            <div key={m.id} className="bg-white rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-transform hover:-translate-y-1">
+                                                <div className={`${m.color} p-6 text-white text-center`}>
+                                                    <i className={`fas ${m.icon} text-4xl mb-2`}></i>
+                                                    <h3 className="text-xl font-bold">{m.title}</h3>
+                                                </div>
+                                                <div className="p-4 h-64 overflow-y-auto bg-gray-50">
+                                                    <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Available Decks</h4>
+                                                    {getDecks(m.items).map(d => {
+                                                        const p = progress[`${m.id}-${d}`];
+                                                        return (
+                                                            <button key={d} onClick={() => startSession(m.id, d)} className="w-full text-left p-3 mb-2 bg-white border border-gray-200 rounded hover:border-jpm-primary hover:text-jpm-primary transition flex justify-between items-center group">
+                                                                <span className="font-semibold">{d}</span>
+                                                                {p?.status === 'Completed' ? <i className="fas fa-check-circle text-green-500"></i> : <i className="fas fa-play opacity-0 group-hover:opacity-100"></i>}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {mode === 'flashcard' && activeDeck && <FlashcardMode deckData={activeDeck.items} onEnd={() => { saveProgress('flashcard', activeDeck.name, 'Completed'); endSession(); }} onStatsUpdate={updateStats} />}
+                            {mode === 'type' && activeDeck && <TypeMode deckData={activeDeck.items} onEnd={() => { saveProgress('type', activeDeck.name, 'Completed'); endSession(); }} onStatsUpdate={updateStats} />}
+                            {mode === 'mcq' && activeDeck && <MCQMode deckData={activeDeck.items} onEnd={() => { saveProgress('mcq', activeDeck.name, 'Completed'); endSession(); }} onStatsUpdate={updateStats} />}
+                        </main>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
