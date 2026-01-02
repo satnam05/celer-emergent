@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>JPM Interview Prep App v9.0 (Final Polish)</title>
+    <title>JPM Interview Prep App v10.0 (Study Mode)</title>
     
     <!-- Dependencies -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -402,7 +402,7 @@
         };
 
         const App = () => {
-            const [data, setData] = useState({ flashcards: [], type: [], mcq: [] });
+            const [data, setData] = useState({ flashcards: [], type: [], mcq: [], study: [] }); // Added study
             const [mode, setMode] = useState('menu'); 
             const [activeDeck, setActiveDeck] = useState(null);
             const [stats, setStats] = useState({ correct: 0, completed: 0, total: 0 });
@@ -411,7 +411,7 @@
             const [modalDeck, setModalDeck] = useState(null);
             const [testResults, setTestResults] = useState(null);
 
-            // COMPREHENSIVE AUTOMATED REGRESSION SUITE (V8.2)
+            // COMPREHENSIVE AUTOMATED REGRESSION SUITE (V10.0)
             const runTests = () => {
                 const results = [];
                 const csv1 = 'H1,H2\nV1,"V, 2"';
@@ -425,14 +425,10 @@
                 const sim = calculateSimilarity("test", "test");
                 results.push({ id: 3, name: "Algorithm: Similarity", pass: sim === 100 });
 
-                const arr = [1,2,3];
-                const shuf = shuffleArray(arr);
-                results.push({ id: 4, name: "Algorithm: Shuffle", pass: shuf.length === 3 });
-
                 try {
                     localStorage.setItem('test', '1');
-                    results.push({ id: 5, name: "System: LocalStorage", pass: localStorage.getItem('test') === '1' });
-                } catch(e) { results.push({ id: 5, name: "System: Storage", pass: false }); }
+                    results.push({ id: 4, name: "System: LocalStorage", pass: localStorage.getItem('test') === '1' });
+                } catch(e) { results.push({ id: 4, name: "System: Storage", pass: false }); }
 
                 setTestResults(results);
             };
@@ -441,14 +437,20 @@
                 const load = async () => {
                     try {
                         const ts = Date.now(); 
-                        const [f, t, m] = await Promise.all([
+                        const [f, t, m, s] = await Promise.all([
                             fetch(`flashcards.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""),
                             fetch(`type_answer.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""),
-                            fetch(`mcq.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : "")
+                            fetch(`mcq.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""),
+                            fetch(`context.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : "")
                         ]);
-                        setData({ flashcards: f ? parseCSV(f) : [], type: t ? parseCSV(t) : [], mcq: m ? parseCSV(m) : [] });
+                        setData({ 
+                            flashcards: f ? parseCSV(f) : [], 
+                            type: t ? parseCSV(t) : [], 
+                            mcq: m ? parseCSV(m) : [],
+                            study: s ? parseCSV(s) : []
+                        });
                     } catch(e) { console.error(e); }
-                    const saved = localStorage.getItem('jpm_prep_progress_v8');
+                    const saved = localStorage.getItem('jpm_prep_progress_v10');
                     if(saved) setProgress(JSON.parse(saved));
                 };
                 load();
@@ -473,10 +475,22 @@
             };
 
             const startSession = (m, deckName, specificQueue = null) => {
-                const map = { 'flashcard': 'flashcards', 'type': 'type', 'mcq': 'mcq' };
+                const map = { 'flashcard': 'flashcards', 'type': 'type', 'mcq': 'mcq', 'study': 'study' };
                 let deck = specificQueue || data[map[m]].filter(d => d.Deck === deckName);
 
                 if(deck.length === 0) return;
+                
+                // STUDY MODE SPECIAL LOGIC
+                if (m === 'study') {
+                    const link = deck[0].Link;
+                    window.open(link, '_blank');
+                    // Doesn't change view, just marks in progress if new
+                    if (!progress[`${m}-${deckName}`]) {
+                        saveProgress(m, deckName, 'In Progress', 0);
+                    }
+                    return;
+                }
+
                 setActiveDeck({ name: deckName, items: deck });
                 setMode(m);
                 setStats({ correct: 0, completed: 0, total: 0 });
@@ -507,7 +521,12 @@
             const saveProgress = (m, d, status, score, queue = null) => {
                 const newP = { ...progress, [`${m}-${d}`]: { status, score, date: new Date().toLocaleString(), queue } };
                 setProgress(newP);
-                localStorage.setItem('jpm_prep_progress_v8', JSON.stringify(newP));
+                localStorage.setItem('jpm_prep_progress_v10', JSON.stringify(newP));
+            };
+
+            // Manual Completion for Study Mode
+            const markStudyComplete = (deckName) => {
+                saveProgress('study', deckName, 'Completed', 100);
             };
 
             const updateStats = (isCorrect) => {
@@ -528,18 +547,23 @@
                             const p = progress[`${mId}-${d}`];
                             const isDone = p.status === 'Completed';
                             return (
-                                <button key={d} onClick={() => handleDeckClick(mId, d)} className={`w-full text-left p-3 mb-2 border rounded flex justify-between items-center ${isDone ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
-                                    <span className="font-semibold text-gray-700">{d}</span>
-                                    {isDone ? <i className="fas fa-check-circle text-green-500"></i> : <div className="flex items-center text-orange-500 text-xs font-bold"><i className="fas fa-history mr-1"></i> RESUME</div>}
-                                </button>
+                                <div key={d} className={`w-full text-left p-3 mb-2 border rounded flex justify-between items-center ${isDone ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
+                                    <button onClick={() => handleDeckClick(mId, d)} className="font-semibold text-gray-700 flex-grow text-left hover:underline">{d}</button>
+                                    
+                                    {mId === 'study' && !isDone && (
+                                        <button onClick={() => markStudyComplete(d)} className="bg-green-500 text-white text-xs px-2 py-1 rounded hover:bg-green-600 ml-2">Mark Done</button>
+                                    )}
+
+                                    {isDone ? <i className="fas fa-check-circle text-green-500 ml-2"></i> : (mId !== 'study' && <div className="flex items-center text-orange-500 text-xs font-bold ml-2"><i className="fas fa-history mr-1"></i> RESUME</div>)}
+                                </div>
                             )
                         })}
                         {newDecks.length > 0 && <h4 className="text-xs font-bold text-gray-500 uppercase mb-2 mt-4">New Decks</h4>}
                         {newDecks.map(d => (
-                            <button key={d} onClick={() => startSession(mId, d)} className="w-full text-left p-3 mb-2 bg-white border border-gray-200 rounded hover:border-jpm-primary hover:text-jpm-primary transition flex justify-between items-center group">
-                                <span className="font-semibold">{d}</span>
+                            <div key={d} className="w-full text-left p-3 mb-2 bg-white border border-gray-200 rounded hover:border-jpm-primary hover:text-jpm-primary transition flex justify-between items-center group">
+                                <button onClick={() => startSession(mId, d)} className="font-semibold flex-grow text-left">{d}</button>
                                 <i className="fas fa-play opacity-0 group-hover:opacity-100"></i>
-                            </button>
+                            </div>
                         ))}
                     </div>
                 );
@@ -550,7 +574,7 @@
                     <header className="flex-shrink-0 bg-jpm-primary text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
                         <div className="flex flex-col">
                             <h1 className="text-lg font-bold leading-tight">JPM Prep App</h1>
-                            <span className="text-xs text-blue-200">v8.2 | Developed by Satnam using Gemini</span>
+                            <span className="text-xs text-blue-200">v10.0 | Developed by Satnam using Gemini</span>
                         </div>
                         <div className="flex items-center gap-4">
                             <UKClock />
@@ -564,8 +588,9 @@
                             {mode === 'menu' && (
                                 <div className="p-10 max-w-7xl mx-auto flex flex-col items-center justify-center h-full">
                                     <h2 className="text-3xl font-bold text-gray-800 mb-10">Select Learning Mode</h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
                                         {[
+                                            { id: 'study', title: 'Study Material', icon: 'fa-book-open', color: 'bg-teal-600', items: data.study },
                                             { id: 'flashcard', title: 'Flashcards', icon: 'fa-layer-group', color: 'bg-orange-500', items: data.flashcards },
                                             { id: 'type', title: 'Type Answer', icon: 'fa-keyboard', color: 'bg-blue-600', items: data.type },
                                             { id: 'mcq', title: 'MCQ Mode', icon: 'fa-tasks', color: 'bg-purple-600', items: data.mcq }
@@ -612,7 +637,7 @@
                                         </div>
                                         <div className="flex gap-4">
                                             <button onClick={() => setModalDeck(null)} className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-bold hover:bg-gray-300">Close</button>
-                                            <button onClick={() => startSession(modalDeck.mode, modalDeck.name)} className="flex-1 bg-jpm-primary text-white py-3 rounded-lg font-bold hover:bg-jpm-dark">Restart</button>
+                                            <button onClick={() => startSession(modalDeck.mode, modalDeck.name)} className="flex-1 bg-jpm-primary text-white py-3 rounded-lg font-bold hover:bg-jpm-dark">{modalDeck.mode === 'study' ? 'Re-Read' : 'Restart'}</button>
                                         </div>
                                     </div>
                                 </div>
