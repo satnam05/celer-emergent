@@ -127,3 +127,471 @@
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                             <div className="bg-green-50 p-2 rounded text-center border border-green-100">
+                                <span className="block text-xl font-bold text-green-600">{stats.correct}</span><span className="text-xs uppercase font-bold text-green-700">Correct</span>
+                            </div>
+                            <div className="bg-blue-50 p-2 rounded text-center border border-blue-100">
+                                <span className="block text-xl font-bold text-blue-600">{stats.completed}</span><span className="text-xs uppercase font-bold text-blue-700">Done</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const FlashcardMode = ({ deckData, onEnd, onStatsUpdate }) => {
+            const [queue, setQueue] = useState(deckData);
+            const [current, setCurrent] = useState(deckData[0]);
+            const [flipped, setFlipped] = useState(false);
+            const [reviewPile, setReviewPile] = useState([]);
+            const [isFinished, setIsFinished] = useState(false);
+
+            useEffect(() => { 
+                if(queue.length > 0) {
+                    setCurrent(queue[0]); 
+                    setFlipped(false); 
+                } else {
+                    setIsFinished(true);
+                }
+            }, [queue]);
+
+            const handleRate = (rating) => {
+                if (rating === 'hard') {
+                    setReviewPile([...reviewPile, current]);
+                    onStatsUpdate(false);
+                } else {
+                    onStatsUpdate(true);
+                }
+                const remaining = queue.slice(1);
+                setQueue(remaining);
+            };
+
+            const startReview = () => {
+                setQueue(reviewPile);
+                setReviewPile([]);
+                setIsFinished(false);
+            };
+
+            const handleExit = () => {
+                // Determine if we need to save state
+                // If Finished but ReviewPile exists -> In Progress (Save ReviewPile)
+                // If Not Finished -> In Progress (Save Queue + ReviewPile)
+                let itemsToSave = [];
+                if (isFinished) itemsToSave = reviewPile;
+                else itemsToSave = [...queue, ...reviewPile];
+                
+                onEnd(itemsToSave.length === 0 ? 100 : 40, itemsToSave); 
+            };
+
+            if (isFinished) {
+                return (
+                    <div className="flex flex-col items-center justify-center h-full p-8 text-center animate-slide-in">
+                        <i className={`fas ${reviewPile.length === 0 ? 'fa-trophy text-yellow-400' : 'fa-clipboard-list text-jpm-primary'} text-6xl mb-4`}></i>
+                        <h2 className="text-3xl font-bold text-gray-800 mb-2">{reviewPile.length === 0 ? "Deck Mastered!" : "Session Complete"}</h2>
+                        <p className="text-gray-600 mb-8">{reviewPile.length === 0 ? "All cards marked Easy." : `You have ${reviewPile.length} Hard cards to review.`}</p>
+                        <div className="flex gap-4">
+                            {reviewPile.length > 0 && <button onClick={startReview} className="bg-jpm-primary text-white px-6 py-3 rounded-lg font-bold shadow hover:bg-jpm-dark">Review Hard</button>}
+                            <button onClick={handleExit} className="bg-gray-500 text-white px-6 py-3 rounded-lg font-bold shadow hover:bg-gray-600">Return to Menu</button>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (!current) return <div className="p-10 text-center">Preparing cards...</div>;
+
+            return (
+                <div className="flex flex-col items-center justify-center h-full max-w-3xl mx-auto w-full px-4">
+                    <div className="w-full flex justify-between mb-2 text-gray-500 font-bold text-sm">
+                        <span>Flashcard Mode</span>
+                        <span>Queue: {queue.length} | Review: {reviewPile.length}</span>
+                    </div>
+                    <div className={`card-object ${flipped ? 'is-flipped' : ''}`} onClick={() => setFlipped(!flipped)} role="button">
+                        <div className="card-face front">
+                            <div className="card-content no-scrollbar"><h3 className="text-2xl font-bold text-gray-800">{current.Question}</h3></div>
+                            <div className="absolute bottom-4 text-gray-400 text-xs uppercase tracking-widest">Tap to Flip</div>
+                        </div>
+                        <div className="card-face back">
+                            <div className="card-content no-scrollbar"><p className="text-lg text-gray-800 whitespace-pre-wrap">{current.Answer}</p></div>
+                        </div>
+                    </div>
+                    {flipped ? (
+                        <div className="flex gap-4 w-full mt-8">
+                            <button onClick={(e) => { e.stopPropagation(); handleRate('hard'); }} className="flex-1 bg-red-500 hover:bg-red-600 text-white py-4 rounded-xl font-bold shadow"><i className="fas fa-times mr-2"></i> Hard</button>
+                            <button onClick={(e) => { e.stopPropagation(); handleRate('easy'); }} className="flex-1 bg-green-500 hover:bg-green-600 text-white py-4 rounded-xl font-bold shadow"><i className="fas fa-check mr-2"></i> Easy</button>
+                        </div>
+                    ) : (
+                        <button onClick={() => setFlipped(true)} className="mt-8 px-8 py-3 bg-jpm-primary text-white rounded-lg font-bold shadow hover:bg-jpm-dark w-full">Show Answer</button>
+                    )}
+                </div>
+            );
+        };
+
+        const TypeMode = ({ deckData, onEnd, onStatsUpdate }) => {
+            const [index, setIndex] = useState(0);
+            const [input, setInput] = useState("");
+            const [submitted, setSubmitted] = useState(false);
+            const [matchScore, setMatchScore] = useState(0);
+            const [totalAccuracy, setTotalAccuracy] = useState(0);
+            const current = deckData[index];
+
+            const handleSubmit = () => {
+                if(!input.trim()) return;
+                const score = calculateSimilarity(input, current.ModelAnswer);
+                setMatchScore(score);
+                setTotalAccuracy(prev => prev + score);
+                setSubmitted(true);
+                onStatsUpdate(score >= 50);
+            };
+
+            const handleNext = () => {
+                if(index < deckData.length - 1) {
+                    setIndex(index + 1); setInput(""); setSubmitted(false);
+                } else {
+                    const finalAvg = Math.round(totalAccuracy / deckData.length);
+                    onEnd(finalAvg);
+                }
+            };
+
+            return (
+                <div className="max-w-3xl mx-auto w-full pt-10 px-6">
+                    <div className="bg-white rounded-xl shadow-xl p-8 max-h-[80vh] overflow-y-auto">
+                        <span className="text-jpm-accent font-bold text-xs uppercase tracking-widest mb-2 block">Question {index + 1} of {deckData.length}</span>
+                        <h2 className="text-2xl font-bold text-gray-800 mb-6">{current.Question}</h2>
+                        <textarea className={`w-full p-4 border-2 rounded-lg mb-4 focus:outline-none focus:border-jpm-primary transition h-32 resize-none ${submitted ? 'bg-gray-100 text-gray-500' : 'bg-white'}`}
+                            placeholder="Type answer..." value={input} onChange={(e) => !submitted && setInput(e.target.value)} readOnly={submitted} />
+                        {!submitted ? (
+                            <button onClick={handleSubmit} className="w-full bg-jpm-primary text-white py-3 rounded-lg font-bold hover:bg-jpm-dark">Submit</button>
+                        ) : (
+                            <div className="animate-slide-in">
+                                <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-4">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="font-bold text-gray-700">Model Answer:</span>
+                                        <span className={`px-2 py-1 rounded text-xs font-bold text-white ${matchScore >= 50 ? 'bg-green-500' : 'bg-orange-500'}`}>{matchScore}% Match</span>
+                                    </div>
+                                    <p className="text-gray-800 whitespace-pre-wrap">{current.ModelAnswer}</p>
+                                </div>
+                                <button onClick={handleNext} className="w-full bg-gray-800 text-white py-3 rounded-lg font-bold hover:bg-black">Next</button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const MCQMode = ({ deckData, onEnd, onStatsUpdate }) => {
+            const [index, setIndex] = useState(0);
+            const [selected, setSelected] = useState(null);
+            const [submitted, setSubmitted] = useState(false);
+            const [shuffledOptions, setShuffledOptions] = useState([]);
+            const [scoreCount, setScoreCount] = useState(0);
+            const current = deckData[index];
+
+            useEffect(() => {
+                const opts = [];
+                ['A','B','C','D'].forEach(letter => {
+                    if(current[`Option${letter}`]) opts.push({ text: current[`Option${letter}`], id: letter });
+                });
+                setShuffledOptions(shuffleArray(opts));
+                setSelected(null);
+                setSubmitted(false);
+            }, [index, current]);
+
+            const checkAnswer = () => {
+                const correctVal = current.Correct.trim();
+                let isMatch = false;
+                const selectedOptObj = shuffledOptions.find(o => o.text === selected);
+                
+                if (correctVal.length === 1 && ['A','B','C','D'].includes(correctVal.toUpperCase())) {
+                     if (selectedOptObj && selectedOptObj.id === correctVal.toUpperCase()) isMatch = true;
+                } else {
+                    if (selected.trim() === correctVal) isMatch = true;
+                }
+
+                setSubmitted(true);
+                if(isMatch) setScoreCount(prev => prev + 1);
+                onStatsUpdate(isMatch);
+            };
+
+            const handleNext = () => {
+                if(index < deckData.length - 1) {
+                    setIndex(index + 1);
+                } else {
+                    const finalScore = Math.round((scoreCount / deckData.length) * 100);
+                    onEnd(finalScore);
+                }
+            };
+
+            const getOptionStyle = (optText) => {
+                if (!submitted) return selected === optText ? "bg-blue-50 border-jpm-primary text-jpm-primary font-bold shadow" : "bg-white border-gray-200 hover:border-blue-300";
+                
+                const correctVal = current.Correct.trim();
+                const optObj = shuffledOptions.find(o => o.text === optText);
+                let isThisCorrect = false;
+
+                if (correctVal.length === 1) {
+                     if (optObj && optObj.id === correctVal.toUpperCase()) isThisCorrect = true;
+                } else {
+                    if (optText === correctVal) isThisCorrect = true;
+                }
+
+                if (isThisCorrect) return "bg-green-50 border-green-500 text-green-700 font-bold";
+                if (selected === optText) return "bg-red-50 border-red-500 text-red-700";
+                return "bg-gray-50 border-gray-100 text-gray-300 opacity-50";
+            };
+
+            return (
+                <div className="max-w-3xl mx-auto w-full pt-10 px-6">
+                    <div className="bg-white rounded-xl shadow-xl p-8">
+                        <h2 className="text-2xl font-bold text-gray-800 mb-6">{current.Question}</h2>
+                        <div className="space-y-3 mb-6">
+                            {shuffledOptions.map((opt, i) => (
+                                <button key={i} onClick={() => !submitted && setSelected(opt.text)} className={`w-full text-left p-4 rounded-lg border-2 transition ${getOptionStyle(opt.text)}`}>
+                                    <span className="font-mono mr-3 opacity-50">{String.fromCharCode(65+i)}.</span> {opt.text}
+                                </button>
+                            ))}
+                        </div>
+                        {!submitted ? (
+                            <button onClick={checkAnswer} disabled={!selected} className="w-full bg-jpm-primary text-white py-3 rounded-lg font-bold hover:bg-jpm-dark disabled:opacity-50">Check Answer</button>
+                        ) : (
+                            <button onClick={handleNext} className="w-full bg-gray-800 text-white py-3 rounded-lg font-bold hover:bg-black">Next</button>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [data, setData] = useState({ flashcards: [], type: [], mcq: [] });
+            const [mode, setMode] = useState('menu'); 
+            const [activeDeck, setActiveDeck] = useState(null);
+            const [stats, setStats] = useState({ correct: 0, completed: 0, total: 0 });
+            const [timer, setTimer] = useState(0);
+            const [progress, setProgress] = useState({});
+            const [modalDeck, setModalDeck] = useState(null);
+
+            // COMPREHENSIVE REGRESSION SUITE
+            window.runRegressionSuite = () => {
+                console.log("🚀 Starting Comprehensive Regression Suite...");
+                const results = [];
+                
+                // Test 1: Comma Parser (Legacy)
+                const legacy = parseCSV('Col1,"Col, 2"\nVal1,"Val, 2"');
+                results.push({ test: "Parser: Comma (Legacy)", status: legacy[0]['Col, 2'] === 'Val, 2' ? "PASS" : "FAIL" });
+
+                // Test 2: Pipe Parser (New)
+                const pipe = parseCSV('Col1|Col2\nVal1|Val, 2');
+                results.push({ test: "Parser: Pipe (New)", status: pipe[0]['Col2'] === 'Val, 2' ? "PASS" : "FAIL" });
+
+                // Test 3: Similarity
+                const sim = calculateSimilarity("hello world", "hello world");
+                results.push({ test: "Algorithm: Text Matching", status: sim === 100 ? "PASS" : "FAIL" });
+
+                // Test 4: Shuffling
+                const arr = [1, 2, 3];
+                const shuff = shuffleArray(arr);
+                results.push({ test: "Algorithm: Shuffling", status: JSON.stringify(arr) !== JSON.stringify(shuff) ? "PASS" : "WARN (Random)" });
+
+                // Test 5: Storage Integrity
+                try {
+                    localStorage.setItem('test_key', 'test_val');
+                    const val = localStorage.getItem('test_key');
+                    results.push({ test: "System: LocalStorage", status: val === 'test_val' ? "PASS" : "FAIL" });
+                    localStorage.removeItem('test_key');
+                } catch(e) { results.push({ test: "System: LocalStorage", status: "FAIL" }); }
+
+                console.table(results);
+                alert(`Regression Complete. ${results.filter(r => r.status === 'PASS').length} / ${results.length} Passed.`);
+            };
+
+            useEffect(() => {
+                const load = async () => {
+                    try {
+                        const [f, t, m] = await Promise.all([
+                            fetch('flashcards.csv').then(r => r.ok ? r.text() : ""),
+                            fetch('type_answer.csv').then(r => r.ok ? r.text() : ""),
+                            fetch('mcq.csv').then(r => r.ok ? r.text() : "")
+                        ]);
+                        setData({ flashcards: f ? parseCSV(f) : [], type: t ? parseCSV(t) : [], mcq: m ? parseCSV(m) : [] });
+                    } catch(e) { console.error(e); }
+                    const saved = localStorage.getItem('jpm_prep_progress_v5');
+                    if(saved) setProgress(JSON.parse(saved));
+                };
+                load();
+            }, []);
+
+            useEffect(() => {
+                let interval;
+                if(mode !== 'menu') interval = setInterval(() => setTimer(t => t + 1), 1000);
+                else setTimer(0);
+                return () => clearInterval(interval);
+            }, [mode]);
+
+            // DECK SELECTION LOGIC (Handles Resume vs Start New)
+            const handleDeckClick = (m, deckName) => {
+                const p = progress[`${m}-${deckName}`];
+                
+                // If Completed, show Modal
+                if (p && p.status === 'Completed') {
+                    setModalDeck({ mode: m, name: deckName, stats: p });
+                } 
+                // If In Progress, RESUME automatically
+                else if (p && p.status === 'In Progress' && p.queue && p.queue.length > 0) {
+                    // RESUME LOGIC
+                    startSession(m, deckName, p.queue);
+                } 
+                // Else, Start New
+                else {
+                    startSession(m, deckName);
+                }
+            };
+
+            const startSession = (m, deckName, specificQueue = null) => {
+                const map = { 'flashcard': 'flashcards', 'type': 'type', 'mcq': 'mcq' };
+                // Load either the persisted queue OR the full fresh deck
+                let deck = [];
+                if (specificQueue) {
+                    deck = specificQueue;
+                } else {
+                    deck = data[map[m]].filter(d => d.Deck === deckName);
+                }
+
+                if(deck.length === 0) return;
+                setActiveDeck({ name: deckName, items: deck });
+                setMode(m);
+                setStats({ correct: 0, completed: 0, total: 0 });
+                setModalDeck(null);
+                
+                // Mark initial in progress if brand new
+                if (!progress[`${m}-${deckName}`]) {
+                    saveProgress(m, deckName, 'In Progress', 0);
+                }
+            };
+
+            const endSession = (finalScore = 0, remainingItems = []) => {
+                // If Flashcard mode and items remain, it is IN PROGRESS
+                // If other modes and score < 50, it is IN PROGRESS
+                let status = 'In Progress';
+                let queueToSave = null;
+
+                if (mode === 'flashcard') {
+                    if (finalScore === 100 && remainingItems.length === 0) status = 'Completed';
+                    else {
+                        status = 'In Progress';
+                        queueToSave = remainingItems; // Save the Hard cards
+                    }
+                } else {
+                    status = finalScore >= 50 ? 'Completed' : 'In Progress';
+                }
+
+                saveProgress(mode, activeDeck.name, status, finalScore, queueToSave);
+                setMode('menu');
+                setActiveDeck(null);
+            };
+
+            const saveProgress = (m, d, status, score, queue = null) => {
+                const newP = { 
+                    ...progress, 
+                    [`${m}-${d}`]: { status, score, date: new Date().toLocaleString(), queue } 
+                };
+                setProgress(newP);
+                localStorage.setItem('jpm_prep_progress_v5', JSON.stringify(newP));
+            };
+
+            const updateStats = (isCorrect) => {
+                setStats(s => ({ total: s.total + 1, completed: s.completed + 1, correct: isCorrect ? s.correct + 1 : s.correct }));
+            };
+
+            const getDecks = (items) => [...new Set(items.map(i => i.Deck))].filter(Boolean);
+
+            const RenderDeckList = ({ items, mId }) => {
+                const decks = getDecks(items);
+                const activeDecks = decks.filter(d => progress[`${mId}-${d}`]);
+                const newDecks = decks.filter(d => !progress[`${mId}-${d}`]);
+
+                return (
+                    <div className="h-64 overflow-y-auto bg-gray-50 p-4">
+                        {activeDecks.length > 0 && <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">My Progress</h4>}
+                        {activeDecks.map(d => {
+                            const p = progress[`${mId}-${d}`];
+                            const isDone = p.status === 'Completed';
+                            return (
+                                <button key={d} onClick={() => handleDeckClick(mId, d)} className={`w-full text-left p-3 mb-2 border rounded flex justify-between items-center ${isDone ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
+                                    <span className="font-semibold text-gray-700">{d}</span>
+                                    {isDone ? <i className="fas fa-check-circle text-green-500"></i> : <div className="flex items-center text-orange-500 text-xs font-bold"><i className="fas fa-history mr-1"></i> RESUME</div>}
+                                </button>
+                            )
+                        })}
+                        
+                        {newDecks.length > 0 && <h4 className="text-xs font-bold text-gray-500 uppercase mb-2 mt-4">New Decks</h4>}
+                        {newDecks.map(d => (
+                            <button key={d} onClick={() => startSession(mId, d)} className="w-full text-left p-3 mb-2 bg-white border border-gray-200 rounded hover:border-jpm-primary hover:text-jpm-primary transition flex justify-between items-center group">
+                                <span className="font-semibold">{d}</span>
+                                <i className="fas fa-play opacity-0 group-hover:opacity-100"></i>
+                            </button>
+                        ))}
+                    </div>
+                );
+            };
+
+            return (
+                <div className="flex flex-col h-screen bg-gray-100">
+                    <header className="flex-shrink-0 bg-jpm-primary text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
+                        <div className="flex items-center gap-3"><i className="fas fa-university text-2xl"></i><div><h1 className="text-lg font-bold leading-tight">JPM Prep App</h1><span className="text-xs text-blue-200">v5.0 | Enterprise</span></div></div>
+                        {mode !== 'menu' && <button onClick={() => activeDeck && document.querySelector('main button[class*="bg-gray-500"]')?.click()} className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded text-sm font-bold transition">End Session</button>}
+                    </header>
+                    
+                    <div className="flex flex-grow overflow-hidden relative">
+                        <Dashboard active={mode !== 'menu'} stats={stats} timer={timer} />
+                        
+                        <main className={`flex-grow overflow-y-auto transition-all duration-300 relative ${mode !== 'menu' ? 'ml-64' : ''}`}>
+                            {mode === 'menu' && (
+                                <div className="p-10 max-w-7xl mx-auto flex flex-col items-center justify-center h-full">
+                                    <h2 className="text-3xl font-bold text-gray-800 mb-10">Select Learning Mode</h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full">
+                                        {[
+                                            { id: 'flashcard', title: 'Flashcards', icon: 'fa-layer-group', color: 'bg-orange-500', items: data.flashcards },
+                                            { id: 'type', title: 'Type Answer', icon: 'fa-keyboard', color: 'bg-blue-600', items: data.type },
+                                            { id: 'mcq', title: 'MCQ Mode', icon: 'fa-tasks', color: 'bg-purple-600', items: data.mcq }
+                                        ].map(m => (
+                                            <div key={m.id} className="bg-white rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-transform hover:-translate-y-1">
+                                                <div className={`${m.color} p-6 text-white text-center`}>
+                                                    <i className={`fas ${m.icon} text-4xl mb-2`}></i><h3 className="text-xl font-bold">{m.title}</h3>
+                                                </div>
+                                                <RenderDeckList items={m.items} mId={m.id} />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* DECK DETAIL & RESTART MODAL (Only for Completed Decks) */}
+                            {modalDeck && (
+                                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                                    <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full animate-slide-in">
+                                        <h3 className="text-2xl font-bold text-gray-800 mb-2">{modalDeck.name}</h3>
+                                        <div className="bg-gray-50 p-4 rounded mb-6">
+                                            <p className="text-sm text-gray-600">Status: <span className="font-bold text-green-600">Completed</span></p>
+                                            <p className="text-sm text-gray-600">Last Score: <span className="font-bold">{modalDeck.stats.score}%</span></p>
+                                            <p className="text-sm text-gray-600">Last Played: <span className="font-mono text-xs">{modalDeck.stats.date}</span></p>
+                                        </div>
+                                        <div className="flex gap-4">
+                                            <button onClick={() => setModalDeck(null)} className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-bold hover:bg-gray-300">Close</button>
+                                            <button onClick={() => startSession(modalDeck.mode, modalDeck.name)} className="flex-1 bg-jpm-primary text-white py-3 rounded-lg font-bold hover:bg-jpm-dark">Restart</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {mode === 'flashcard' && activeDeck && <FlashcardMode deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} />}
+                            {mode === 'type' && activeDeck && <TypeMode deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} />}
+                            {mode === 'mcq' && activeDeck && <MCQMode deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} />}
+                        </main>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
