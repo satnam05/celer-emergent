@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>JPM Interview Prep App v2.2 (Patched)</title>
+    <title>JPM Interview Prep App v3.0 (Fixed)</title>
     
     <!-- Dependencies -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -24,11 +24,15 @@
     <style>
         body { background-color: #f3f4f6; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
         
-        /* --- FIXED 3D FLIP CSS --- */
-        .scene {
+        /* SCROLLBAR HIDING FOR CLEAN UI */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* FIXED 3D FLIP ANIMATION */
+        .card-scene {
             perspective: 1000px;
             width: 100%;
-            height: 320px; /* Fixed height for consistency */
+            height: 400px; /* Increased height for long text */
         }
         .card-object {
             width: 100%;
@@ -46,14 +50,24 @@
             -webkit-backface-visibility: hidden;
             border-radius: 1rem;
             display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem;
+            flex-direction: column;
+            overflow: hidden; /* Contains the scrollable inner area */
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        /* Scrollable content area inside the card */
+        .card-content {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
         }
         .card-face.front { background: white; border: 2px solid #e5e7eb; transform: rotateY(0deg); }
         .card-face.back { background: #f0fdf4; border: 2px solid #86efac; transform: rotateY(180deg); }
-        .card-object.is-flipped { transform: rotateY(180deg); }
+        .is-flipped { transform: rotateY(180deg); }
         
         .slide-in { animation: slideIn 0.3s ease-out forwards; }
         @keyframes slideIn { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
@@ -65,34 +79,39 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // --- ROBUST CSV PARSER (Fixes Data Cutting Issues) ---
+        // --- ROBUST CSV PARSER ---
         const parseCSV = (text) => {
             if (!text) return [];
             
-            // Normalize line breaks
-            const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            // 1. Strip BOM (Byte Order Mark) causing "Day 1" lookup failures
+            if (text.charCodeAt(0) === 0xFEFF) {
+                text = text.slice(1);
+            }
+
+            // 2. Normalize Newlines
+            text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
             const rows = [];
             let currentRow = [];
             let currentVal = '';
             let insideQuotes = false;
 
-            for (let i = 0; i < normalizedText.length; i++) {
-                const char = normalizedText[i];
-                const nextChar = normalizedText[i+1];
+            // 3. State Machine Parsing
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                const nextChar = text[i+1];
 
                 if (char === '"') {
                     if (insideQuotes && nextChar === '"') {
-                        currentVal += '"'; // Handle escaped quote
+                        currentVal += '"'; 
                         i++;
                     } else {
-                        insideQuotes = !insideQuotes; // Toggle quote state
+                        insideQuotes = !insideQuotes;
                     }
                 } else if (char === ',' && !insideQuotes) {
-                    // Split ONLY if not inside quotes
                     currentRow.push(currentVal);
                     currentVal = '';
                 } else if (char === '\n' && !insideQuotes) {
-                    // End of row
                     currentRow.push(currentVal);
                     if(currentRow.length > 0) rows.push(currentRow);
                     currentRow = [];
@@ -104,19 +123,21 @@
             if (currentVal) currentRow.push(currentVal);
             if (currentRow.length > 0) rows.push(currentRow);
 
-            // Map to Objects
-            const headers = rows[0].map(h => h.trim()); // Trim headers
+            // 4. Header Mapping
+            if (rows.length === 0) return [];
+            const headers = rows[0].map(h => h.trim());
+            
             return rows.slice(1).map((row, idx) => {
                 const entry = { id: `row-${idx}` };
                 headers.forEach((header, i) => {
-                    // Remove wrapping quotes if present and trim whitespace
                     let val = row[i] || '';
                     val = val.trim();
+                    // Remove wrapping quotes
                     if (val.startsWith('"') && val.endsWith('"')) {
                         val = val.substring(1, val.length - 1);
                     }
-                    // Fix double quotes unescaping
-                    entry[header] = val.replace(/""/g, '"');
+                    val = val.replace(/""/g, '"'); // Unescape
+                    entry[header] = val;
                 });
                 return entry;
             });
@@ -236,25 +257,35 @@
                         <span>Queue: {queue.length} | Review: {reviewPile.length}</span>
                     </div>
 
-                    <div className="scene mb-8">
-                        <div className={`card-object ${flipped ? 'is-flipped' : ''}`} onClick={() => setFlipped(!flipped)}>
+                    <div className="card-scene mb-8">
+                        {/* Changed to DIV with role button for better touch support on iOS */}
+                        <div 
+                            className={`card-object ${flipped ? 'is-flipped' : ''}`} 
+                            onClick={() => setFlipped(!flipped)}
+                            role="button"
+                            tabIndex="0"
+                        >
                             <div className="card-face front">
-                                <h3 className="text-2xl font-bold text-gray-800 text-center">{current.Question}</h3>
-                                <div className="absolute bottom-4 text-gray-400 text-xs uppercase tracking-widest">Click to Flip</div>
+                                <div className="card-content no-scrollbar">
+                                    <h3 className="text-2xl font-bold text-gray-800">{current.Question}</h3>
+                                </div>
+                                <div className="absolute bottom-4 text-gray-400 text-xs uppercase tracking-widest">Tap to Flip</div>
                             </div>
                             <div className="card-face back">
-                                <p className="text-xl text-gray-800 text-center">{current.Answer}</p>
+                                <div className="card-content no-scrollbar">
+                                    <p className="text-lg text-gray-800 leading-relaxed whitespace-pre-wrap">{current.Answer}</p>
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     {flipped ? (
                         <div className="flex gap-4 w-full">
-                            <button onClick={(e) => { e.stopPropagation(); handleRate('hard'); }} className="flex-1 bg-red-500 hover:bg-red-600 text-white py-4 rounded-xl font-bold shadow transition"><i className="fas fa-times mr-2"></i> Hard</button>
-                            <button onClick={(e) => { e.stopPropagation(); handleRate('easy'); }} className="flex-1 bg-green-500 hover:bg-green-600 text-white py-4 rounded-xl font-bold shadow transition"><i className="fas fa-check mr-2"></i> Easy</button>
+                            <button onClick={(e) => { e.stopPropagation(); handleRate('hard'); }} className="flex-1 bg-red-500 hover:bg-red-600 text-white py-4 rounded-xl font-bold shadow transition transform hover:scale-105 active:scale-95"><i className="fas fa-times mr-2"></i> Hard</button>
+                            <button onClick={(e) => { e.stopPropagation(); handleRate('easy'); }} className="flex-1 bg-green-500 hover:bg-green-600 text-white py-4 rounded-xl font-bold shadow transition transform hover:scale-105 active:scale-95"><i className="fas fa-check mr-2"></i> Easy</button>
                         </div>
                     ) : (
-                        <button onClick={() => setFlipped(true)} className="px-8 py-3 bg-jpm-primary text-white rounded-lg font-bold shadow hover:bg-jpm-dark transition">Show Answer</button>
+                        <button onClick={() => setFlipped(true)} className="px-8 py-3 bg-jpm-primary text-white rounded-lg font-bold shadow hover:bg-jpm-dark transition transform hover:scale-105 active:scale-95">Show Answer</button>
                     )}
                 </div>
             );
@@ -287,7 +318,7 @@
 
             return (
                 <div className="max-w-3xl mx-auto w-full pt-10 px-6">
-                    <div className="bg-white rounded-xl shadow-xl p-8">
+                    <div className="bg-white rounded-xl shadow-xl p-8 max-h-[80vh] overflow-y-auto">
                         <span className="text-jpm-accent font-bold text-xs uppercase tracking-widest mb-2 block">Question {index + 1} of {deckData.length}</span>
                         <h2 className="text-2xl font-bold text-gray-800 mb-6">{current.Question}</h2>
                         <textarea className={`w-full p-4 border-2 rounded-lg mb-4 focus:outline-none focus:border-jpm-primary transition h-32 resize-none ${submitted ? 'bg-gray-100 text-gray-500' : 'bg-white'}`}
@@ -305,7 +336,7 @@
                                         <span className="font-bold text-gray-700">Model Answer:</span>
                                         <span className={`px-2 py-1 rounded text-xs font-bold text-white ${matchScore >= 70 ? 'bg-green-500' : 'bg-orange-500'}`}>{matchScore}% Match</span>
                                     </div>
-                                    <p className="text-gray-800">{current.ModelAnswer}</p>
+                                    <p className="text-gray-800 whitespace-pre-wrap">{current.ModelAnswer}</p>
                                 </div>
                                 <button onClick={handleNext} className="w-full bg-gray-800 text-white py-3 rounded-lg font-bold hover:bg-black transition">Next</button>
                             </div>
@@ -321,19 +352,16 @@
             const [submitted, setSubmitted] = useState(false);
             const current = deckData[index];
 
-            // --- BUG FIX: Answer Resolver ---
             const checkAnswer = () => {
                 const correctVal = current.Correct.trim();
                 let isMatch = false;
 
-                // Case 1: CSV says "B" and user clicked Option B
+                // Robust Matching: Handle both "B" and "Full Text" in Correct Column
                 if (correctVal.length === 1 && ['A','B','C','D'].includes(correctVal.toUpperCase())) {
-                     const key = `Option${correctVal.toUpperCase()}`; // e.g., "OptionB"
+                     const key = `Option${correctVal.toUpperCase()}`; 
                      const correctText = current[key];
                      if (selected === correctText) isMatch = true;
-                } 
-                // Case 2: CSV says "Full Text" and user clicked Full Text
-                else {
+                } else {
                     if (selected.trim() === correctVal) isMatch = true;
                 }
 
@@ -358,15 +386,12 @@
                         : "bg-white border-gray-200 hover:border-blue-300 hover:bg-gray-50";
                 }
                 
-                // Logic to highlight correct/wrong
                 const correctVal = current.Correct.trim();
                 let isThisOptionCorrect = false;
 
                 if (correctVal.length === 1) {
-                    // Match by Letter (e.g., this button is OptionA, correct is "A")
                     if (optKey === `Option${correctVal.toUpperCase()}`) isThisOptionCorrect = true;
                 } else {
-                    // Match by Text
                     if (optText === correctVal) isThisOptionCorrect = true;
                 }
 
@@ -382,7 +407,7 @@
                         <div className="space-y-3 mb-6">
                             {['OptionA', 'OptionB', 'OptionC', 'OptionD'].map((key, i) => {
                                 const optText = current[key];
-                                if (!optText) return null; // Skip empty options
+                                if (!optText) return null;
                                 return (
                                     <button 
                                         key={key} 
@@ -413,6 +438,15 @@
             const [timer, setTimer] = useState(0);
             const [progress, setProgress] = useState({});
 
+            // DIAGNOSTICS FOR USER
+            window.diagnoseApp = () => {
+                console.log("--- JPM App Diagnostics ---");
+                console.log("Flashcards Loaded:", data.flashcards.length);
+                if(data.flashcards.length > 0) console.log("First Flashcard:", data.flashcards[0]);
+                console.log("Type Answer Loaded:", data.type.length);
+                console.log("MCQ Loaded:", data.mcq.length);
+            };
+
             useEffect(() => {
                 const load = async () => {
                     try {
@@ -426,7 +460,7 @@
                             type: t ? parseCSV(t) : [],
                             mcq: m ? parseCSV(m) : []
                         });
-                    } catch(e) { console.error(e); }
+                    } catch(e) { console.error("Data Load Error:", e); }
                     const saved = localStorage.getItem('jpm_prep_progress');
                     if(saved) setProgress(JSON.parse(saved));
                 };
@@ -478,7 +512,7 @@
                             <i className="fas fa-university text-2xl"></i>
                             <div>
                                 <h1 className="text-lg font-bold leading-tight">JPM Prep App</h1>
-                                <span className="text-xs text-blue-200">v2.2 | Enterprise Edition</span>
+                                <span className="text-xs text-blue-200">v3.0 | Enterprise Edition</span>
                             </div>
                         </div>
                         {mode !== 'menu' && <button onClick={endSession} className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded text-sm font-bold transition">End Session</button>}
@@ -527,26 +561,6 @@
                     </div>
                 </div>
             );
-        };
-
-        // --- UNIT TESTS (Run via console: runUnitTests()) ---
-        window.runUnitTests = () => {
-            console.log("Running Unit Tests...");
-            let passed = 0;
-            
-            // Test 1: Parser Quotes
-            const csv = 'Col1,"Col 2, with comma"\nVal1,"Val 2"';
-            const parsed = parseCSV(csv);
-            if (parsed[0]['Col 2, with comma'] === 'Val 2') { console.log("✅ Parser: Quotes/Commas handled"); passed++; }
-            else console.error("❌ Parser Failed");
-
-            // Test 2: MCQ Mapping Logic (Simulated)
-            const mockCorrect = "B";
-            const mockOptionB = "Correct Answer";
-            const isMatch = (mockCorrect === 'B' && 'OptionB' === 'OptionB'); // Logic validation
-            if (isMatch) { console.log("✅ MCQ Logic: Letter mapping verified"); passed++; }
-
-            alert(`Tests Complete: ${passed}/2 Passed`);
         };
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
