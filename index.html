@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>JPM Interview Prep App v11.1 (Regression Verified)</title>
+    <title>JPM Interview Prep App v11.3 (Dynamic Prompts)</title>
     
     <!-- Dependencies -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -402,7 +402,7 @@
         };
 
         const App = () => {
-            const [data, setData] = useState({ flashcards: [], type: [], mcq: [], study: [] }); // Added study
+            const [data, setData] = useState({ flashcards: [], type: [], mcq: [], study: [], prompts: [] });
             const [mode, setMode] = useState('menu'); 
             const [activeDeck, setActiveDeck] = useState(null);
             const [stats, setStats] = useState({ correct: 0, completed: 0, total: 0 });
@@ -412,7 +412,7 @@
             const [testResults, setTestResults] = useState(null);
             const [showPrompts, setShowPrompts] = useState(false);
 
-            // COMPREHENSIVE AUTOMATED REGRESSION SUITE (V11.1)
+            // COMPREHENSIVE AUTOMATED REGRESSION SUITE (V11.3)
             const runTests = () => {
                 const results = [];
                 // 1. Parser Comma
@@ -442,6 +442,10 @@
                 // 6. Prompt Hub
                 results.push({ id: 6, name: "System: Prompt Hub", pass: document.querySelector('button[class*="bg-jpm-primary"]') !== null });
 
+                // 7. Prompt Data Logic
+                const promptMock = parseCSV('Deck,Link\nPrompt A,http://a.com');
+                results.push({ id: 7, name: "Prompts: CSV Logic", pass: promptMock.length === 1 && promptMock[0].Deck === 'Prompt A' });
+
                 setTestResults(results);
             };
 
@@ -449,17 +453,19 @@
                 const load = async () => {
                     try {
                         const ts = Date.now(); 
-                        const [f, t, m, s] = await Promise.all([
+                        const [f, t, m, s, p] = await Promise.all([
                             fetch(`flashcards.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""),
                             fetch(`type_answer.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""),
                             fetch(`mcq.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""),
-                            fetch(`context.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : "")
+                            fetch(`context.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""),
+                            fetch(`prompt.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : "")
                         ]);
                         setData({ 
                             flashcards: f ? parseCSV(f) : [], 
                             type: t ? parseCSV(t) : [], 
                             mcq: m ? parseCSV(m) : [],
-                            study: s ? parseCSV(s) : []
+                            study: s ? parseCSV(s) : [],
+                            prompts: p ? parseCSV(p) : []
                         });
                     } catch(e) { console.error(e); }
                     const saved = localStorage.getItem('jpm_prep_progress_v10');
@@ -493,8 +499,8 @@
                 if(deck.length === 0) return;
                 
                 if (m === 'study') {
-                    const link = deck[0].Link;
-                    window.open(link, '_blank');
+                    const link = deck[0].Link || deck[0].Links; // Handle column variation
+                    if(link) window.open(link, '_blank');
                     if (!progress[`${m}-${deckName}`]) {
                         saveProgress(m, deckName, 'In Progress', 0);
                     }
@@ -583,7 +589,7 @@
                     <header className="flex-shrink-0 bg-jpm-primary text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
                         <div className="flex flex-col">
                             <h1 className="text-lg font-bold leading-tight">JPM Prep App</h1>
-                            <span className="text-xs text-blue-200">v11.1 | Developed by Satnam using Gemini</span>
+                            <span className="text-xs text-blue-200">v11.3 | Developed by Satnam using Gemini</span>
                         </div>
                         <div className="flex items-center gap-4">
                             <UKClock />
@@ -624,17 +630,17 @@
                                         <h3 className="text-2xl font-bold mb-4 text-jpm-primary"><i className="fas fa-robot mr-2"></i>LLM Prompts</h3>
                                         <p className="text-sm text-gray-500 mb-6">Download and view the system prompts used to generate content.</p>
                                         <div className="space-y-3 mb-6">
-                                            {[
-                                                { name: "Gemini JPM 10-Day Plan", url: "https://drive.google.com/file/d/1eQf--cFU4TbgX-xoFi0c86ShSDPT61C4/view?usp=drive_link" },
-                                                { name: "Perplexity 200 Card Prompt", url: "https://drive.google.com/file/d/1ctjBnwhbfzompnVQ9f6q6OanHCiHq3of/view?usp=drive_link" },
-                                                { name: "Perplexity JPM 10-Day Plan", url: "https://drive.google.com/file/d/1l7FP5EHNUeiKr1YeqQhvcpHo6fhvSujj/view?usp=drive_link" }
-                                            ].map((p, i) => (
-                                                <a key={i} href={p.url} target="_blank" className="flex items-center p-3 bg-gray-50 hover:bg-blue-50 border rounded-lg transition group">
-                                                    <i className="fas fa-file-alt text-jpm-accent mr-3"></i>
-                                                    <span className="font-semibold text-gray-700 group-hover:text-jpm-primary">{p.name}</span>
-                                                    <i className="fas fa-external-link-alt ml-auto text-gray-400"></i>
-                                                </a>
-                                            ))}
+                                            {data.prompts.length > 0 ? (
+                                                data.prompts.map((p, i) => (
+                                                    <a key={i} href={p.Link || p.Links} target="_blank" className="flex items-center p-3 bg-gray-50 hover:bg-blue-50 border rounded-lg transition group">
+                                                        <i className="fas fa-file-alt text-jpm-accent mr-3"></i>
+                                                        <span className="font-semibold text-gray-700 group-hover:text-jpm-primary">{p.Deck}</span>
+                                                        <i className="fas fa-external-link-alt ml-auto text-gray-400"></i>
+                                                    </a>
+                                                ))
+                                            ) : (
+                                                <p className="text-center text-gray-400 italic">No prompts loaded from prompt.csv</p>
+                                            )}
                                         </div>
                                         <button onClick={() => setShowPrompts(false)} className="w-full bg-gray-200 text-gray-700 py-3 rounded-lg font-bold hover:bg-gray-300">Close</button>
                                     </div>
