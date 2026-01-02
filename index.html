@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>JPM Interview Prep App v5.1 (Universal)</title>
+    <title>JPM Interview Prep App v6.0 (Regression Suite)</title>
     
     <!-- Dependencies -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -47,15 +47,15 @@
 
         // --- CORE UTILS ---
         
-        // 1. UNIVERSAL PARSER (Handles | or , with quotes support)
+        // 1. ROBUST STATE MACHINE PARSER (Fixes Newlines in Quotes & Delimiter Detection)
         const parseCSV = (text) => {
             if (!text) return [];
-            if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1); // Remove BOM
+            if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1); // Strip BOM
             text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-            
-            // Detect delimiter from first line
-            const firstLine = text.split('\n')[0];
-            // Prefer Pipe if present, else Comma
+
+            // Auto-detect delimiter from first line
+            const firstLineEnd = text.indexOf('\n');
+            const firstLine = text.substring(0, firstLineEnd === -1 ? text.length : firstLineEnd);
             const delimiter = firstLine.includes('|') ? '|' : ',';
 
             const rows = [];
@@ -68,28 +68,30 @@
                 const nextChar = text[i+1];
 
                 if (char === '"') {
-                    if (insideQuotes && nextChar === '"') { 
-                        currentVal += '"'; 
+                    if (insideQuotes && nextChar === '"') {
+                        currentVal += '"'; // Handle escaped quote
                         i++; 
                     } else {
                         insideQuotes = !insideQuotes;
                     }
                 } else if (char === delimiter && !insideQuotes) {
-                    currentRow.push(currentVal); 
+                    currentRow.push(currentVal);
                     currentVal = '';
                 } else if (char === '\n' && !insideQuotes) {
                     currentRow.push(currentVal);
-                    if(currentRow.length > 0) rows.push(currentRow);
-                    currentRow = []; 
+                    if (currentRow.length > 0 || currentVal.length > 0) rows.push(currentRow);
+                    currentRow = [];
                     currentVal = '';
                 } else {
                     currentVal += char;
                 }
             }
-            if (currentVal) currentRow.push(currentVal);
-            if (currentRow.length > 0) rows.push(currentRow);
+            if (currentVal || currentRow.length > 0) {
+                currentRow.push(currentVal);
+                rows.push(currentRow);
+            }
 
-            if (rows.length === 0) return [];
+            if (rows.length < 2) return []; // Need at least header + 1 row
             
             // Header Mapping
             const headers = rows[0].map(h => h.trim());
@@ -105,7 +107,6 @@
             });
         };
 
-        // 2. Similarity Algorithm
         const calculateSimilarity = (s1, s2) => {
             if (!s1 || !s2) return 0;
             const a = s1.toLowerCase(), b = s2.toLowerCase();
@@ -119,7 +120,6 @@
             return Math.round((1 - matrix[b.length][a.length] / Math.max(a.length, b.length)) * 100);
         };
 
-        // 3. Shuffle Algorithm
         const shuffleArray = (array) => {
             let arr = [...array];
             for (let i = arr.length - 1; i > 0; i--) {
@@ -162,18 +162,18 @@
             );
         };
 
-        // FLASHCARD MODE (Fix: Handles exit during review)
         const FlashcardMode = ({ deckData, onEnd, onStatsUpdate }) => {
             const [queue, setQueue] = useState(deckData);
-            const [current, setCurrent] = useState(deckData[0]);
+            const [current, setCurrent] = useState(null);
             const [flipped, setFlipped] = useState(false);
             const [reviewPile, setReviewPile] = useState([]);
             const [isFinished, setIsFinished] = useState(false);
 
             useEffect(() => { 
-                if(queue.length > 0) {
+                if (queue.length > 0) {
                     setCurrent(queue[0]); 
                     setFlipped(false); 
+                    setIsFinished(false);
                 } else {
                     setIsFinished(true);
                 }
@@ -193,17 +193,11 @@
             const startReview = () => {
                 setQueue(reviewPile);
                 setReviewPile([]);
-                setIsFinished(false);
             };
 
             const handleExit = () => {
-                // If exiting from Summary screen, save only remaining review items
-                // If exiting from Middle of deck, save Queue + ReviewPile
-                let itemsToSave = [];
-                if (isFinished) itemsToSave = reviewPile;
-                else itemsToSave = [...queue, ...reviewPile];
-                
-                // If items remain, it's NOT 100% complete
+                // If cards remain in Queue OR ReviewPile, it's In Progress
+                const itemsToSave = isFinished ? reviewPile : [...queue, ...reviewPile];
                 const score = itemsToSave.length === 0 ? 100 : 50; 
                 onEnd(score, itemsToSave); 
             };
@@ -222,13 +216,13 @@
                 );
             }
 
-            if (!current) return <div className="p-10 text-center">Preparing cards...</div>;
+            if (!current) return <div className="p-10 text-center">Loading...</div>;
 
             return (
                 <div className="flex flex-col items-center justify-center h-full max-w-3xl mx-auto w-full px-4">
                     <div className="w-full flex justify-between mb-2 text-gray-500 font-bold text-sm">
                         <span>Flashcard Mode</span>
-                        <span>Queue: {queue.length} | Review: {reviewPile.length}</span>
+                        <span>Remaining: {queue.length} | Review: {reviewPile.length}</span>
                     </div>
                     <div className={`card-object ${flipped ? 'is-flipped' : ''}`} onClick={() => setFlipped(!flipped)} role="button">
                         <div className="card-face front">
@@ -393,38 +387,42 @@
             const [timer, setTimer] = useState(0);
             const [progress, setProgress] = useState({});
             const [modalDeck, setModalDeck] = useState(null);
+            const [testResults, setTestResults] = useState(null);
 
-            // COMPREHENSIVE REGRESSION SUITE (Updated V5.1)
-            window.runRegressionSuite = () => {
-                console.log("🚀 Starting Comprehensive Regression Suite...");
+            // COMPREHENSIVE AUTOMATED REGRESSION SUITE
+            const runTests = () => {
                 const results = [];
-                
-                // Test 1: Comma Parser (Legacy)
-                const legacy = parseCSV('Col1,"Col, 2"\nVal1,"Val, 2"');
-                results.push({ test: "Parser: Comma", status: legacy[0]['Col, 2'] === 'Val, 2' ? "PASS" : "FAIL" });
+                // 1. Comma Parser
+                const csv1 = 'H1,H2\nV1,"V, 2"';
+                const p1 = parseCSV(csv1);
+                results.push({ id: 1, name: "Parser: Comma", pass: p1[0] && p1[0].H2 === "V, 2" });
 
-                // Test 2: Pipe Parser (New Universal)
-                const pipe = parseCSV('Col1|Col2\nVal1|Val, 2');
-                results.push({ test: "Parser: Pipe", status: pipe[0]['Col2'] === 'Val, 2' ? "PASS" : "FAIL" });
-                
-                // Test 3: Pipe with Quotes (New Feature)
-                const pipeQuotes = parseCSV('Col1|Col2\nVal1|"Val with | pipe"');
-                results.push({ test: "Parser: Pipe + Quotes", status: pipeQuotes[0]['Col2'] === 'Val with | pipe' ? "PASS" : "FAIL" });
+                // 2. Pipe Parser
+                const csv2 = 'H1|H2\nV1|V|2';
+                const p2 = parseCSV(csv2);
+                results.push({ id: 2, name: "Parser: Pipe", pass: p2[0] && p2[0].H2 === "V|2" });
 
-                // Test 4: Similarity
-                const sim = calculateSimilarity("hello world", "hello world");
-                results.push({ test: "Algorithm: Text Matching", status: sim === 100 ? "PASS" : "FAIL" });
+                // 3. Newline in Quotes
+                const csv3 = 'H1,H2\nV1,"Line\nBreak"';
+                const p3 = parseCSV(csv3);
+                results.push({ id: 3, name: "Parser: Newlines", pass: p3[0] && p3[0].H2.includes("\n") });
 
-                // Test 5: Storage
+                // 4. Similarity
+                const sim = calculateSimilarity("test", "test");
+                results.push({ id: 4, name: "Algorithm: Similarity", pass: sim === 100 });
+
+                // 5. Shuffle
+                const arr = [1,2,3];
+                const shuf = shuffleArray(arr);
+                results.push({ id: 5, name: "Algorithm: Shuffle", pass: shuf.length === 3 });
+
+                // 6. Persistence
                 try {
-                    localStorage.setItem('test_key', 'test_val');
-                    const val = localStorage.getItem('test_key');
-                    results.push({ test: "System: LocalStorage", status: val === 'test_val' ? "PASS" : "FAIL" });
-                    localStorage.removeItem('test_key');
-                } catch(e) { results.push({ test: "System: LocalStorage", status: "FAIL" }); }
+                    localStorage.setItem('test', '1');
+                    results.push({ id: 6, name: "System: Storage", pass: localStorage.getItem('test') === '1' });
+                } catch(e) { results.push({ id: 6, name: "System: Storage", pass: false }); }
 
-                console.table(results);
-                alert(`Regression Complete. ${results.filter(r => r.status === 'PASS').length} / ${results.length} Passed.`);
+                setTestResults(results);
             };
 
             useEffect(() => {
@@ -437,7 +435,7 @@
                         ]);
                         setData({ flashcards: f ? parseCSV(f) : [], type: t ? parseCSV(t) : [], mcq: m ? parseCSV(m) : [] });
                     } catch(e) { console.error(e); }
-                    const saved = localStorage.getItem('jpm_prep_progress_v5');
+                    const saved = localStorage.getItem('jpm_prep_progress_v6');
                     if(saved) setProgress(JSON.parse(saved));
                 };
                 load();
@@ -453,29 +451,18 @@
             // DECK SELECTION & RESUME LOGIC
             const handleDeckClick = (m, deckName) => {
                 const p = progress[`${m}-${deckName}`];
-                
-                // If Completed, show Modal
                 if (p && p.status === 'Completed') {
                     setModalDeck({ mode: m, name: deckName, stats: p });
-                } 
-                // If In Progress, RESUME
-                else if (p && p.status === 'In Progress' && p.queue && p.queue.length > 0) {
+                } else if (p && p.status === 'In Progress' && p.queue && p.queue.length > 0) {
                     startSession(m, deckName, p.queue);
-                } 
-                // Else, Start New
-                else {
+                } else {
                     startSession(m, deckName);
                 }
             };
 
             const startSession = (m, deckName, specificQueue = null) => {
                 const map = { 'flashcard': 'flashcards', 'type': 'type', 'mcq': 'mcq' };
-                let deck = [];
-                if (specificQueue) {
-                    deck = specificQueue;
-                } else {
-                    deck = data[map[m]].filter(d => d.Deck === deckName);
-                }
+                let deck = specificQueue || data[map[m]].filter(d => d.Deck === deckName);
 
                 if(deck.length === 0) return;
                 setActiveDeck({ name: deckName, items: deck });
@@ -483,9 +470,7 @@
                 setStats({ correct: 0, completed: 0, total: 0 });
                 setModalDeck(null);
                 
-                if (!progress[`${m}-${deckName}`]) {
-                    saveProgress(m, deckName, 'In Progress', 0);
-                }
+                if (!progress[`${m}-${deckName}`]) saveProgress(m, deckName, 'In Progress', 0);
             };
 
             const endSession = (finalScore = 0, remainingItems = []) => {
@@ -493,6 +478,7 @@
                 let queueToSave = null;
 
                 if (mode === 'flashcard') {
+                    // Strict Completion: Score 100 AND No Review Items
                     if (finalScore === 100 && remainingItems.length === 0) status = 'Completed';
                     else {
                         status = 'In Progress';
@@ -508,12 +494,9 @@
             };
 
             const saveProgress = (m, d, status, score, queue = null) => {
-                const newP = { 
-                    ...progress, 
-                    [`${m}-${d}`]: { status, score, date: new Date().toLocaleString(), queue } 
-                };
+                const newP = { ...progress, [`${m}-${d}`]: { status, score, date: new Date().toLocaleString(), queue } };
                 setProgress(newP);
-                localStorage.setItem('jpm_prep_progress_v5', JSON.stringify(newP));
+                localStorage.setItem('jpm_prep_progress_v6', JSON.stringify(newP));
             };
 
             const updateStats = (isCorrect) => {
@@ -540,7 +523,6 @@
                                 </button>
                             )
                         })}
-                        
                         {newDecks.length > 0 && <h4 className="text-xs font-bold text-gray-500 uppercase mb-2 mt-4">New Decks</h4>}
                         {newDecks.map(d => (
                             <button key={d} onClick={() => startSession(mId, d)} className="w-full text-left p-3 mb-2 bg-white border border-gray-200 rounded hover:border-jpm-primary hover:text-jpm-primary transition flex justify-between items-center group">
@@ -555,13 +537,12 @@
             return (
                 <div className="flex flex-col h-screen bg-gray-100">
                     <header className="flex-shrink-0 bg-jpm-primary text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
-                        <div className="flex items-center gap-3"><i className="fas fa-university text-2xl"></i><div><h1 className="text-lg font-bold leading-tight">JPM Prep App</h1><span className="text-xs text-blue-200">v5.1 | Universal</span></div></div>
-                        {mode !== 'menu' && <button onClick={() => activeDeck && mode==='flashcard' ? onEnd(50, activeDeck.items) : endSession(0)} className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded text-sm font-bold transition">End Session</button>}
+                        <div className="flex items-center gap-3"><i className="fas fa-university text-2xl"></i><div><h1 className="text-lg font-bold leading-tight">JPM Prep App</h1><span className="text-xs text-blue-200">v6.0 | Regression Suite</span></div></div>
+                        {mode !== 'menu' && <button onClick={() => activeDeck && mode==='flashcard' ? endSession(0, activeDeck.items) : endSession(0)} className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded text-sm font-bold transition">End Session</button>}
                     </header>
                     
                     <div className="flex flex-grow overflow-hidden relative">
                         <Dashboard active={mode !== 'menu'} stats={stats} timer={timer} />
-                        
                         <main className={`flex-grow overflow-y-auto transition-all duration-300 relative ${mode !== 'menu' ? 'ml-64' : ''}`}>
                             {mode === 'menu' && (
                                 <div className="p-10 max-w-7xl mx-auto flex flex-col items-center justify-center h-full">
@@ -580,10 +561,29 @@
                                             </div>
                                         ))}
                                     </div>
+                                    <button onClick={runTests} className="fixed bottom-4 right-4 bg-gray-800 text-white p-3 rounded-full shadow-lg hover:bg-black transition z-50"><i className="fas fa-bug"></i> DevTools</button>
                                 </div>
                             )}
 
-                            {/* DECK DETAIL & RESTART MODAL */}
+                            {/* TEST RESULTS MODAL */}
+                            {testResults && (
+                                <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4">
+                                    <div className="bg-white rounded-xl shadow-2xl p-6 max-w-lg w-full">
+                                        <h3 className="text-2xl font-bold mb-4">Regression Suite Results</h3>
+                                        <div className="space-y-2 mb-6">
+                                            {testResults.map(r => (
+                                                <div key={r.id} className="flex justify-between items-center p-2 border-b">
+                                                    <span>{r.name}</span>
+                                                    <span className={`font-bold ${r.pass ? 'text-green-600' : 'text-red-600'}`}>{r.pass ? 'PASS' : 'FAIL'}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <button onClick={() => setTestResults(null)} className="w-full bg-blue-600 text-white py-2 rounded font-bold">Close</button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* RESTART MODAL */}
                             {modalDeck && (
                                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
                                     <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full animate-slide-in">
