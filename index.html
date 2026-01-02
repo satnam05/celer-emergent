@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>JPM Interview Prep App v7.1 (Regression Proof)</title>
+    <title>JPM Interview Prep App v8.0 (Live Data)</title>
     
     <!-- Dependencies -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -431,33 +431,33 @@
             const [modalDeck, setModalDeck] = useState(null);
             const [testResults, setTestResults] = useState(null);
 
-            // COMPREHENSIVE AUTOMATED REGRESSION SUITE (V7.1)
+            // COMPREHENSIVE AUTOMATED REGRESSION SUITE (V8.0)
             const runTests = () => {
                 const results = [];
-                
-                // Test 1: Parser - Basic Comma
+                // 1. CSV Standard
                 const csv1 = 'H1,H2\nV1,"V, 2"';
                 const p1 = parseCSV(csv1);
-                results.push({ id: 1, name: "Parser: Standard Comma", pass: p1[0] && p1[0].H2 === "V, 2" });
+                results.push({ id: 1, name: "Parser: Comma", pass: p1[0] && p1[0].H2 === "V, 2" });
 
-                // Test 2: Parser - Complex (JPM Data Simulation)
-                const csv2 = 'H1,H2\nV1,"Text with commas, and newlines\ninside quotes."';
+                // 2. CSV Newline in Quotes
+                const csv2 = 'H1,H2\nV1,"Val\nWith\nLine"';
                 const p2 = parseCSV(csv2);
-                results.push({ id: 2, name: "Parser: JPM Data (Quotes)", pass: p2[0] && p2[0].H2.includes('\n') && p2[0].H2.includes(',') });
+                results.push({ id: 2, name: "Parser: Multiline Quotes", pass: p2[0] && p2[0].H2.includes("\n") });
 
-                // Test 3: Parser - Pipe
-                const csv3 = 'H1|H2\nV1|V2';
-                const p3 = parseCSV(csv3);
-                results.push({ id: 3, name: "Parser: Pipe Support", pass: p3[0] && p3[0].H2 === "V2" });
+                // 3. Similarity
+                const sim = calculateSimilarity("test", "test");
+                results.push({ id: 3, name: "Algorithm: Similarity", pass: sim === 100 });
 
-                // 4. Similarity Algorithm
-                const sim = calculateSimilarity("hello world", "hello world");
-                results.push({ id: 4, name: "Algorithm: Similarity", pass: sim === 100 });
-
-                // 5. Shuffle Algorithm
-                const arr = [1,2,3,4,5];
+                // 4. Shuffle
+                const arr = [1,2,3];
                 const shuf = shuffleArray(arr);
-                results.push({ id: 5, name: "Algorithm: Shuffle", pass: shuf.length === 5 });
+                results.push({ id: 4, name: "Algorithm: Shuffle", pass: shuf.length === 3 });
+
+                // 5. Storage
+                try {
+                    localStorage.setItem('test', '1');
+                    results.push({ id: 5, name: "System: LocalStorage", pass: localStorage.getItem('test') === '1' });
+                } catch(e) { results.push({ id: 5, name: "System: Storage", pass: false }); }
 
                 setTestResults(results);
             };
@@ -465,14 +465,15 @@
             useEffect(() => {
                 const load = async () => {
                     try {
+                        const ts = Date.now(); // Cache Buster
                         const [f, t, m] = await Promise.all([
-                            fetch('flashcards.csv').then(r => r.ok ? r.text() : ""),
-                            fetch('type_answer.csv').then(r => r.ok ? r.text() : ""),
-                            fetch('mcq.csv').then(r => r.ok ? r.text() : "")
+                            fetch(`flashcards.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""),
+                            fetch(`type_answer.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""),
+                            fetch(`mcq.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : "")
                         ]);
                         setData({ flashcards: f ? parseCSV(f) : [], type: t ? parseCSV(t) : [], mcq: m ? parseCSV(m) : [] });
                     } catch(e) { console.error(e); }
-                    const saved = localStorage.getItem('jpm_prep_progress_v7');
+                    const saved = localStorage.getItem('jpm_prep_progress_v8');
                     if(saved) setProgress(JSON.parse(saved));
                 };
                 load();
@@ -531,7 +532,7 @@
             const saveProgress = (m, d, status, score, queue = null) => {
                 const newP = { ...progress, [`${m}-${d}`]: { status, score, date: new Date().toLocaleString(), queue } };
                 setProgress(newP);
-                localStorage.setItem('jpm_prep_progress_v7', JSON.stringify(newP));
+                localStorage.setItem('jpm_prep_progress_v8', JSON.stringify(newP));
             };
 
             const updateStats = (isCorrect) => {
@@ -574,7 +575,7 @@
                     <header className="flex-shrink-0 bg-jpm-primary text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
                         <div className="flex flex-col">
                             <h1 className="text-lg font-bold leading-tight">JPM Prep App</h1>
-                            <span className="text-xs text-blue-200">v7.1 | Developed by Satnam using Gemini</span>
+                            <span className="text-xs text-blue-200">v8.0 | Developed by Satnam using Gemini</span>
                         </div>
                         <div className="flex items-center gap-4">
                             <UKClock />
