@@ -2,35 +2,47 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JPM Interview Prep App v2.0</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>JPM Interview Prep App v2.1 (Fixed)</title>
     
-    <!-- Core Dependencies -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <!-- JPM Styling Config -->
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    colors: {
-                        jpm: { primary: '#0f4c81', dark: '#1e3a5f', light: '#e0f2fe', accent: '#00a1de' }
-                    }
+                    colors: { jpm: { primary: '#0f4c81', dark: '#1e3a5f', light: '#e0f2fe', accent: '#00a1de' } }
                 }
             }
         }
     </script>
     <style>
         body { background-color: #f3f4f6; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
-        .card-perspective { perspective: 1000px; }
-        .card-inner { position: relative; width: 100%; height: 100%; transition: transform 0.6s; transform-style: preserve-3d; }
-        .card-front, .card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 1rem; }
+        
+        /* FIXED FLIP ANIMATION CSS */
+        .card-container { perspective: 1000px; }
+        .card-inner { 
+            position: relative; 
+            width: 100%; 
+            height: 100%; 
+            transition: transform 0.6s; 
+            transform-style: preserve-3d; 
+        }
+        .card-front, .card-back { 
+            position: absolute; 
+            width: 100%; 
+            height: 100%; 
+            backface-visibility: hidden; 
+            -webkit-backface-visibility: hidden; /* Safari Fix */
+            border-radius: 1rem; 
+        }
         .card-back { transform: rotateY(180deg); }
-        .flipped .card-inner { transform: rotateY(180deg); }
+        .flipped { transform: rotateY(180deg); }
+        
         .slide-in { animation: slideIn 0.3s ease-out forwards; }
         @keyframes slideIn { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     </style>
@@ -39,21 +51,54 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect } = React;
 
-        // --- UTILS ---
+        // --- FIXED PARSER LOGIC (State Machine) ---
         const parseCSV = (text) => {
             if (!text) return [];
-            const lines = text.trim().split('\n');
-            const headers = lines[0].split(',').map(h => h.trim());
-            return lines.slice(1).map((line, idx) => {
-                const values = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
-                const entry = { id: `row-${idx}` };
+            const rows = [];
+            let currentRow = [];
+            let currentVal = '';
+            let insideQuotes = false;
+            
+            // Normalize line endings
+            text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                const nextChar = text[i+1];
+
+                if (char === '"') {
+                    if (insideQuotes && nextChar === '"') {
+                        currentVal += '"'; // Handle escaped quotes
+                        i++;
+                    } else {
+                        insideQuotes = !insideQuotes;
+                    }
+                } else if (char === ',' && !insideQuotes) {
+                    currentRow.push(currentVal.trim());
+                    currentVal = '';
+                } else if (char === '\n' && !insideQuotes) {
+                    currentRow.push(currentVal.trim());
+                    if (currentRow.length > 0) rows.push(currentRow);
+                    currentRow = [];
+                    currentVal = '';
+                } else {
+                    currentVal += char;
+                }
+            }
+            if (currentVal) currentRow.push(currentVal.trim());
+            if (currentRow.length > 0) rows.push(currentRow);
+
+            // Convert to Objects using Header
+            const headers = rows[0];
+            return rows.slice(1).map((row, idx) => {
+                const obj = { id: `row-${idx}` };
                 headers.forEach((h, i) => {
-                    let val = values[i] || '';
-                    entry[h] = val.replace(/^"|"$/g, '').trim();
+                    // Safety check if row has fewer cols than header
+                    obj[h] = row[i] ? row[i].replace(/^"|"$/g, '') : '';
                 });
-                return entry;
+                return obj;
             });
         };
 
@@ -62,7 +107,6 @@
             const longer = s1.length > s2.length ? s1.toLowerCase() : s2.toLowerCase();
             const shorter = s1.length > s2.length ? s2.toLowerCase() : s1.toLowerCase();
             if (longer.length === 0) return 100;
-            
             const costs = new Array();
             for (let i = 0; i <= longer.length; i++) {
                 let lastValue = i;
@@ -82,22 +126,11 @@
             return Math.round(((longer.length - costs[shorter.length]) / longer.length) * 100);
         };
 
-        // --- DATA LOADERS ---
-        const FALLBACK_DATA = {
-            flashcards: [{ Deck: "Demo", Question: "Local Mode Active", Answer: "Upload to GitHub to see real data." }],
-            type: [{ Deck: "Demo", Question: "Type 'Hello'", ModelAnswer: "Hello" }],
-            mcq: [{ Deck: "Demo", Question: "Is this local?", OptionA: "Yes", OptionB: "No", OptionC: "Maybe", OptionD: "Unsure", Correct: "Yes" }]
-        };
-
         // --- COMPONENTS ---
 
         const Dashboard = ({ active, stats, timer }) => {
             const accuracy = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
-            const formatTime = (s) => {
-                const mins = Math.floor(s / 60).toString().padStart(2, '0');
-                const secs = (s % 60).toString().padStart(2, '0');
-                return `${mins}:${secs}`;
-            };
+            const formatTime = (s) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
 
             return (
                 <div className={`fixed inset-y-0 left-0 w-64 bg-white shadow-2xl z-20 flex flex-col transition-transform duration-300 border-r border-gray-200 ${active ? 'translate-x-0' : '-translate-x-full'}`}>
@@ -128,13 +161,6 @@
                                 <span className="text-xs uppercase font-bold text-blue-700">Done</span>
                             </div>
                         </div>
-                        {active && (
-                            <div className="mt-8 pt-6 border-t border-gray-100">
-                                <h3 className="text-xs font-bold text-gray-400 uppercase mb-2">Session Info</h3>
-                                <p className="text-sm text-gray-600"><i className="fas fa-calendar mr-2"></i> {new Date().toLocaleDateString()}</p>
-                                <p className="text-sm text-gray-600"><i className="fas fa-clock mr-2"></i> {new Date().toLocaleTimeString()}</p>
-                            </div>
-                        )}
                     </div>
                 </div>
             );
@@ -156,20 +182,9 @@
                 } else {
                     onStatsUpdate(true);
                 }
-
                 const remaining = queue.slice(1);
-                if (remaining.length > 0) {
-                    setQueue(remaining);
-                } else {
-                    // End of batch
-                    if (reviewPile.length > 0 || rating === 'hard') {
-                        // Ask to review or finish
-                        // For simplicity in this UI, we show a summary state handled by the render
-                        setQueue([]); 
-                    } else {
-                        setQueue([]);
-                    }
-                }
+                if (remaining.length > 0) setQueue(remaining);
+                else setQueue([]); 
             };
 
             const startReview = () => {
@@ -178,47 +193,50 @@
                 setIsReviewing(true);
             };
 
-            if (!current) {
+            if (queue.length === 0 && !current) return <div>Loading...</div>;
+
+            if (queue.length === 0) {
                 return (
                     <div className="flex flex-col items-center justify-center h-full p-8 text-center animate-slide-in">
                         <i className={`fas ${reviewPile.length === 0 ? 'fa-check-circle text-green-500' : 'fa-exclamation-circle text-orange-500'} text-6xl mb-4`}></i>
-                        <h2 className="text-3xl font-bold text-gray-800 mb-2">{reviewPile.length === 0 ? "Session Mastered!" : "Session Complete"}</h2>
-                        <p className="text-gray-600 mb-8">{reviewPile.length === 0 ? "You marked all cards as Easy." : `You have ${reviewPile.length} cards marked for review.`}</p>
+                        <h2 className="text-3xl font-bold text-gray-800 mb-2">{reviewPile.length === 0 ? "All Clear!" : "Session Complete"}</h2>
+                        <p className="text-gray-600 mb-8">{reviewPile.length === 0 ? "You mastered this deck." : `You have ${reviewPile.length} cards marked for review.`}</p>
                         <div className="flex gap-4">
                             {reviewPile.length > 0 && (
-                                <button onClick={startReview} className="bg-jpm-primary text-white px-6 py-3 rounded-lg font-bold shadow hover:bg-jpm-dark transition">
-                                    Review Hard Cards
-                                </button>
+                                <button onClick={startReview} className="bg-jpm-primary text-white px-6 py-3 rounded-lg font-bold shadow hover:bg-jpm-dark transition">Review Hard Cards</button>
                             )}
-                            <button onClick={onEnd} className="bg-gray-500 text-white px-6 py-3 rounded-lg font-bold shadow hover:bg-gray-600 transition">
-                                Return to Menu
-                            </button>
+                            <button onClick={onEnd} className="bg-gray-500 text-white px-6 py-3 rounded-lg font-bold shadow hover:bg-gray-600 transition">Return to Menu</button>
                         </div>
                     </div>
                 );
             }
 
             return (
-                <div className="flex flex-col items-center justify-center h-full max-w-2xl mx-auto w-full px-4">
+                <div className="flex flex-col items-center justify-center h-full max-w-2xl mx-auto w-full px-4 pt-4">
                     <div className="w-full flex justify-between mb-4 text-gray-500 font-bold text-sm">
                         <span>{isReviewing ? "Review Mode" : "Standard Mode"}</span>
                         <span>Queue: {queue.length} | Review: {reviewPile.length}</span>
                     </div>
-                    <div className="w-full h-80 card-perspective cursor-pointer group mb-8" onClick={() => setFlipped(!flipped)}>
+                    
+                    {/* Fixed Card Structure */}
+                    <div className="w-full h-80 card-container cursor-pointer group mb-8" onClick={() => setFlipped(!flipped)}>
                         <div className={`card-inner ${flipped ? 'flipped' : ''}`}>
-                            <div className="card-front bg-white border-2 border-gray-100 shadow-xl flex items-center justify-center p-8 text-center">
-                                <h3 className="text-2xl font-bold text-gray-800">{current.Question}</h3>
+                            {/* Front */}
+                            <div className="card-front bg-white border-2 border-gray-100 shadow-xl flex items-center justify-center p-8 text-center z-10">
+                                <h3 className="text-2xl font-bold text-gray-800 select-none">{current.Question}</h3>
                                 <div className="absolute bottom-4 text-gray-400 text-xs uppercase tracking-widest">Click to Flip</div>
                             </div>
-                            <div className="card-back bg-green-50 border-2 border-green-200 shadow-xl flex items-center justify-center p-8 text-center">
-                                <p className="text-xl text-gray-800">{current.Answer}</p>
+                            {/* Back */}
+                            <div className="card-back bg-green-50 border-2 border-green-200 shadow-xl flex items-center justify-center p-8 text-center z-0">
+                                <p className="text-xl text-gray-800 select-none">{current.Answer}</p>
                             </div>
                         </div>
                     </div>
+
                     {flipped ? (
                         <div className="flex gap-4 w-full">
-                            <button onClick={() => handleRate('hard')} className="flex-1 bg-red-500 hover:bg-red-600 text-white py-4 rounded-xl font-bold shadow transition"><i className="fas fa-times mr-2"></i> Hard</button>
-                            <button onClick={() => handleRate('easy')} className="flex-1 bg-green-500 hover:bg-green-600 text-white py-4 rounded-xl font-bold shadow transition"><i className="fas fa-check mr-2"></i> Easy</button>
+                            <button onClick={(e) => { e.stopPropagation(); handleRate('hard'); }} className="flex-1 bg-red-500 hover:bg-red-600 text-white py-4 rounded-xl font-bold shadow transition"><i className="fas fa-times mr-2"></i> Hard</button>
+                            <button onClick={(e) => { e.stopPropagation(); handleRate('easy'); }} className="flex-1 bg-green-500 hover:bg-green-600 text-white py-4 rounded-xl font-bold shadow transition"><i className="fas fa-check mr-2"></i> Easy</button>
                         </div>
                     ) : (
                         <button onClick={() => setFlipped(true)} className="px-8 py-3 bg-jpm-primary text-white rounded-lg font-bold shadow hover:bg-jpm-dark transition">Show Answer</button>
@@ -232,7 +250,6 @@
             const [input, setInput] = useState("");
             const [submitted, setSubmitted] = useState(false);
             const [matchScore, setMatchScore] = useState(0);
-            
             const current = deckData[index];
 
             const handleSubmit = () => {
@@ -333,7 +350,6 @@
             );
         };
 
-        // --- MAIN APP ---
         const App = () => {
             const [data, setData] = useState({ flashcards: [], type: [], mcq: [] });
             const [mode, setMode] = useState('menu'); 
@@ -343,27 +359,22 @@
             const [progress, setProgress] = useState({});
 
             useEffect(() => {
-                // Load CSVs
                 const load = async () => {
                     try {
                         const [f, t, m] = await Promise.all([
-                            fetch('flashcards.csv').then(r => r.ok ? r.text() : null),
-                            fetch('type_answer.csv').then(r => r.ok ? r.text() : null),
-                            fetch('mcq.csv').then(r => r.ok ? r.text() : null)
+                            fetch('flashcards.csv').then(r => r.ok ? r.text() : ""),
+                            fetch('type_answer.csv').then(r => r.ok ? r.text() : ""),
+                            fetch('mcq.csv').then(r => r.ok ? r.text() : "")
                         ]);
                         
-                        if(!f && !t && !m) throw new Error("Local fallback");
-
                         setData({
                             flashcards: f ? parseCSV(f) : [],
                             type: t ? parseCSV(t) : [],
                             mcq: m ? parseCSV(m) : []
                         });
                     } catch(e) {
-                        console.warn("Using Fallback Data (CORS or missing files)");
-                        setData(FALLBACK_DATA);
+                        console.error("Fetch Error:", e);
                     }
-                    
                     const saved = localStorage.getItem('jpm_prep_progress');
                     if(saved) setProgress(JSON.parse(saved));
                 };
@@ -378,9 +389,9 @@
             }, [mode]);
 
             const startSession = (m, deckName) => {
-                const deck = data[m === 'flashcard' ? 'flashcards' : m === 'type' ? 'type' : 'mcq'].filter(d => d.Deck === deckName);
+                const map = { 'flashcard': 'flashcards', 'type': 'type', 'mcq': 'mcq' };
+                const deck = data[map[m]].filter(d => d.Deck === deckName);
                 if(deck.length === 0) return;
-                
                 setActiveDeck({ name: deckName, items: deck });
                 setMode(m);
                 setStats({ correct: 0, completed: 0, total: 0 });
@@ -406,7 +417,7 @@
                 }));
             };
 
-            const getDecks = (items) => [...new Set(items.map(i => i.Deck))];
+            const getDecks = (items) => [...new Set(items.map(i => i.Deck))].filter(Boolean);
 
             return (
                 <div className="flex flex-col h-screen bg-gray-100">
@@ -415,7 +426,7 @@
                             <i className="fas fa-university text-2xl"></i>
                             <div>
                                 <h1 className="text-lg font-bold leading-tight">JPM Prep App</h1>
-                                <span className="text-xs text-blue-200">v2.0 | Enterprise Edition</span>
+                                <span className="text-xs text-blue-200">v2.1 | Enterprise Edition</span>
                             </div>
                         </div>
                         {mode !== 'menu' && <button onClick={endSession} className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded text-sm font-bold transition">End Session</button>}
@@ -441,6 +452,7 @@
                                                 </div>
                                                 <div className="p-4 h-64 overflow-y-auto bg-gray-50">
                                                     <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Available Decks</h4>
+                                                    {getDecks(m.items).length === 0 && <p className="text-gray-400 text-sm text-center italic">Loading data...</p>}
                                                     {getDecks(m.items).map(d => {
                                                         const p = progress[`${m.id}-${d}`];
                                                         return (
