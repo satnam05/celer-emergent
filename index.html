@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>JPM Interview Prep App v13.0 (iPad Fix)</title>
+    <title>JPM Interview Prep App v13.1 (Scalable)</title>
     
     <!-- Dependencies -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -28,7 +28,6 @@
         
         /* 3D FLIP ANIMATION */
         .card-scene { perspective: 1000px; width: 100%; height: 400px; }
-        /* iPad Specific: Ensure height is responsive */
         @media (max-height: 800px) { .card-scene { height: 300px; } }
         
         .card-object { width: 100%; height: 100%; position: relative; transition: transform 0.6s; transform-style: preserve-3d; cursor: pointer; }
@@ -243,7 +242,6 @@
 
             if (!current) return <div className="p-10 text-center">Loading...</div>;
 
-            // Updated Layout for iPad/Mobile Scrollability
             return (
                 <div className="flex flex-col items-center h-full w-full px-4 pt-4 overflow-y-auto">
                     <div className="w-full max-w-3xl flex justify-between mb-4 text-gray-500 font-bold text-sm">
@@ -263,7 +261,6 @@
                         </div>
                     </div>
 
-                    {/* Buttons fixed to ensure they are visible */}
                     {flipped ? (
                         <div className="flex gap-4 w-full max-w-3xl pb-10 z-50">
                             <button onClick={(e) => { e.stopPropagation(); handleRate('hard'); }} className="flex-1 bg-red-500 hover:bg-red-600 text-white py-4 rounded-xl font-bold shadow-lg transform transition active:scale-95"><i className="fas fa-times mr-2"></i> Hard</button>
@@ -423,7 +420,7 @@
             const [testResults, setTestResults] = useState(null);
             const [showPrompts, setShowPrompts] = useState(false);
 
-            // COMPREHENSIVE AUTOMATED REGRESSION SUITE (V13.0)
+            // COMPREHENSIVE AUTOMATED REGRESSION SUITE (V13.1)
             const runTests = () => {
                 const results = [];
                 const csv1 = 'H1,H2\nV1,"V, 2"';
@@ -454,6 +451,14 @@
                 // New iPad UI Check
                 const hasBtns = document.querySelectorAll('button').length > 0;
                 results.push({ id: 8, name: "UI: Flashcard Buttons", pass: hasBtns });
+
+                // Scalability Test (1000 Rows Load Simulation)
+                const start = performance.now();
+                let bigCsv = "Col1,Col2\n";
+                for(let i=0; i<1000; i++) bigCsv += `Row${i},Data${i}\n`;
+                const parsedBig = parseCSV(bigCsv);
+                const end = performance.now();
+                results.push({ id: 9, name: `Scalability: 1k Rows (${(end-start).toFixed(1)}ms)`, pass: parsedBig.length === 1000 && (end-start) < 200 });
 
                 setTestResults(results);
             };
@@ -597,7 +602,7 @@
                     <header className="flex-shrink-0 bg-jpm-primary text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
                         <div className="flex flex-col">
                             <h1 className="text-lg font-bold leading-tight">JPM Prep App</h1>
-                            <span className="text-xs text-blue-200">v13.0 | Developed by Satnam using Gemini</span>
+                            <span className="text-xs text-blue-200">v13.1 | Developed by Satnam using Gemini</span>
                         </div>
                         <div className="flex items-center gap-4">
                             <UKClock />
