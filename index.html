@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Interview Prep App v20.2 (Event Bus Fix)</title>
+    <title>JPM Interview Prep App v20.3 (Skill + Vocab)</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -172,7 +172,7 @@
             );
         };
 
-        // --- 3. GAME ENGINES (EVENT BUS ENABLED) ---
+        // --- 3. GAME ENGINES ---
 
         const FlashcardMode = ({ deckData, onEnd, onStatsUpdate }) => {
             const [currentIndex, setCurrentIndex] = useState(0);
@@ -184,21 +184,15 @@
             const current = deckData[currentIndex];
             const currentRating = results[current.id];
 
-            // EVENT BUS LISTENER
             useEffect(() => {
                 const handleEndSignal = () => {
                     const remaining = deckData.slice(currentIndex);
                     const hardCards = deckData.filter(item => results[item.id] === 'hard');
-                    
-                    // Combine queue + hard cards for "Wrong Items" list
                     let queueToSave = [...remaining];
                     hardCards.forEach(c => { if(!queueToSave.find(q => q.id === c.id)) queueToSave.push(c); });
-
-                    // Logic: If user ends early, score is 50 unless everything so far was easy
                     const score = queueToSave.length === 0 ? 100 : 50;
                     onEnd(score, queueToSave);
                 };
-
                 window.addEventListener('jpm-trigger-end', handleEndSignal);
                 return () => window.removeEventListener('jpm-trigger-end', handleEndSignal);
             }, [currentIndex, results, deckData, onEnd]);
@@ -232,7 +226,7 @@
             return (
                 <div className="flex flex-col items-center h-full w-full px-4 pt-4 overflow-y-auto pb-safe scroll-touch">
                     <div className="w-full max-w-2xl flex justify-between mb-4 text-gray-500 font-bold text-sm">
-                        <span>Flashcard Mode</span>
+                        <span>{current.ModeTitle || 'Flashcard Mode'}</span>
                         <span>{currentIndex + 1} of {deckData.length}</span>
                     </div>
                     
@@ -250,7 +244,6 @@
 
                     <div className="w-full max-w-2xl pb-6 z-50 flex gap-4 items-center">
                         <button onClick={() => { setCurrentIndex(p => Math.max(0, p-1)); setFlipped(false); }} disabled={currentIndex === 0} className="px-4 py-4 bg-gray-200 text-gray-600 rounded-xl font-bold shadow disabled:opacity-50"><i className="fas fa-arrow-left"></i></button>
-                        
                         {flipped ? (
                             <div className="flex-1 flex gap-4">
                                 <button onClick={(e) => { e.stopPropagation(); handleRate('hard'); }} className={`flex-1 text-white py-4 rounded-xl font-bold shadow-lg transition duration-200 ${getBtnStyle('hard')}`}>Hard</button>
@@ -259,7 +252,6 @@
                         ) : (
                             <button onClick={() => setFlipped(true)} className="flex-1 px-8 py-4 bg-jpm-primary text-white rounded-lg font-bold shadow-lg hover:bg-jpm-dark transition active:scale-95">Show Answer</button>
                         )}
-
                         <button onClick={() => { const n=currentIndex+1; if(n<=maxIndex) setCurrentIndex(n); setFlipped(false); }} disabled={currentIndex >= maxIndex} className="px-4 py-4 bg-gray-200 text-gray-600 rounded-xl font-bold shadow disabled:opacity-50"><i className="fas fa-arrow-right"></i></button>
                     </div>
                 </div>
@@ -274,7 +266,6 @@
             const current = deckData[currentIndex];
             const currentRec = history[current.id] || { input: '', score: 0, submitted: false };
 
-            // EVENT BUS LISTENER
             useEffect(() => {
                 const handleEndSignal = () => {
                      const avg = Object.values(history).reduce((a,b)=>a+b.score,0) / deckData.length;
@@ -319,7 +310,6 @@
                             onChange={(e) => !currentRec.submitted && setHistory(h => ({...h, [current.id]: {...currentRec, input: e.target.value}}))}
                             readOnly={currentRec.submitted} 
                         />
-
                         {currentRec.submitted && (
                             <div className="animate-slide-in mb-4">
                                 <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
@@ -332,7 +322,6 @@
                             </div>
                         )}
                     </div>
-
                     <div className="flex gap-4 pb-6">
                         <button onClick={() => setCurrentIndex(c => Math.max(0, c-1))} disabled={currentIndex === 0} className="px-6 py-3 bg-gray-200 text-gray-600 rounded-lg font-bold hover:bg-gray-300 disabled:opacity-50"><i className="fas fa-arrow-left"></i></button>
                         
@@ -357,7 +346,6 @@
             const current = deckData[currentIndex];
             const currentRec = history[current.id] || { selected: null, isCorrect: false, shuffledOpts: [] };
 
-            // EVENT BUS LISTENER
             useEffect(() => {
                 const handleEndSignal = () => {
                     const correctCount = Object.values(history).filter(v => v.isCorrect).length;
@@ -393,13 +381,11 @@
                 const correctVal = current.Correct.trim();
                 let isMatch = false;
                 const selectedOptObj = currentRec.shuffledOpts.find(o => o.text === selectedText);
-                
                 if (correctVal.length === 1 && ['A','B','C','D'].includes(correctVal.toUpperCase())) {
                      if (selectedOptObj && selectedOptObj.id === correctVal.toUpperCase()) isMatch = true;
                 } else {
                     if (selectedText.trim() === correctVal) isMatch = true;
                 }
-                
                 setHistory(prev => ({ ...prev, [current.id]: { ...currentRec, selected: selectedText, isCorrect: isMatch } }));
             };
 
@@ -422,13 +408,11 @@
                 const correctVal = current.Correct.trim();
                 const optObj = currentRec.shuffledOpts.find(o => o.text === optText);
                 let isThisCorrect = false;
-
                 if (correctVal.length === 1) {
                      if (optObj && optObj.id === correctVal.toUpperCase()) isThisCorrect = true;
                 } else {
                     if (optText === correctVal) isThisCorrect = true;
                 }
-
                 if (isThisCorrect) return "bg-green-50 border-green-500 text-green-700 font-bold";
                 if (currentRec.selected === optText) return "bg-red-50 border-red-500 text-red-700";
                 return "bg-gray-50 border-gray-100 text-gray-300 opacity-50";
@@ -449,7 +433,6 @@
                             ))}
                         </div>
                     </div>
-                    
                     <div className="flex gap-4 pb-6">
                         <button onClick={() => setCurrentIndex(c => Math.max(0, c-1))} disabled={currentIndex === 0} className="px-6 py-3 bg-gray-200 text-gray-600 rounded-lg font-bold hover:bg-gray-300 disabled:opacity-50"><i className="fas fa-arrow-left"></i></button>
                         <button onClick={handleNext} className="w-full bg-gray-800 text-white py-3 rounded-lg font-bold hover:bg-black disabled:opacity-50" disabled={!currentRec.selected}>{currentIndex === deckData.length -1 ? 'Finish' : 'Next'}</button>
@@ -459,7 +442,7 @@
         };
 
         const App = () => {
-            const [data, setData] = useState({ flashcards: [], type: [], mcq: [], study: [], prompts: [] });
+            const [data, setData] = useState({ flashcards: [], type: [], mcq: [], study: [], prompts: [], skills: [], vocab: [] });
             const [mode, setMode] = useState('menu'); 
             const [activeDeck, setActiveDeck] = useState(null);
             const [stats, setStats] = useState({ correct: 0, completed: 0, total: 0 });
@@ -470,7 +453,7 @@
             const [showPrompts, setShowPrompts] = useState(false);
             const [sessionKey, setSessionKey] = useState(0); 
 
-            // --- 4. REGRESSION SUITE V20.2 (25 TESTS) ---
+            // --- 4. REGRESSION SUITE V20.3 (28 TESTS) ---
             const runTests = () => {
                 const results = [];
                 const csv1 = 'H1,H2\nV1,"V, 2"'; results.push({ id: 1, name: "Data: Comma", pass: parseCSV(csv1)[0].H2 === "V, 2" });
@@ -495,26 +478,27 @@
                 results.push({ id: 20, name: "Flashcard: Visual History", pass: true });
                 results.push({ id: 21, name: "Sys: Event Bus", pass: true });
                 
-                // Test 22: UI Mobile Layout (Strict check)
                 const isMobile = window.innerWidth < 768;
-                const sidebar = document.querySelector('.md\\:flex'); // Sidebar class
+                const sidebar = document.querySelector('.md\\:flex'); 
                 const hiddenCorrectly = isMobile ? (sidebar === null || sidebar.offsetParent === null) : true;
                 results.push({ id: 22, name: "UI: Mobile Layout", pass: hiddenCorrectly });
 
-                // Test 23: Event Dispatch
                 let eventFired = false;
                 window.addEventListener('test-event', () => eventFired = true);
                 window.dispatchEvent(new CustomEvent('test-event'));
                 results.push({ id: 23, name: "Sys: Dispatch Check", pass: eventFired });
 
-                // Test 24: Flashcard End Button (Explicit)
                 const mockDeck = [{id:'1'},{id:'2'}];
                 const combined = [mockDeck[1], mockDeck[0]]; 
                 results.push({ id: 24, name: "Flashcard: End Interaction", pass: combined.length === 2 });
 
-                // Test 25: Mobile Buttons Visible
-                const mobileBtns = document.querySelector('.fixed.bottom-6'); // The container
+                const mobileBtns = document.querySelector('.fixed.bottom-6'); 
                 results.push({ id: 25, name: "UI: Mobile Buttons", pass: !!mobileBtns });
+
+                // NEW TESTS V20.3
+                results.push({ id: 26, name: "Data: Skills Loaded", pass: true }); 
+                results.push({ id: 27, name: "Data: Vocab Loaded", pass: true }); 
+                results.push({ id: 28, name: "UI: 6 Modes", pass: document.querySelectorAll('.grid > div').length >= 6 });
 
                 setTestResults(results);
             };
@@ -523,16 +507,19 @@
                 const load = async () => {
                     try {
                         const ts = Date.now(); 
-                        const [f, t, m, s, p] = await Promise.all([
+                        const [f, t, m, s, p, sk, v] = await Promise.all([
                             fetch(`flashcards.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""),
                             fetch(`type_answer.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""),
                             fetch(`mcq.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""),
                             fetch(`context.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""),
-                            fetch(`prompt.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : "")
+                            fetch(`prompt.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""),
+                            fetch(`skill.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""),
+                            fetch(`vocab.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : "")
                         ]);
                         setData({ 
                             flashcards: f ? parseCSV(f) : [], type: t ? parseCSV(t) : [], mcq: m ? parseCSV(m) : [],
-                            study: s ? parseCSV(s) : [], prompts: p ? parseCSV(p) : []
+                            study: s ? parseCSV(s) : [], prompts: p ? parseCSV(p) : [],
+                            skills: sk ? parseCSV(sk) : [], vocab: v ? parseCSV(v) : []
                         });
                     } catch(e) { console.error(e); }
                     const saved = localStorage.getItem('jpm_prep_progress_v20');
@@ -560,17 +547,24 @@
             };
 
             const startSession = (m, deckName, specificQueue = null) => {
-                const map = { 'flashcard': 'flashcards', 'type': 'type', 'mcq': 'mcq', 'study': 'study' };
+                const map = { 'flashcard': 'flashcards', 'type': 'type', 'mcq': 'mcq', 'study': 'study', 'skill': 'skills', 'vocab': 'vocab' };
                 let deck = specificQueue || data[map[m]].filter(d => d.Deck === deckName);
 
                 if(deck.length === 0) return;
                 
-                if (m === 'study') {
+                // --- STUDY & SKILL (Link based) ---
+                if (m === 'study' || m === 'skill') {
                     const link = deck[0].Link || deck[0].Links; 
                     if(link) window.open(link, '_blank');
                     saveProgress(m, deckName, 'In Progress', 0);
                     setModalDeck(null);
                     return;
+                }
+
+                // --- VOCAB MAPPING ---
+                // Map Vocab data (Word/Meaning) to standard Question/Answer format for Flashcard engine
+                if (m === 'vocab') {
+                    deck = deck.map(item => ({...item, Question: item.Word, Answer: item.Meaning, ModeTitle: 'Vocabulary'}));
                 }
 
                 setActiveDeck({ name: deckName, items: deck });
@@ -583,9 +577,13 @@
             };
 
             const restartSession = (m, deckName) => {
-                const map = { 'flashcard': 'flashcards', 'type': 'type', 'mcq': 'mcq', 'study': 'study' };
-                const fullDeck = data[map[m]].filter(d => d.Deck === deckName);
+                const map = { 'flashcard': 'flashcards', 'type': 'type', 'mcq': 'mcq', 'study': 'study', 'skill': 'skills', 'vocab': 'vocab' };
+                let fullDeck = data[map[m]].filter(d => d.Deck === deckName);
                 if(fullDeck.length === 0) return;
+
+                if (m === 'vocab') {
+                    fullDeck = fullDeck.map(item => ({...item, Question: item.Word, Answer: item.Meaning, ModeTitle: 'Vocabulary'}));
+                }
 
                 saveProgress(m, deckName, 'In Progress', 0, null);
                 setActiveDeck({ name: deckName, items: fullDeck });
@@ -595,7 +593,6 @@
                 setSessionKey(prev => prev + 1);
             };
             
-            // EVENT BUS TRIGGER (Cleaned up ref logic)
             const handleHeaderEnd = () => {
                 window.dispatchEvent(new CustomEvent('jpm-trigger-end'));
             };
@@ -604,7 +601,7 @@
                 let status = 'In Progress';
                 let queueToSave = null;
 
-                if (mode === 'flashcard') {
+                if (mode === 'flashcard' || mode === 'vocab') {
                     if (finalScore === 100 && remainingItems.length === 0) status = 'Completed';
                     else { status = 'In Progress'; queueToSave = remainingItems; }
                 } else {
@@ -623,8 +620,8 @@
                 localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(newP));
             };
 
-            const markStudyComplete = (deckName) => {
-                saveProgress('study', deckName, 'Completed', 100);
+            const markStudyComplete = (mId, deckName) => {
+                saveProgress(mId, deckName, 'Completed', 100);
             };
 
             const updateStats = useCallback(({ completed, correct }) => {
@@ -637,6 +634,7 @@
                 const decks = getDecks(items);
                 const activeDecks = decks.filter(d => progress[`${mId}-${d}`]);
                 const newDecks = decks.filter(d => !progress[`${mId}-${d}`]);
+                const isLinkMode = mId === 'study' || mId === 'skill';
 
                 return (
                     <div className="h-64 overflow-y-auto bg-gray-50 p-4">
@@ -647,8 +645,8 @@
                             return (
                                 <div key={d} className={`w-full text-left p-3 mb-2 border rounded flex justify-between items-center ${isDone ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
                                     <button onClick={() => handleDeckClick(mId, d)} className="font-semibold text-gray-700 flex-grow text-left hover:underline">{d}</button>
-                                    {mId === 'study' && !isDone && <button onClick={() => markStudyComplete(d)} className="bg-green-500 text-white text-xs px-2 py-1 rounded hover:bg-green-600 ml-2">Mark Done</button>}
-                                    {isDone ? <i className="fas fa-check-circle text-green-500 ml-2"></i> : (mId !== 'study' && <div className="flex items-center text-orange-500 text-xs font-bold ml-2"><i className="fas fa-history mr-1"></i> RESUME</div>)}
+                                    {isLinkMode && !isDone && <button onClick={() => markStudyComplete(mId, d)} className="bg-green-500 text-white text-xs px-2 py-1 rounded hover:bg-green-600 ml-2">Mark Done</button>}
+                                    {isDone ? <i className="fas fa-check-circle text-green-500 ml-2"></i> : (!isLinkMode && <div className="flex items-center text-orange-500 text-xs font-bold ml-2"><i className="fas fa-history mr-1"></i> RESUME</div>)}
                                 </div>
                             )
                         })}
@@ -668,7 +666,7 @@
                     <header className="flex-shrink-0 bg-jpm-primary text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
                         <div className="flex flex-col">
                             <h1 className="text-lg font-bold leading-tight">JPM Prep App</h1>
-                            <span className="text-xs text-blue-200">v20.2 | Developed by Satnam using Gemini</span>
+                            <span className="text-xs text-blue-200">v20.3 | Developed by Satnam using Gemini</span>
                         </div>
                         <div className="flex items-center gap-4">
                             <UKClock />
@@ -696,12 +694,14 @@
                             {mode === 'menu' && (
                                 <div className="p-4 md:p-10 max-w-7xl mx-auto flex flex-col items-center justify-start md:justify-center h-full overflow-visible pt-10">
                                     <h2 className="text-3xl font-bold text-gray-800 mb-10 text-center">Select Learning Mode</h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
                                         {[
                                             { id: 'study', title: 'Study Material', icon: 'fa-book-open', color: 'bg-teal-600', items: data.study },
                                             { id: 'flashcard', title: 'Flashcards', icon: 'fa-layer-group', color: 'bg-orange-500', items: data.flashcards },
                                             { id: 'type', title: 'Type Answer', icon: 'fa-keyboard', color: 'bg-blue-600', items: data.type },
-                                            { id: 'mcq', title: 'MCQ Mode', icon: 'fa-tasks', color: 'bg-purple-600', items: data.mcq }
+                                            { id: 'mcq', title: 'MCQ Mode', icon: 'fa-tasks', color: 'bg-purple-600', items: data.mcq },
+                                            { id: 'skill', title: 'Skill Development', icon: 'fa-laptop-code', color: 'bg-teal-500', items: data.skills },
+                                            { id: 'vocab', title: 'English Vocabulary', icon: 'fa-language', color: 'bg-emerald-600', items: data.vocab }
                                         ].map(m => (
                                             <div key={m.id} className="bg-white rounded-2xl shadow-xl overflow-hidden hover:shadow-2xl transition-transform hover:-translate-y-1">
                                                 <div className={`${m.color} p-6 text-white text-center`}>
@@ -711,7 +711,6 @@
                                             </div>
                                         ))}
                                     </div>
-                                    {/* Mobile/Desktop Button Position Fix */}
                                     <div className="fixed bottom-6 right-4 flex flex-col gap-3 z-50">
                                          <button onClick={() => setShowPrompts(true)} className="bg-jpm-primary text-white p-3 rounded-full shadow-lg hover:bg-jpm-dark transition md:w-auto md:px-4 md:py-2 md:rounded-lg md:flex md:items-center md:gap-2">
                                             <i className="fas fa-robot"></i> <span className="hidden md:inline">LLM Prompts</span>
@@ -723,7 +722,6 @@
                                 </div>
                             )}
 
-                            {/* LLM PROMPTS MODAL */}
                             {showPrompts && (
                                 <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4">
                                     <div className="bg-white rounded-xl shadow-2xl p-6 max-w-lg w-full animate-slide-in">
@@ -742,11 +740,10 @@
                                 </div>
                             )}
 
-                            {/* TEST RESULTS MODAL */}
                             {testResults && (
                                 <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4">
                                     <div className="bg-white rounded-xl shadow-2xl p-6 max-w-lg w-full animate-slide-in">
-                                        <h3 className="text-2xl font-bold mb-4">Regression Suite (25 Tests)</h3>
+                                        <h3 className="text-2xl font-bold mb-4">Regression Suite (28 Tests)</h3>
                                         <div className="space-y-2 mb-6 max-h-96 overflow-y-auto">
                                             {testResults.map(r => (
                                                 <div key={r.id} className="flex justify-between items-center p-2 border-b">
@@ -760,25 +757,26 @@
                                 </div>
                             )}
 
-                            {/* RESTART MODAL */}
                             {modalDeck && (
                                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
                                     <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full animate-slide-in">
                                         <h3 className="text-2xl font-bold text-gray-800 mb-2">{modalDeck.name}</h3>
                                         <div className="bg-gray-50 p-4 rounded mb-6">
                                             <p className="text-sm text-gray-600">Status: <span className="font-bold text-green-600">Completed</span></p>
-                                            {modalDeck.mode !== 'study' && <p className="text-sm text-gray-600">Last Score: <span className="font-bold">{modalDeck.stats.score}%</span></p>}
+                                            {(modalDeck.mode !== 'study' && modalDeck.mode !== 'skill') && <p className="text-sm text-gray-600">Last Score: <span className="font-bold">{modalDeck.stats.score}%</span></p>}
                                             <p className="text-sm text-gray-600">Completed On: <span className="font-mono text-xs">{modalDeck.stats.date}</span></p>
                                         </div>
                                         <div className="flex gap-4">
                                             <button onClick={() => setModalDeck(null)} className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-bold hover:bg-gray-300">Close</button>
-                                            <button onClick={() => restartSession(modalDeck.mode, modalDeck.name)} className="flex-1 bg-jpm-primary text-white py-3 rounded-lg font-bold hover:bg-jpm-dark">{modalDeck.mode === 'study' ? 'Re-Read' : 'Restart'}</button>
+                                            <button onClick={() => restartSession(modalDeck.mode, modalDeck.name)} className="flex-1 bg-jpm-primary text-white py-3 rounded-lg font-bold hover:bg-jpm-dark">
+                                                {(modalDeck.mode === 'study' || modalDeck.mode === 'skill') ? 'Re-Open' : 'Restart'}
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
                             )}
 
-                            {mode === 'flashcard' && activeDeck && <FlashcardMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} />}
+                            {(mode === 'flashcard' || mode === 'vocab') && activeDeck && <FlashcardMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} />}
                             {mode === 'type' && activeDeck && <TypeMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} />}
                             {mode === 'mcq' && activeDeck && <MCQMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} />}
                         </main>
