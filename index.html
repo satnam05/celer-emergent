@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Interview Prep App v18.0 (Mobile & End Fix)</title>
+    <title>JPM Interview Prep App v17.3 (iPhone UI Fix)</title>
     
     <!-- Dependencies -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -27,8 +27,10 @@
         body { background-color: #f3f4f6; overflow: hidden; font-family: 'Segoe UI', sans-serif; -webkit-tap-highlight-color: transparent; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .scroll-touch { -webkit-overflow-scrolling: touch; }
         
+        /* iOS Smooth Scrolling */
+        .scroll-touch { -webkit-overflow-scrolling: touch; }
+
         /* 3D FLIP ANIMATION */
         .card-scene { perspective: 1000px; width: 100%; min-height: 300px; }
         .card-object { width: 100%; height: 100%; position: relative; transition: transform 0.6s; transform-style: preserve-3d; cursor: pointer; }
@@ -46,7 +48,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef, useCallback } = React;
+        const { useState, useEffect, useRef, useMemo } = React;
 
         // --- 1. CORE UTILS ---
         
@@ -57,6 +59,7 @@
 
             const firstLineEnd = text.indexOf('\n');
             if (firstLineEnd === -1) return [];
+            
             const firstLine = text.substring(0, firstLineEnd);
             const delimiter = firstLine.includes('|') ? '|' : ',';
 
@@ -67,8 +70,10 @@
 
             for (let i = 0; i < text.length; i++) {
                 const char = text[i];
+                const nextChar = text[i+1];
+
                 if (char === '"') {
-                    if (insideQuotes && text[i+1] === '"') { currentVal += '"'; i++; }
+                    if (insideQuotes && nextChar === '"') { currentVal += '"'; i++; }
                     else insideQuotes = !insideQuotes;
                 } else if (char === delimiter && !insideQuotes) {
                     currentRow.push(currentVal); currentVal = '';
@@ -121,13 +126,15 @@
         const UKClock = () => {
             const [timeData, setTimeData] = useState({ time: '', date: '' });
             useEffect(() => {
-                const timer = setInterval(() => {
+                const updateTime = () => {
                     const now = new Date();
                     setTimeData({
                         time: now.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', second: '2-digit' }),
                         date: now.toLocaleDateString('en-GB', { timeZone: 'Europe/London', day: 'numeric', month: 'short', year: 'numeric' })
                     });
-                }, 1000);
+                };
+                updateTime();
+                const timer = setInterval(updateTime, 1000);
                 return () => clearInterval(timer);
             }, []);
             return (
@@ -138,11 +145,10 @@
             );
         };
 
-        // Updated Dashboard: Hidden on Mobile
         const Dashboard = ({ active, stats, timer }) => {
             const accuracy = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
             return (
-                <div className={`hidden md:flex fixed inset-y-0 left-0 w-64 bg-white shadow-2xl z-20 flex-col transition-transform duration-300 border-r border-gray-200 ${active ? 'translate-x-0' : '-translate-x-full'}`}>
+                <div className={`fixed inset-y-0 left-0 w-64 bg-white shadow-2xl z-20 flex flex-col transition-transform duration-300 border-r border-gray-200 ${active ? 'translate-x-0' : '-translate-x-full'}`}>
                     <div className="p-6 bg-jpm-primary text-white">
                         <h2 className="text-xl font-bold"><i className="fas fa-chart-pie mr-2"></i> Dashboard</h2>
                     </div>
@@ -172,7 +178,7 @@
 
         // --- 3. GAME ENGINES (EVENT-DRIVEN END) ---
 
-        const FlashcardMode = ({ deckData, onEnd, onStatsUpdate }) => {
+        const FlashcardMode = ({ deckData, onEnd, onStatsUpdate, historyRef }) => {
             const [currentIndex, setCurrentIndex] = useState(0);
             const [flipped, setFlipped] = useState(false);
             const [results, setResults] = useState({}); 
@@ -185,31 +191,14 @@
 
             // 1. Listen for Global "End Session" Event (Robust Fix)
             useEffect(() => {
-                const handleEndEvent = () => {
-                    // Logic: Save Queue + Hard Cards
-                    const remainingQueue = deckData.slice(currentIndex); 
-                    const hardCards = deckData.filter(item => results[item.id] === 'hard');
-                    
-                    // Combine distinct
-                    const combined = [...remainingQueue];
-                    hardCards.forEach(card => {
-                        if (!combined.find(c => c.id === card.id)) combined.push(card);
-                    });
-
-                    // If Queue is empty, score is 100 (Done). Else 50 (In Progress).
-                    const score = combined.length === 0 ? 100 : 50;
-                    onEnd(score, combined);
-                };
-                window.addEventListener('app-end-session', handleEndEvent);
-                return () => window.removeEventListener('app-end-session', handleEndEvent);
-            }, [currentIndex, results, deckData]); // Dependencies ensure fresh state capture
-
-            // 2. Stats Update
-            useEffect(() => {
+                const remaining = deckData.slice(currentIndex); 
+                // CRITICAL FIX: Ensure ref is updated for Header End Button
+                if(historyRef) historyRef.current = { results, queue: remaining, fullDeck: deckData };
+                
                 const completed = Object.keys(results).length;
                 const correct = Object.values(results).filter(r => r === 'easy').length;
                 onStatsUpdate({ completed, correct });
-            }, [results]);
+            }, [currentIndex, results, deckData]); 
 
             const handleRate = (rating) => {
                 setResults(prev => ({ ...prev, [current.id]: rating }));
@@ -219,7 +208,7 @@
                     setCurrentIndex(next);
                     if (next > maxIndex) setMaxIndex(next);
                 } else {
-                    // Manual finish
+                    // Implicit finish
                     const finalResults = { ...results, [current.id]: rating };
                     const hardCards = deckData.filter(item => finalResults[item.id] === 'hard');
                     onEnd(hardCards.length === 0 ? 100 : 50, hardCards); 
@@ -269,28 +258,17 @@
             );
         };
 
-        const TypeMode = ({ deckData, onEnd, onStatsUpdate }) => {
+        const TypeMode = ({ deckData, onEnd, onStatsUpdate, historyRef }) => {
             const [currentIndex, setCurrentIndex] = useState(0);
             const [history, setHistory] = useState({}); 
             
-            if (!deckData || deckData.length === 0) return <div>No Data.</div>;
+            // Sync history for Header End Button
+            useEffect(() => { historyRef.current = history; }, [history]);
+            
+            if (!deckData || deckData.length === 0) return <div>No data.</div>;
+            
             const current = deckData[currentIndex];
             const currentRec = history[current.id] || { input: '', score: 0, submitted: false };
-
-            // End Event Listener
-            useEffect(() => {
-                const handleEnd = () => {
-                    const allScores = Object.values(history).map(h => h.score);
-                    const avg = allScores.reduce((a,b)=>a+b,0) / (deckData.length || 1);
-                    const wrongItems = deckData.filter(d => {
-                        const rec = history[d.id];
-                        return !rec || rec.score < 50; 
-                    });
-                    onEnd(avg, wrongItems);
-                };
-                window.addEventListener('app-end-session', handleEnd);
-                return () => window.removeEventListener('app-end-session', handleEnd);
-            }, [history]);
 
             useEffect(() => {
                 const done = Object.keys(history).filter(k => history[k].submitted).length;
@@ -308,7 +286,9 @@
                 if (currentIndex < deckData.length - 1) {
                     setCurrentIndex(prev => prev + 1);
                 } else {
-                    window.dispatchEvent(new CustomEvent('app-end-session'));
+                    const avg = Object.values(history).reduce((a,b)=>a+b.score,0) / deckData.length;
+                    const wrongItems = deckData.filter(d => (history[d.id]?.score || 0) < 50);
+                    onEnd(avg, wrongItems);
                 }
             };
 
@@ -354,9 +334,12 @@
             );
         };
 
-        const MCQMode = ({ deckData, onEnd, onStatsUpdate }) => {
+        const MCQMode = ({ deckData, onEnd, onStatsUpdate, historyRef }) => {
             const [currentIndex, setCurrentIndex] = useState(0);
             const [history, setHistory] = useState({}); 
+            
+            // Sync to ref
+            useEffect(() => { historyRef.current = history; }, [history]);
             
             if (!deckData || deckData.length === 0) return <div>No Data.</div>;
             const current = deckData[currentIndex];
@@ -373,21 +356,6 @@
                 }
             }, [currentIndex, current]);
 
-            // End Event Listener
-            useEffect(() => {
-                const handleEnd = () => {
-                    const correctCount = Object.values(history).filter(v => v.isCorrect).length;
-                    const score = Math.round((correctCount / deckData.length) * 100);
-                    const wrongItems = deckData.filter(d => {
-                        const h = history[d.id];
-                        return !h || !h.isCorrect;
-                    });
-                    onEnd(score, wrongItems);
-                };
-                window.addEventListener('app-end-session', handleEnd);
-                return () => window.removeEventListener('app-end-session', handleEnd);
-            }, [history]);
-
             useEffect(() => {
                 const done = Object.keys(history).filter(k => history[k].selected).length;
                 const correct = Object.values(history).filter(v => v.isCorrect).length;
@@ -397,21 +365,31 @@
             const checkAnswer = (selectedText) => {
                 const correctVal = current.Correct.trim();
                 let isMatch = false;
+                const selectedOptObj = currentRec.shuffledOpts.find(o => o.text === selectedText);
+                
                 if (correctVal.length === 1 && ['A','B','C','D'].includes(correctVal.toUpperCase())) {
-                     const selectedOptObj = currentRec.shuffledOpts.find(o => o.text === selectedText);
                      if (selectedOptObj && selectedOptObj.id === correctVal.toUpperCase()) isMatch = true;
                 } else {
                     if (selectedText.trim() === correctVal) isMatch = true;
                 }
                 
-                setHistory(prev => ({ ...prev, [current.id]: { ...currentRec, selected: selectedText, isCorrect: isMatch } }));
+                setHistory(prev => ({ 
+                    ...prev, 
+                    [current.id]: { ...currentRec, selected: selectedText, isCorrect: isMatch } 
+                }));
             };
 
             const handleNext = () => {
                 if (currentIndex < deckData.length - 1) {
                     setCurrentIndex(prev => prev + 1);
                 } else {
-                    window.dispatchEvent(new CustomEvent('app-end-session'));
+                    const correctCount = Object.values(history).filter(v => v.isCorrect).length;
+                    const score = Math.round((correctCount / deckData.length) * 100);
+                    const wrongItems = deckData.filter(d => {
+                        const h = history[d.id];
+                        return !h || !h.isCorrect;
+                    });
+                    onEnd(score, wrongItems);
                 }
             };
 
@@ -451,7 +429,7 @@
                     
                     <div className="flex gap-4 pb-6">
                         <button onClick={() => setCurrentIndex(c => Math.max(0, c-1))} disabled={currentIndex === 0} className="px-6 py-3 bg-gray-200 text-gray-600 rounded-lg font-bold hover:bg-gray-300 disabled:opacity-50"><i className="fas fa-arrow-left"></i></button>
-                        <button onClick={handleNext} disabled={!currentRec.selected} className="w-full bg-gray-800 text-white py-3 rounded-lg font-bold hover:bg-black disabled:opacity-50">{currentIndex === deckData.length -1 ? 'Finish' : 'Next'}</button>
+                        <button onClick={handleNext} disabled={!currentRec.selected} className="w-full bg-gray-800 text-white py-3 rounded-lg font-bold hover:bg-black disabled:opacity-50" disabled={!currentRec.selected}>{currentIndex === deckData.length -1 ? 'Finish' : 'Next'}</button>
                     </div>
                 </div>
             );
@@ -469,7 +447,7 @@
             const [showPrompts, setShowPrompts] = useState(false);
             const [sessionKey, setSessionKey] = useState(0); 
 
-            // --- 4. REGRESSION SUITE V18.0 (22 TESTS) ---
+            // --- 4. REGRESSION SUITE V17.2 (22 TESTS) ---
             const runTests = () => {
                 const results = [];
                 // 1-10 Data & Perf
@@ -594,6 +572,7 @@
                     if (finalScore === 100 && remainingItems.length === 0) status = 'Completed';
                     else { status = 'In Progress'; queueToSave = remainingItems; }
                 } else {
+                    // Type/MCQ: If items remaining (wrong ones), status is In Progress
                     status = finalScore >= 50 && remainingItems.length === 0 ? 'Completed' : 'In Progress';
                     if (status === 'In Progress') queueToSave = remainingItems;
                 }
@@ -649,19 +628,64 @@
                 );
             };
 
+            const getRemainingItems = (history, queueRef = null) => {
+                if (!activeDeck) return [];
+                // Flashcard Logic
+                if (queueRef && queueRef.current) {
+                    const remainingQueue = queueRef.current;
+                    const hardCards = activeDeck.items.filter(item => historyRef.current.results?.[item.id] === 'hard');
+                    const combined = [...remainingQueue];
+                    hardCards.forEach(card => { if (!combined.find(c => c.id === card.id)) combined.push(card); });
+                    return combined;
+                }
+
+                // MCQ/Type Logic: Return Wrong + Unanswered
+                return activeDeck.items.filter(item => {
+                   const rec = history[item.id];
+                   if (!rec) return true; // Unanswered
+                   if (mode === 'mcq' && !rec.isCorrect) return true; // Wrong
+                   if (mode === 'type' && rec.score < 50) return true; // Low Score
+                   return false; 
+                });
+            };
+            
+            const historyRef = useRef({}); 
+            
+            const handleHeaderEnd = () => {
+                let remaining = [];
+                let score = 0;
+                const total = activeDeck.items.length;
+
+                if (mode === 'flashcard') {
+                    const h = historyRef.current;
+                    // FIX: Pass queueRef struct to helper
+                    remaining = getRemainingItems(null, { current: h.queue }); 
+                    score = remaining.length === 0 ? 100 : 50;
+                } else {
+                    const h = historyRef.current;
+                    let correct = 0;
+                    if (mode === 'mcq') correct = Object.values(h).filter(v => v.isCorrect).length;
+                    if (mode === 'type') correct = Object.values(h).filter(v => v.score >= 50).length;
+                    score = Math.round((correct / total) * 100);
+                    remaining = getRemainingItems(h);
+                }
+                
+                endSession(score, remaining);
+            };
+
             return (
                 <div className="flex flex-col h-dvh bg-gray-100">
                     <header className="flex-shrink-0 bg-jpm-primary text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
                         <div className="flex flex-col">
                             <h1 className="text-lg font-bold leading-tight">JPM Prep App</h1>
-                            <span className="text-xs text-blue-200">v18.0 | Developed by Satnam using Gemini</span>
+                            <span className="text-xs text-blue-200">v17.2 | Developed by Satnam using Gemini</span>
                         </div>
                         <div className="flex items-center gap-4">
                             <UKClock />
                             {mode !== 'menu' && (
                                 <div className="flex gap-2">
                                     <button onClick={() => restartSession(mode, activeDeck.name)} className="bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded text-sm font-bold transition" title="Restart Session"><i className="fas fa-sync-alt"></i></button>
-                                    <button onClick={triggerHeaderEnd} className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded text-sm font-bold transition">End</button>
+                                    <button onClick={() => mode === 'flashcard' ? document.querySelector('#flashcard-exit')?.click() : handleHeaderEnd()} className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded text-sm font-bold transition">End</button>
                                 </div>
                             )}
                         </div>
@@ -757,9 +781,9 @@
                                 </div>
                             )}
 
-                            {mode === 'flashcard' && activeDeck && <FlashcardMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} />}
-                            {mode === 'type' && activeDeck && <TypeMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} />}
-                            {mode === 'mcq' && activeDeck && <MCQMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} />}
+                            {mode === 'flashcard' && activeDeck && <FlashcardMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} historyRef={historyRef} />}
+                            {mode === 'type' && activeDeck && <TypeMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} historyRef={historyRef} />}
+                            {mode === 'mcq' && activeDeck && <MCQMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} historyRef={historyRef} />}
                         </main>
                     </div>
                 </div>
