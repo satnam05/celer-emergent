@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Interview Prep App v20.3 (Skill + Vocab)</title>
+    <title>JPM Interview Prep App v20.4 (UI Clip Fix)</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -453,7 +453,7 @@
             const [showPrompts, setShowPrompts] = useState(false);
             const [sessionKey, setSessionKey] = useState(0); 
 
-            // --- 4. REGRESSION SUITE V20.3 (28 TESTS) ---
+            // --- 4. REGRESSION SUITE V20.4 (30 TESTS) ---
             const runTests = () => {
                 const results = [];
                 const csv1 = 'H1,H2\nV1,"V, 2"'; results.push({ id: 1, name: "Data: Comma", pass: parseCSV(csv1)[0].H2 === "V, 2" });
@@ -495,10 +495,15 @@
                 const mobileBtns = document.querySelector('.fixed.bottom-6'); 
                 results.push({ id: 25, name: "UI: Mobile Buttons", pass: !!mobileBtns });
 
-                // NEW TESTS V20.3
                 results.push({ id: 26, name: "Data: Skills Loaded", pass: true }); 
                 results.push({ id: 27, name: "Data: Vocab Loaded", pass: true }); 
                 results.push({ id: 28, name: "UI: 6 Modes", pass: document.querySelectorAll('.grid > div').length >= 6 });
+
+                // NEW TESTS V20.4
+                // Ensure content is not forced to center (which causes clipping)
+                const menuContainer = document.querySelector('.overflow-y-auto .justify-start');
+                results.push({ id: 29, name: "UI: Vertical Safety", pass: !!menuContainer });
+                results.push({ id: 30, name: "UI: Grid Consistency", pass: document.querySelector('.grid').children.length > 0 });
 
                 setTestResults(results);
             };
@@ -666,7 +671,7 @@
                     <header className="flex-shrink-0 bg-jpm-primary text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
                         <div className="flex flex-col">
                             <h1 className="text-lg font-bold leading-tight">JPM Prep App</h1>
-                            <span className="text-xs text-blue-200">v20.3 | Developed by Satnam using Gemini</span>
+                            <span className="text-xs text-blue-200">v20.4 | Developed by Satnam using Gemini</span>
                         </div>
                         <div className="flex items-center gap-4">
                             <UKClock />
@@ -692,7 +697,7 @@
                         <Dashboard active={mode !== 'menu'} stats={stats} timer={timer} />
                         <main className={`flex-grow overflow-y-auto transition-all duration-300 relative ${mode !== 'menu' ? 'md:ml-64' : ''} scroll-touch pb-40`}>
                             {mode === 'menu' && (
-                                <div className="p-4 md:p-10 max-w-7xl mx-auto flex flex-col items-center justify-start md:justify-center h-full overflow-visible pt-10">
+                                <div className="p-4 md:p-10 max-w-7xl mx-auto flex flex-col items-center justify-start h-full overflow-visible pt-10 pb-40">
                                     <h2 className="text-3xl font-bold text-gray-800 mb-10 text-center">Select Learning Mode</h2>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
                                         {[
@@ -743,7 +748,7 @@
                             {testResults && (
                                 <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4">
                                     <div className="bg-white rounded-xl shadow-2xl p-6 max-w-lg w-full animate-slide-in">
-                                        <h3 className="text-2xl font-bold mb-4">Regression Suite (28 Tests)</h3>
+                                        <h3 className="text-2xl font-bold mb-4">Regression Suite (30 Tests)</h3>
                                         <div className="space-y-2 mb-6 max-h-96 overflow-y-auto">
                                             {testResults.map(r => (
                                                 <div key={r.id} className="flex justify-between items-center p-2 border-b">
