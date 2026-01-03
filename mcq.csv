@@ -89,4 +89,3 @@ Day2_Payments_Fundamentals_ISO20022,"If a payment fails Sanctions Screening, wha
 Day2_Payments_Fundamentals_ISO20022,"Under CBPR+, when is the 'Structured Address' mandatory?",Nov 2022,Nov 2025 (End of Coexistence),Nov 2023,Never,"Nov 2025 (End of Coexistence)"
 Day2_Payments_Fundamentals_ISO20022,"A 'Recall' request (camt.056) usually requires the beneficiary's permission to debit their account. True or False?",True (for most schemes like SEPA),False (Bank can always take it),True but only for fraud,False (Regulator decides),"True (for most schemes like SEPA)"
 Day2_Payments_Fundamentals_ISO20022,"Which character set is strictly allowed in SEPA ISO 20022 messages?",UTF-8 (All),Latin-1 subset,ASCII only,EBCDIC,"Latin-1 subset"
-
