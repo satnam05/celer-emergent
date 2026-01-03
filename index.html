@@ -200,7 +200,7 @@
                 queueRef.current = remaining;
                 
                 // Expose to parent ref for End Button access
-                if(historyRef) historyRef.current = { results, queue: remaining };
+                if(historyRef) historyRef.current = { results, queue: remaining, fullDeck: deckData };
             }, [currentIndex, deckData, results]);
 
             useEffect(() => {
@@ -224,6 +224,7 @@
             const finishSession = (lastRating) => {
                 const finalResults = { ...results, [current.id]: lastRating };
                 const hardCards = deckData.filter(item => finalResults[item.id] === 'hard');
+                // Resume with ONLY hard cards next time
                 onEnd(hardCards.length === 0 ? 100 : 50, hardCards); 
             };
 
@@ -681,10 +682,15 @@
                     const remainingQueue = queueRef.current; // Not yet seen
                     // Get Hard cards from history
                     const hardCards = activeDeck.items.filter(item => historyRef.current.results?.[item.id] === 'hard');
-                    return [...remainingQueue, ...hardCards];
+                    // FIX: Ensure no duplicates if card is both in queue and hard (unlikely but safe)
+                    const combined = [...remainingQueue];
+                    hardCards.forEach(card => {
+                        if (!combined.find(c => c.id === card.id)) combined.push(card);
+                    });
+                    return combined;
                 }
 
-                // MCQ/Type Logic
+                // MCQ/Type Logic: Return Unanswered + Wrong
                 return activeDeck.items.filter(item => {
                    const rec = history[item.id];
                    if (!rec) return true; // Not answered
@@ -734,7 +740,7 @@
                             {mode !== 'menu' && (
                                 <div className="flex gap-2">
                                     <button onClick={() => restartSession(mode, activeDeck.name)} className="bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded text-sm font-bold transition" title="Restart Session"><i className="fas fa-sync-alt"></i></button>
-                                    <button onClick={() => handleHeaderEnd()} className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded text-sm font-bold transition">End</button>
+                                    <button onClick={() => mode === 'flashcard' ? document.querySelector('#flashcard-exit')?.click() : handleHeaderEnd()} className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded text-sm font-bold transition">End</button>
                                 </div>
                             )}
                         </div>
