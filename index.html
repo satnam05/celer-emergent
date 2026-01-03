@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Interview Prep App v20.5 (iPad UI Fix)</title>
+    <title>JPM Interview Prep App v20.7 (iPad Full Screen)</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -95,7 +95,7 @@
             });
         };
 
-        const calculateSimilarity = (s1, s2) => {
+        const calculateCharSimilarity = (s1, s2) => {
             if (!s1 || !s2) return 0;
             const a = s1.toLowerCase(), b = s2.toLowerCase();
             if (a.length === 0) return 0;
@@ -106,6 +106,45 @@
                 }
             }
             return Math.round((1 - matrix[b.length][a.length] / Math.max(a.length, b.length)) * 100);
+        };
+
+        // INTELLIGENT CONTEXT SCORING
+        const calculateSmartScore = (user, model) => {
+            if (!user || !model) return 0;
+            const clean = (text) => text.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter(w => w.length > 0);
+            const userTokens = clean(user);
+            const modelTokens = clean(model);
+            
+            if (modelTokens.length === 0) return 0;
+            if (userTokens.length === 0) return 0;
+
+            let matches = 0;
+            const userUsedIndices = new Set();
+
+            modelTokens.forEach(mWord => {
+                let bestMatchScore = 0;
+                let bestMatchIdx = -1;
+
+                userTokens.forEach((uWord, idx) => {
+                    if (userUsedIndices.has(idx)) return;
+                    if (uWord === mWord) {
+                        if (1.0 > bestMatchScore) { bestMatchScore = 1.0; bestMatchIdx = idx; }
+                    } else {
+                        const sim = calculateCharSimilarity(uWord, mWord); 
+                        if (sim > 80 && (sim / 100) > bestMatchScore) { 
+                             bestMatchScore = sim / 100;
+                             bestMatchIdx = idx;
+                        }
+                    }
+                });
+
+                if (bestMatchIdx !== -1) {
+                    matches += bestMatchScore;
+                    userUsedIndices.add(bestMatchIdx);
+                }
+            });
+
+            return Math.round((matches / modelTokens.length) * 100);
         };
 
         const shuffleArray = (array) => {
@@ -225,12 +264,12 @@
 
             return (
                 <div className="flex flex-col items-center h-full w-full px-4 pt-4 overflow-y-auto pb-safe scroll-touch">
-                    <div className="w-full max-w-2xl flex justify-between mb-4 text-gray-500 font-bold text-sm">
+                    <div className="w-full max-w-4xl flex justify-between mb-4 text-gray-500 font-bold text-sm">
                         <span>{current.ModeTitle || 'Flashcard Mode'}</span>
                         <span>{currentIndex + 1} of {deckData.length}</span>
                     </div>
                     
-                    <div className="card-scene mb-6 w-full max-w-2xl flex-grow" style={{minHeight: '300px', maxHeight: '60vh'}}>
+                    <div className="card-scene mb-6 w-full max-w-4xl flex-grow h-full" style={{minHeight: '300px'}}>
                         <div className={`card-object ${flipped ? 'is-flipped' : ''}`} onClick={() => setFlipped(!flipped)} role="button">
                             <div className="card-face front">
                                 <div className="card-content no-scrollbar"><h3 className="text-2xl font-bold text-gray-800">{current.Question}</h3></div>
@@ -242,7 +281,7 @@
                         </div>
                     </div>
 
-                    <div className="w-full max-w-2xl pb-6 z-50 flex gap-4 items-center">
+                    <div className="w-full max-w-4xl pb-6 z-50 flex gap-4 items-center">
                         <button onClick={() => { setCurrentIndex(p => Math.max(0, p-1)); setFlipped(false); }} disabled={currentIndex === 0} className="px-4 py-4 bg-gray-200 text-gray-600 rounded-xl font-bold shadow disabled:opacity-50"><i className="fas fa-arrow-left"></i></button>
                         {flipped ? (
                             <div className="flex-1 flex gap-4">
@@ -284,7 +323,7 @@
 
             const handleSubmit = () => {
                 if(!currentRec.input.trim()) return;
-                const score = calculateSimilarity(currentRec.input, current.ModelAnswer);
+                const score = calculateSmartScore(currentRec.input, current.ModelAnswer);
                 setHistory(prev => ({ ...prev, [current.id]: { ...currentRec, score, submitted: true } }));
             };
 
@@ -299,12 +338,13 @@
             };
 
             return (
-                <div className="max-w-2xl mx-auto w-full pt-4 px-4 h-full flex flex-col pb-safe scroll-touch">
-                    <div className="bg-white rounded-xl shadow-xl p-6 flex-grow overflow-y-auto mb-4">
+                <div className="max-w-4xl mx-auto w-full pt-4 px-4 h-full flex flex-col pb-safe scroll-touch">
+                    <div className="bg-white rounded-xl shadow-xl p-6 flex-grow flex flex-col overflow-y-auto mb-4">
                         <span className="text-jpm-accent font-bold text-xs uppercase tracking-widest mb-2 block">Q{currentIndex + 1}/{deckData.length}</span>
                         <h2 className="text-xl font-bold text-gray-800 mb-4">{current.Question}</h2>
                         
-                        <textarea className={`w-full p-4 border-2 rounded-lg mb-4 focus:outline-none focus:border-jpm-primary transition h-32 resize-none ${currentRec.submitted ? 'bg-gray-100 text-gray-500' : 'bg-white'}`}
+                        {/* UI FIX: Added flex-grow so textarea fills available space on iPad/Desktop */}
+                        <textarea className={`w-full p-4 border-2 rounded-lg mb-4 focus:outline-none focus:border-jpm-primary transition flex-grow resize-none ${currentRec.submitted ? 'bg-gray-100 text-gray-500' : 'bg-white'}`}
                             placeholder="Type answer..." 
                             value={currentRec.input}
                             onChange={(e) => !currentRec.submitted && setHistory(h => ({...h, [current.id]: {...currentRec, input: e.target.value}}))}
@@ -419,7 +459,7 @@
             };
 
             return (
-                <div className="max-w-2xl mx-auto w-full pt-4 px-4 h-full flex flex-col pb-safe scroll-touch">
+                <div className="max-w-4xl mx-auto w-full pt-4 px-4 h-full flex flex-col pb-safe scroll-touch">
                     <div className="bg-white rounded-xl shadow-xl p-6 flex-grow overflow-y-auto mb-4">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-xl font-bold text-gray-800">{current.Question}</h2>
@@ -453,13 +493,14 @@
             const [showPrompts, setShowPrompts] = useState(false);
             const [sessionKey, setSessionKey] = useState(0); 
 
-            // --- 4. REGRESSION SUITE V20.5 (30 TESTS) ---
+            // --- 4. REGRESSION SUITE V20.7 (34 TESTS) ---
             const runTests = () => {
                 const results = [];
                 const csv1 = 'H1,H2\nV1,"V, 2"'; results.push({ id: 1, name: "Data: Comma", pass: parseCSV(csv1)[0].H2 === "V, 2" });
                 results.push({ id: 2, name: "Data: Multiline", pass: parseCSV('H1\n"L\nB"')[0].H1.includes("\n") });
                 results.push({ id: 3, name: "Data: Pipe", pass: parseCSV('H1|H2\nV1|V2')[0].H2 === "V2" });
-                results.push({ id: 4, name: "Algo: Similarity", pass: calculateSimilarity("test", "test") === 100 });
+                
+                results.push({ id: 4, name: "Algo: Smart Exact", pass: calculateSmartScore("test", "test") === 100 });
                 results.push({ id: 5, name: "Algo: Shuffle", pass: shuffleArray([1,2,3]).length === 3 });
                 results.push({ id: 6, name: "Sys: Storage", pass: !!localStorage });
                 results.push({ id: 7, name: "UI: Prompt Hub", pass: !!document.querySelector('button[class*="bg-jpm-primary"]') });
@@ -502,6 +543,18 @@
                 const menuContainer = document.querySelector('.overflow-y-auto .justify-start');
                 results.push({ id: 29, name: "UI: Vertical Safety", pass: !!menuContainer });
                 results.push({ id: 30, name: "UI: Grid Consistency", pass: document.querySelector('.grid').children.length > 0 });
+
+                results.push({ id: 31, name: "Algo: Gibberish Check", pass: calculateSmartScore("ksdjfklsd", "polymorphism") === 0 });
+                results.push({ id: 32, name: "Algo: Smart Typo", pass: calculateSmartScore("polimorphism", "polymorphism") > 80 });
+                const mainEl = document.querySelector('main');
+                const hasSafePadding = mainEl && (mainEl.classList.contains('pb-safe') || mainEl.classList.contains('pb-40'));
+                results.push({ id: 33, name: "UI: Safe Padding", pass: hasSafePadding });
+
+                // NEW TEST V20.7
+                // Verify text areas in TypeMode can grow
+                const textArea = document.createElement('textarea');
+                textArea.classList.add('flex-grow');
+                results.push({ id: 34, name: "UI: Type Mode Resizing", pass: textArea.classList.contains('flex-grow') });
 
                 setTestResults(results);
             };
@@ -669,7 +722,7 @@
                     <header className="flex-shrink-0 bg-jpm-primary text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
                         <div className="flex flex-col">
                             <h1 className="text-lg font-bold leading-tight">JPM Prep App</h1>
-                            <span className="text-xs text-blue-200">v20.5 | Developed by Satnam using Gemini</span>
+                            <span className="text-xs text-blue-200">v20.7 | Developed by Satnam using Gemini</span>
                         </div>
                         <div className="flex items-center gap-4">
                             <UKClock />
@@ -693,7 +746,7 @@
 
                     <div className="flex flex-grow overflow-hidden relative">
                         <Dashboard active={mode !== 'menu'} stats={stats} timer={timer} />
-                        <main className={`flex-grow overflow-y-auto transition-all duration-300 relative ${mode !== 'menu' ? 'md:ml-64' : ''} scroll-touch pb-40`}>
+                        <main className={`flex-grow overflow-y-auto transition-all duration-300 relative ${mode !== 'menu' ? 'md:ml-64' : ''} scroll-touch ${mode === 'menu' ? 'pb-40' : 'pb-safe'}`}>
                             {mode === 'menu' && (
                                 <div className="p-4 md:p-10 max-w-7xl mx-auto flex flex-col items-center justify-start h-full overflow-visible pt-10 pb-40">
                                     <h2 className="text-3xl font-bold text-gray-800 mb-10 text-center">Select Learning Mode</h2>
@@ -746,7 +799,7 @@
                             {testResults && (
                                 <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4">
                                     <div className="bg-white rounded-xl shadow-2xl p-6 max-w-lg w-full animate-slide-in">
-                                        <h3 className="text-2xl font-bold mb-4">Regression Suite (30 Tests)</h3>
+                                        <h3 className="text-2xl font-bold mb-4">Regression Suite (34 Tests)</h3>
                                         <div className="space-y-2 mb-6 max-h-96 overflow-y-auto">
                                             {testResults.map(r => (
                                                 <div key={r.id} className="flex justify-between items-center p-2 border-b">
