@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>JPM Interview Prep App v20.2 (Mobile UI Final)</title>
     
-    <!-- Dependencies -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -702,7 +701,7 @@
                         <Dashboard active={mode !== 'menu'} stats={stats} timer={timer} />
                         <main className={`flex-grow overflow-y-auto transition-all duration-300 relative ${mode !== 'menu' ? 'md:ml-64' : ''} scroll-touch pb-40`}>
                             {mode === 'menu' && (
-                                <div className="p-4 md:p-10 max-w-7xl mx-auto flex flex-col items-center justify-center h-full">
+                                <div className="p-4 md:p-10 max-w-7xl mx-auto flex flex-col items-center justify-start md:justify-center h-full overflow-visible pt-10">
                                     <h2 className="text-3xl font-bold text-gray-800 mb-10 text-center">Select Learning Mode</h2>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
                                         {[
