@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Prep v20.29 (Smart Voice + Fixed Modal)</title>
+    <title>JPM Prep v20.30 (Infinite Raw Voice)</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -311,7 +311,7 @@
             );
         };
 
-        // --- 4. GAME ENGINES (WITH INFINITE DICTATION & SMART INTELLIGENCE) ---
+        // --- 4. GAME ENGINES ---
 
         const FlashcardMode = ({ deckData, onEnd, onStatsUpdate, pressureMode }) => {
             const [currentIndex, setCurrentIndex] = useState(0);
@@ -435,28 +435,6 @@
             );
         };
 
-        // --- NEW: Smart Correction Utility ---
-        const smartCorrect = (text) => {
-            if(!text) return "";
-            let corrected = text;
-            const replacements = [
-                // Domain Specific Fixes
-                { find: /cheese/gi, replace: "Chase" }, // Context: JP Morgan and "Cheese" -> Chase
-                { find: /sequel/gi, replace: "SQL" },
-                { find: /tie script/gi, replace: "TypeScript" },
-                { find: /jpm/gi, replace: "J.P. Morgan" },
-                { find: /react js/gi, replace: "React.js" },
-                { find: /no js/gi, replace: "Node.js" },
-                { find: /angula/gi, replace: "Angular" },
-                { find: /aws/gi, replace: "AWS" },
-                { find: /api/gi, replace: "API" }
-            ];
-            replacements.forEach(r => {
-                corrected = corrected.replace(r.find, r.replace);
-            });
-            return corrected;
-        };
-
         const TypeMode = ({ deckData, onEnd, onStatsUpdate, pressureMode }) => {
             const [currentIndex, setCurrentIndex] = useState(0);
             const [history, setHistory] = useState({}); 
@@ -478,7 +456,7 @@
             const current = deckData[currentIndex];
             const currentRec = history[current.id] || { input: '', score: 0, submitted: false };
 
-            // --- BULLETPROOF INFINITE DICTATION ---
+            // --- BULLETPROOF INFINITE DICTATION (RAW) ---
             const startSpeechEngine = useCallback(() => {
                 if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) return;
                 
@@ -501,21 +479,16 @@
                         }
                     }
 
-                    // 1. Show stream (raw)
                     setInterimText(interimChunk);
 
-                    // 2. Commit Final using REF to avoid stale closures
                     if (finalChunk) {
-                        const smartChunk = smartCorrect(finalChunk); // APPLY INTELLIGENCE HERE
-                        
+                        // RAW APPENDING (No smartCorrect)
                         const oldVal = inputRef.current;
                         const prefix = oldVal.trim() && !oldVal.endsWith(' ') ? oldVal + ' ' : oldVal;
-                        const newVal = prefix + smartChunk.trim() + ' ';
+                        const newVal = prefix + finalChunk.trim() + ' ';
                         
-                        // Update Truth
                         inputRef.current = newVal;
                         
-                        // Update UI
                         setHistory(prev => ({ 
                             ...prev, 
                             [current.id]: { ...prev[current.id], input: newVal } 
@@ -536,13 +509,11 @@
                 };
                 
                 recognition.onerror = (e) => {
-                    // Ignore 'no-speech' (user paused) and 'aborted' (we stopped it)
                     if (e.error === 'not-allowed') {
                         setIsListening(false);
                         isExplicitlyStopped.current = true;
                         alert("Microphone access denied.");
                     }
-                    // For other errors like 'network' or 'no-speech', onend handles the restart
                 };
                 
                 recognitionRef.current = recognition;
@@ -565,25 +536,23 @@
                 }
             };
 
-            // Sync Ref with State when changing questions
+            // SYNC EFFECT (Only runs on question change, NOT on every character typed)
             useEffect(() => {
-                inputRef.current = currentRec.input || ""; 
-            }, [currentRec.input]);
-
-            // Cleanup when component unmounts
-            useEffect(() => {
+                // 1. Reset Internal State
                 if(pressureMode) setTimeLeft(60);
                 inputRef.current = history[current.id]?.input || "";
                 setStarData({ s: '', t: '', a: '', r: '' }); 
                 setInterimText("");
                 
-                // Hard Stop
+                // 2. FORCE STOP on navigation (Clean Slate)
                 if(recognitionRef.current) {
                     isExplicitlyStopped.current = true;
                     recognitionRef.current.stop();
                 }
                 setIsListening(false);
-            }, [currentIndex, pressureMode, current.id, history]);
+                
+                // NO 'history' dependency here! This fixes the restart loop.
+            }, [currentIndex, pressureMode, current.id]); 
 
             const finalizeSubmission = useCallback((finalInput) => {
                 const score = calculateSmartScore(finalInput, current.ModelAnswer);
@@ -1170,7 +1139,7 @@
                     <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
                         <div className="flex flex-col">
                             <h1 className="text-lg font-bold leading-tight">JPM Prep App</h1>
-                            <span className="text-xs text-blue-200">v20.29 (Smart Voice + Fixed Modal)</span>
+                            <span className="text-xs text-blue-200">v20.30 (Infinite Raw Voice)</span>
                         </div>
                         <div className="flex items-center gap-4">
                             <UKClock />
