@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Prep v20.28 (Smart Voice)</title>
+    <title>JPM Prep v20.29 (Smart Voice + Fixed Modal)</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -1170,7 +1170,7 @@
                     <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
                         <div className="flex flex-col">
                             <h1 className="text-lg font-bold leading-tight">JPM Prep App</h1>
-                            <span className="text-xs text-blue-200">v20.28 (Smart Voice)</span>
+                            <span className="text-xs text-blue-200">v20.29 (Smart Voice + Fixed Modal)</span>
                         </div>
                         <div className="flex items-center gap-4">
                             <UKClock />
@@ -1281,6 +1281,25 @@
                                             ))}
                                         </div>
                                         <button onClick={() => setTestResults(null)} className="w-full bg-blue-600 text-white py-2 rounded font-bold">Close</button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {modalDeck && (
+                                <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4">
+                                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-8 max-w-md w-full animate-slide-in">
+                                        <h3 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">{modalDeck.name}</h3>
+                                        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded mb-6">
+                                            <p className="text-sm text-gray-600 dark:text-gray-300">Status: <span className="font-bold text-green-600 dark:text-green-400">Completed</span></p>
+                                            {(modalDeck.mode !== 'study' && modalDeck.mode !== 'skill') && <p className="text-sm text-gray-600 dark:text-gray-300">Last Score: <span className="font-bold">{modalDeck.stats.score}%</span></p>}
+                                            <p className="text-sm text-gray-600 dark:text-gray-300">Completed On: <span className="font-mono text-xs">{modalDeck.stats.date}</span></p>
+                                        </div>
+                                        <div className="flex gap-4">
+                                            <button onClick={() => setModalDeck(null)} className="flex-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-white py-3 rounded-lg font-bold hover:bg-gray-300">Close</button>
+                                            <button onClick={() => restartSession(modalDeck.mode, modalDeck.name)} className="flex-1 bg-jpm-primary text-white py-3 rounded-lg font-bold hover:bg-jpm-dark">
+                                                {(modalDeck.mode === 'study' || modalDeck.mode === 'skill') ? 'Re-Open' : 'Restart'}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             )}
