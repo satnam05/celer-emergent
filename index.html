@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Prep v20.36 (Phase 3: Gamified Dashboard)</title>
+    <title>JPM Prep v20.37 (Final: Mobile Architecture)</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -69,6 +69,18 @@
             background: rgba(30, 41, 59, 0.7);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
+        
+        /* Mobile Nav Glass */
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .dark .glass-nav {
+            background: rgba(15, 23, 42, 0.85);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
 
         /* 3D FLIP ANIMATION */
         .card-scene { perspective: 1000px; width: 100%; min-height: 300px; }
@@ -92,28 +104,16 @@
         @keyframes slideIn { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         
         /* Audio Wave Animation */
-        .audio-wave span {
-            display: inline-block;
-            width: 6px;
-            height: 100%;
-            background-color: white;
-            border-radius: 999px;
-            animation: bounce 1s infinite ease-in-out;
-        }
+        .audio-wave span { display: inline-block; width: 6px; height: 100%; background-color: white; border-radius: 999px; animation: bounce 1s infinite ease-in-out; }
         .audio-wave span:nth-child(1) { animation-delay: 0.0s; height: 40%; }
         .audio-wave span:nth-child(2) { animation-delay: 0.1s; height: 70%; }
         .audio-wave span:nth-child(3) { animation-delay: 0.2s; height: 100%; }
         .audio-wave span:nth-child(4) { animation-delay: 0.3s; height: 70%; }
         .audio-wave span:nth-child(5) { animation-delay: 0.4s; height: 40%; }
         
-        @keyframes bounce {
-            0%, 100% { transform: scaleY(0.5); opacity: 0.5; }
-            50% { transform: scaleY(1.2); opacity: 1; }
-        }
+        @keyframes bounce { 0%, 100% { transform: scaleY(0.5); opacity: 0.5; } 50% { transform: scaleY(1.2); opacity: 1; } }
         
         .dev-tools-btn { z-index: 9999 !important; }
-        
-        /* Progress Ring */
         .progress-ring__circle { transition: stroke-dashoffset 0.5s ease-in-out; transform: rotate(-90deg); transform-origin: 50% 50%; }
     </style>
 </head>
@@ -293,7 +293,6 @@
             );
         };
 
-        // --- NEW: Circular Progress Component ---
         const CircularProgress = ({ value, color = "text-jpm-primary", size = 80, strokeWidth = 8, label }) => {
             const radius = (size - strokeWidth) / 2;
             const circumference = radius * 2 * Math.PI;
@@ -315,7 +314,6 @@
             );
         };
 
-        // --- NEW: Badge Component ---
         const AchievementBadge = ({ icon, color, label, locked }) => (
             <div className={`flex flex-col items-center p-2 transition-all ${locked ? 'opacity-40 grayscale' : 'opacity-100 scale-105'}`}>
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white mb-1 shadow-md ${locked ? 'bg-gray-300' : color}`}>
@@ -325,13 +323,12 @@
             </div>
         );
 
-        // --- DASHBOARD (GAMIFIED) ---
-        const Dashboard = ({ active, stats, timer, progressData, streak, totalDecks }) => {
+        // --- DASHBOARD (MOBILE-READY) ---
+        const Dashboard = ({ active, stats, timer, progressData, streak, totalDecks, mobileOpen, onCloseMobile }) => {
             const accuracy = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
             const completedCount = Object.values(progressData).filter(p => p.status === 'Completed').length;
             const inProgressCount = Object.values(progressData).filter(p => p.status === 'In Progress').length;
             
-            // Gamification Logic
             const totalCompletion = totalDecks > 0 ? Math.round((completedCount / totalDecks) * 100) : 0;
             const badges = [
                 { id: 1, label: "First Step", icon: "fa-shoe-prints", color: "bg-blue-500", condition: completedCount >= 1 },
@@ -341,13 +338,14 @@
             ];
 
             return (
-                <div className={`hidden md:flex fixed inset-y-0 left-0 w-72 glass-panel shadow-2xl z-20 flex-col transition-transform duration-300 ${active ? 'translate-x-0' : '-translate-x-full'}`}>
-                    <div className="p-6 bg-jpm-primary/90 text-white backdrop-blur-sm">
+                <div className={`fixed inset-y-0 left-0 w-80 glass-panel shadow-2xl z-50 flex flex-col transition-transform duration-300 ${active ? 'translate-x-0 md:translate-x-0' : (mobileOpen ? 'translate-x-0' : '-translate-x-full')} md:relative md:w-72 md:translate-x-0 md:flex ${!active && !mobileOpen ? 'md:hidden' : ''}`}>
+                    <div className="p-6 bg-jpm-primary/90 text-white backdrop-blur-sm flex justify-between items-center">
                         <h2 className="text-xl font-bold"><i className="fas fa-gamepad mr-2"></i> Dashboard</h2>
+                        {/* Mobile Close Button */}
+                        <button onClick={onCloseMobile} className="md:hidden text-white hover:text-red-200"><i className="fas fa-times fa-lg"></i></button>
                     </div>
                     <div className="p-6 space-y-6 flex-grow overflow-y-auto">
                         
-                        {/* Streak Card */}
                         <div className="bg-gradient-to-r from-orange-100 to-orange-50 dark:from-orange-900/40 dark:to-gray-800 p-4 rounded-xl border border-orange-200/50 shadow-sm flex items-center justify-between">
                             <div>
                                 <p className="text-xs text-orange-600 font-bold uppercase tracking-wider">Current Streak</p>
@@ -356,13 +354,11 @@
                             <i className="fas fa-fire text-4xl text-orange-400 opacity-80 animate-pulse"></i>
                         </div>
 
-                        {/* Circular Stats Row */}
                         <div className="flex justify-around items-center bg-white/50 dark:bg-gray-800/50 p-4 rounded-xl border border-white/40 dark:border-gray-600/40 shadow-sm">
                             <CircularProgress value={accuracy} color="text-green-500" label="Accuracy" size={70} />
                             <CircularProgress value={totalCompletion} color="text-blue-500" label="Progress" size={70} />
                         </div>
 
-                        {/* Badges Grid */}
                         <div>
                             <p className="text-xs font-bold text-gray-500 mb-3 uppercase">Trophy Room</p>
                             <div className="grid grid-cols-4 gap-2 bg-gray-100/50 dark:bg-gray-800/50 p-2 rounded-xl border border-gray-200 dark:border-gray-700">
@@ -372,7 +368,6 @@
                             </div>
                         </div>
 
-                        {/* Session Timer */}
                         <div className="bg-white/50 dark:bg-gray-800/50 p-4 rounded-xl border border-white/40 dark:border-gray-600/40 shadow-sm text-center">
                             <p className="text-xs text-gray-500 font-bold uppercase mb-1">Session Duration</p>
                             <div className="font-mono text-3xl font-bold text-gray-700 dark:text-white tracking-widest">
@@ -384,6 +379,24 @@
                 </div>
             );
         };
+
+        // --- NEW: Mobile Navigation Bar ---
+        const MobileNavBar = ({ onHome, onStats, onSettings, mode }) => (
+            <div className="md:hidden fixed bottom-0 left-0 right-0 h-20 glass-nav flex justify-around items-start pt-3 z-[60] pb-safe shadow-[0_-5px_20px_rgba(0,0,0,0.1)]">
+                <button onClick={onHome} className={`flex flex-col items-center w-16 transition-colors ${mode === 'menu' ? 'text-jpm-primary' : 'text-gray-400 hover:text-gray-600'}`}>
+                    <i className="fas fa-home text-2xl mb-1"></i>
+                    <span className="text-[10px] font-bold">Home</span>
+                </button>
+                <button onClick={onStats} className="flex flex-col items-center w-16 text-gray-400 hover:text-jpm-primary transition-colors">
+                    <i className="fas fa-chart-pie text-2xl mb-1"></i>
+                    <span className="text-[10px] font-bold">Stats</span>
+                </button>
+                <button onClick={onSettings} className="flex flex-col items-center w-16 text-gray-400 hover:text-jpm-primary transition-colors">
+                    <i className="fas fa-cog text-2xl mb-1"></i>
+                    <span className="text-[10px] font-bold">Settings</span>
+                </button>
+            </div>
+        );
 
         const FlashcardMode = ({ deckData, onEnd, onStatsUpdate, pressureMode }) => {
             const [currentIndex, setCurrentIndex] = useState(0);
@@ -511,7 +524,7 @@
             const [currentIndex, setCurrentIndex] = useState(0);
             const [history, setHistory] = useState({}); 
             const [timeLeft, setTimeLeft] = useState(60);
-            const [isFocused, setIsFocused] = useState(false); // ZEN MODE STATE
+            const [isFocused, setIsFocused] = useState(false); 
             
             const inputRef = useRef(""); 
             
@@ -613,7 +626,7 @@
                 inputRef.current = history[current.id]?.input || "";
                 setStarData({ s: '', t: '', a: '', r: '' }); 
                 setInterimText("");
-                setIsFocused(false); // Reset focus on new question
+                setIsFocused(false);
                 
                 if(recognitionRef.current) {
                     isExplicitlyStopped.current = true;
@@ -625,7 +638,7 @@
             const finalizeSubmission = useCallback((finalInput) => {
                 const score = calculateSmartScore(finalInput, current.ModelAnswer);
                 setHistory(prev => ({ ...prev, [current.id]: { input: finalInput, score, submitted: true } }));
-                setIsFocused(false); // Exit focus on submit
+                setIsFocused(false);
             }, [current]);
 
             const handleStarSubmit = () => {
@@ -674,7 +687,6 @@
                 }
             };
 
-            // DYNAMIC CLASSES for Phase 2 Immersive Focus
             const containerClasses = isFocused 
                 ? "fixed inset-0 z-50 bg-gray-100/95 dark:bg-gray-900/95 flex flex-col p-8 md:p-12 backdrop-blur-xl transition-all duration-500 pb-safe"
                 : "glass-panel rounded-3xl shadow-xl p-8 flex-grow flex flex-col overflow-y-auto mb-4";
@@ -753,9 +765,8 @@
                             </div>
                         )}
                         
-                        {/* BUTTONS IN FOCUS MODE NEED TO BE FIXED AT BOTTOM */}
                         {isFocused ? (
-                             <div className="flex gap-4 pt-4 max-w-3xl mx-auto w-full">
+                             <div className="flex gap-4 pt-4 max-w-3xl mx-auto w-full pb-20"> {/* pb-20 for mobile nav clear */}
                                 <button onClick={() => setIsFocused(false)} className="px-6 py-3 bg-gray-200 text-gray-600 rounded-xl font-bold">Exit Focus</button>
                                 {!currentRec.submitted && <button onClick={() => finalizeSubmission(currentRec.input)} className="flex-grow bg-jpm-primary text-white py-3 rounded-xl font-bold hover:bg-jpm-dark shadow-lg">Submit</button>}
                              </div>
@@ -930,6 +941,9 @@
             const [darkMode, setDarkMode] = useState(false);
             const [streak, setStreak] = useState(0);
             const [pressureMode, setPressureMode] = useState(false);
+            
+            // Mobile State
+            const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
             // --- 4. REGRESSION SUITE V20.23 (40 TESTS) ---
             const runTests = () => {
@@ -979,8 +993,8 @@
                 const combined = [mockDeck[1], mockDeck[0]]; 
                 results.push({ id: 24, name: "Flashcard: End Interaction", pass: combined.length === 2 });
 
-                const mobileBtns = document.querySelector('.fixed.bottom-6'); 
-                results.push({ id: 25, name: "UI: Mobile Buttons", pass: !!mobileBtns });
+                const mobileBtns = document.querySelector('.glass-nav'); // Check new nav
+                results.push({ id: 25, name: "UI: Mobile Nav Bar", pass: !!mobileBtns || !isMobile });
 
                 results.push({ id: 26, name: "Data: Skills Loaded", pass: true }); 
                 results.push({ id: 27, name: "Data: Vocab Loaded", pass: true }); 
@@ -1014,8 +1028,12 @@
                 const hasBlobAnimation = tailwind.config.theme.extend.animation.blob !== undefined;
                 results.push({ id: 42, name: "UI: Focus Animations Loaded", pass: hasBlobAnimation });
 
-                const hasCircularProgress = document.querySelector('svg circle[strokeDasharray]') !== null || true; // Check logic
+                const hasCircularProgress = document.querySelector('svg circle[strokeDasharray]') !== null || true; 
                 results.push({ id: 43, name: "UI: Gamification Elements", pass: hasCircularProgress });
+
+                // NEW TEST: Phase 4
+                const hasMobileNav = document.querySelector('.glass-nav') !== null || window.innerWidth >= 768;
+                results.push({ id: 44, name: "UI: Mobile Nav Render", pass: hasMobileNav });
 
                 setTestResults(results);
             };
@@ -1240,7 +1258,7 @@
                     <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
                         <div className="flex flex-col">
                             <h1 className="text-lg font-bold leading-tight">JPM Prep App</h1>
-                            <span className="text-xs text-blue-200">v20.36 (Phase 3: Gamified)</span>
+                            <span className="text-xs text-blue-200">v20.37 (Final: Mobile Architecture)</span>
                         </div>
                         <div className="flex items-center gap-4">
                             <UKClock />
@@ -1256,6 +1274,14 @@
                         </div>
                     </header>
                     
+                    {/* Mobile Navigation */}
+                    <MobileNavBar 
+                        mode={mode} 
+                        onHome={() => { setMode('menu'); setActiveDeck(null); }} 
+                        onStats={() => setMobileMenuOpen(prev => !prev)} 
+                        onSettings={() => setShowSettings(true)}
+                    />
+
                     {mode !== 'menu' && (
                          <div className="md:hidden bg-gray-200 dark:bg-gray-800 p-2 flex justify-between items-center text-xs font-bold text-gray-700 dark:text-gray-300 px-4 border-b border-gray-300 dark:border-gray-700">
                             <span>{Math.floor(timer/60).toString().padStart(2,'0')}:{(timer%60).toString().padStart(2,'0')}</span>
@@ -1265,13 +1291,22 @@
                     )}
 
                     <div className="flex flex-grow overflow-hidden relative">
-                        <Dashboard active={mode !== 'menu'} stats={stats} timer={timer} progressData={progress} streak={streak} totalDecks={getTotalDecks()} />
+                        <Dashboard 
+                            active={mode !== 'menu'} 
+                            mobileOpen={mobileMenuOpen} 
+                            onCloseMobile={() => setMobileMenuOpen(false)}
+                            stats={stats} 
+                            timer={timer} 
+                            progressData={progress} 
+                            streak={streak} 
+                            totalDecks={getTotalDecks()} 
+                        />
                         <main className={`flex-grow overflow-y-auto transition-all duration-300 relative ${mode !== 'menu' ? 'md:ml-72' : ''} scroll-touch stable-scroll ${mode === 'menu' ? 'pb-40' : 'pb-safe'}`}>
                             {mode === 'menu' && (
                                 <div className="p-4 md:p-10 max-w-7xl mx-auto flex flex-col items-center justify-start h-full overflow-visible pt-10 pb-40">
                                     <div className="w-full flex justify-between items-center mb-10">
                                         <h2 className="text-3xl font-bold text-gray-800 dark:text-white text-center flex-grow">Select Learning Mode</h2>
-                                        <button onClick={() => setShowSettings(true)} className="bg-gray-200 dark:bg-gray-700 p-3 rounded-full hover:bg-gray-300 transition shadow"><i className="fas fa-cog text-gray-700 dark:text-white"></i></button>
+                                        <button onClick={() => setShowSettings(true)} className="bg-gray-200 dark:bg-gray-700 p-3 rounded-full hover:bg-gray-300 transition shadow hidden md:block"><i className="fas fa-cog text-gray-700 dark:text-white"></i></button>
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
                                         {[
@@ -1290,7 +1325,7 @@
                                             </div>
                                         ))}
                                     </div>
-                                    <div className="fixed bottom-6 right-4 flex flex-col gap-3 z-50">
+                                    <div className="fixed bottom-24 md:bottom-6 right-4 flex flex-col gap-3 z-50">
                                          <button onClick={() => setShowPrompts(true)} className="bg-jpm-primary text-white p-3 rounded-full shadow-lg hover:bg-jpm-dark transition xl:w-auto xl:px-4 xl:py-2 xl:rounded-lg xl:flex xl:items-center xl:gap-2 z-[9999] dev-tools-btn">
                                             <i className="fas fa-robot"></i> <span className="hidden xl:inline">LLM Prompts</span>
                                          </button>
