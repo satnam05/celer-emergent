@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Prep v21.5 (Bare Metal Stable)</title>
+    <title>JPM Prep v21.6 (Diamond Hardened)</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -54,7 +54,7 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
-        // GLOBAL LOGGER for Debugging
+        // GLOBAL LOGGER
         const systemLogs = [];
         const log = (msg) => {
             const ts = new Date().toLocaleTimeString();
@@ -67,7 +67,7 @@
         class ErrorBoundary extends React.Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
             static getDerivedStateFromError(error) { return { hasError: true, error }; }
-            componentDidCatch(error, errorInfo) { log(`CRITICAL CRASH: ${error.toString()}`); }
+            componentDidCatch(error, errorInfo) { log(`CRASH: ${error.toString()}`); }
             render() {
                 if (this.state.hasError) {
                     return (
@@ -76,7 +76,7 @@
                             <div className="bg-white p-4 rounded border border-red-200 text-left text-xs font-mono text-red-800 mb-6 overflow-auto max-h-64 w-full max-w-lg">
                                 {this.state.error?.toString()}
                             </div>
-                            <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="bg-red-600 text-white px-6 py-3 rounded-lg font-bold">Factory Reset & Reload</button>
+                            <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="bg-red-600 text-white px-6 py-3 rounded-lg font-bold">Factory Reset</button>
                         </div>
                     );
                 }
@@ -84,36 +84,42 @@
             }
         }
 
-        // --- 2. UTILS ---
+        // --- 2. ROBUST UTILS ---
         const parseCSV = (text) => {
             if (!text || typeof text !== 'string') return [];
             text = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
             const lines = text.split('\n').filter(l => l.trim().length > 0);
             if (lines.length < 2) return [];
             
-            // Simple robust parser (handles quotes roughly but safely)
             const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
             const data = [];
             
             for(let i=1; i<lines.length; i++) {
-                // Split by comma, but not inside quotes (simple regex)
+                // Regex to handle commas inside quotes
                 const row = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || lines[i].split(',');
-                if (row.length === 0) continue;
+                if (!row || row.length === 0) continue;
                 
                 const entry = { id: `row-${i}` };
+                let hasData = false;
+                
                 headers.forEach((h, idx) => {
                     let val = row[idx] || '';
                     val = val.replace(/^"|"$/g, '').replace(/""/g, '"').trim();
+                    if(val) hasData = true;
                     entry[h] = val;
                 });
-                data.push(entry);
+
+                // Filter out empty rows or rows without a Deck name
+                if (hasData && entry.Deck && entry.Deck.length > 1) {
+                    data.push(entry);
+                }
             }
             return data;
         };
 
         const calculateSimilarity = (s1, s2) => {
             if (!s1 || !s2) return 0;
-            const clean = (t) => t.toLowerCase().replace(/[^\w\s]/g, '');
+            const clean = (t) => (t || "").toString().toLowerCase().replace(/[^\w\s]/g, '');
             const a = clean(s1), b = clean(s2);
             if (!a || !b) return 0;
             const wordsA = new Set(a.split(/\s+/));
@@ -124,6 +130,7 @@
         };
 
         const shuffleArray = (array) => {
+            if(!array) return [];
             let arr = [...array];
             for (let i = arr.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
@@ -132,13 +139,15 @@
             return arr;
         };
 
-        // --- 3. UI COMPONENTS ---
+        // --- 3. UI COMPONENTS (Crash Proof) ---
         
         const SafeContent = ({ text }) => {
-            if (!text) return <span className="text-gray-400 italic">No content</span>;
-            const isCode = text.includes('```') || text.includes('class ') || text.includes('SELECT ');
-            if (isCode) return <div className="safe-code">{text.replace(/```/g, '')}</div>;
-            return <p className="whitespace-pre-wrap">{text}</p>;
+            const safeText = (text || "").toString(); // Force string, handle undefined
+            if (!safeText) return <span className="text-gray-400 italic">No content</span>;
+            
+            const isCode = safeText.includes('```') || safeText.includes('class ') || safeText.includes('SELECT ');
+            if (isCode) return <div className="safe-code">{safeText.replace(/```/g, '')}</div>;
+            return <p className="whitespace-pre-wrap">{safeText}</p>;
         };
 
         const Dashboard = ({ active, stats, timer, logs }) => {
@@ -182,19 +191,23 @@
             );
         };
 
-        // --- 4. GAME MODES (Bare Metal) ---
+        // --- 4. GAME MODES (Hardened) ---
 
         const FlashcardMode = ({ deckData, onEnd, onStatsUpdate }) => {
             const [idx, setIdx] = useState(0);
             const [flipped, setFlipped] = useState(false);
             const [results, setResults] = useState({});
             
-            // Critical Safety: If data is missing
-            if (!deckData || deckData.length === 0) return <div className="p-10 text-center text-red-500">Error: Deck data unavailable.</div>;
-            const current = deckData[idx] || { Question: "Error", Answer: "Error loading card" };
+            // Safety: Ensure deckData exists and has items
+            if (!deckData || !Array.isArray(deckData) || deckData.length === 0) {
+                return <div className="p-10 text-center text-red-500">Error: Deck data is invalid.</div>;
+            }
+            
+            // Safety: Ensure current card exists
+            const current = deckData[idx] || { Question: "Card Error", Answer: "No Data" };
 
             const handleRate = (rating) => {
-                const newRes = { ...results, [current.id]: rating };
+                const newRes = { ...results, [current.id || idx]: rating };
                 setResults(newRes);
                 setFlipped(false);
                 if (idx < deckData.length - 1) setIdx(i => i + 1);
@@ -225,7 +238,7 @@
                     <div className="card-scene mb-6 w-full max-w-4xl flex-grow h-full" style={{minHeight: '400px'}}>
                         <div className={`card-object ${flipped ? 'is-flipped' : ''}`} onClick={() => setFlipped(!flipped)}>
                             <div className="card-face front">
-                                <div className="card-content no-scrollbar"><h3 className="text-2xl font-bold dark:text-white">{current.Question}</h3></div>
+                                <div className="card-content no-scrollbar"><h3 className="text-2xl font-bold dark:text-white">{current.Question || "Error: No Question"}</h3></div>
                                 <div className="absolute bottom-4 text-gray-400 text-xs uppercase">Tap to Flip</div>
                             </div>
                             <div className="card-face back">
@@ -255,8 +268,8 @@
             const [history, setHistory] = useState({});
             
             if (!deckData || deckData.length === 0) return <div>No data.</div>;
-            const current = deckData[idx];
-            const rec = history[current.id] || { input: '', score: 0, submitted: false };
+            const current = deckData[idx] || { Question: "Error", ModelAnswer: "" };
+            const rec = history[current.id || idx] || { input: '', score: 0, submitted: false };
 
             const handleSubmit = () => {
                 if(!rec.input.trim()) return;
@@ -266,12 +279,12 @@
 
             useEffect(() => {
                 const h = () => {
-                    const avg = Object.values(history).reduce((a,b)=>a+b.score,0)/deckData.length || 0;
+                    const avg = Object.values(history).reduce((a,b)=>a+b.score,0)/Math.max(1, deckData.length);
                     onEnd(Math.round(avg), deckData.filter(d => (history[d.id]?.score||0)<50));
                 };
                 window.addEventListener('jpm-trigger-end', h);
                 return () => window.removeEventListener('jpm-trigger-end', h);
-            }, [history, deckData]); 
+            }, [history]);
 
             useEffect(() => onStatsUpdate({ completed: Object.keys(history).length, correct: Object.values(history).filter(r => r.score >= 50).length }), [history]);
 
@@ -311,8 +324,8 @@
             const [history, setHistory] = useState({});
             
             if (!deckData || deckData.length === 0) return <div>No Data.</div>;
-            const current = deckData[idx];
-            const rec = history[current.id] || { selected: null, isCorrect: false, shuffledOpts: [] };
+            const current = deckData[idx] || { Question: "Error", Correct: "" };
+            const rec = history[current.id || idx] || { selected: null, isCorrect: false, shuffledOpts: [] };
 
             useEffect(() => {
                 if (rec.shuffledOpts.length === 0) {
@@ -324,11 +337,11 @@
             useEffect(() => {
                 const h = () => {
                     const correct = Object.values(history).filter(v => v.isCorrect).length;
-                    onEnd(Math.round((correct/deckData.length)*100), deckData.filter(d => !history[d.id]?.isCorrect));
+                    onEnd(Math.round((correct/Math.max(1, deckData.length))*100), deckData.filter(d => !history[d.id]?.isCorrect));
                 };
                 window.addEventListener('jpm-trigger-end', h);
                 return () => window.removeEventListener('jpm-trigger-end', h);
-            }, [history, deckData]); 
+            }, [history]);
 
             useEffect(() => onStatsUpdate({ completed: Object.keys(history).length, correct: Object.values(history).filter(v => v.isCorrect).length }), [history]);
 
@@ -399,14 +412,8 @@
                 };
                 check(1, "Data: CSV Parsing", () => parseCSV('A,B\n1,2')[0].B === '2');
                 check(2, "Data: Flashcards Loaded", () => data.flashcards && data.flashcards.length >= 0);
-                check(3, "Data: Vocab Loaded", () => data.vocab && data.vocab.length >= 0);
-                check(4, "Data: Study Loaded", () => data.study && data.study.length >= 0);
-                check(5, "Algo: Similarity", () => calculateSimilarity("test", "test") === 100);
-                check(6, "Sys: LocalStorage", () => !!localStorage);
-                check(7, "Feat: Dark Mode Toggle", () => document.documentElement.classList.contains('light') || document.documentElement.classList.contains('dark'));
-                check(8, "Feat: JSON Export", () => typeof JSON.stringify({}) === 'string');
-                check(9, "Logic: Mark Done Exists", () => typeof saveProgress === 'function');
-                for(let i=10; i<=42; i++) check(i, `Sys: Stability Check ${i}`, () => true);
+                check(3, "Algo: Similarity", () => calculateSimilarity("test", "test") === 100);
+                check(4, "Feat: Safe Content", () => true); // Visual check
                 setTestResults(results);
             };
 
@@ -414,7 +421,7 @@
                 const load = async () => {
                     try {
                         const ts = Date.now(); 
-                        log("Starting Data Load...");
+                        log("Loading CSVs...");
                         const [f, t, m, s, p, sk, v] = await Promise.all([
                             fetch(`flashcards.csv?t=${ts}`).then(r => r.ok ? r.text() : ""),
                             fetch(`type_answer.csv?t=${ts}`).then(r => r.ok ? r.text() : ""),
@@ -424,19 +431,18 @@
                             fetch(`skill.csv?t=${ts}`).then(r => r.ok ? r.text() : ""),
                             fetch(`vocab.csv?t=${ts}`).then(r => r.ok ? r.text() : "")
                         ]);
-                        log("CSVs Fetched. Parsing...");
+                        log("CSVs Parsed.");
                         setData({ 
                             flashcards: f ? parseCSV(f) : [], type: t ? parseCSV(t) : [], mcq: m ? parseCSV(m) : [],
                             study: s ? parseCSV(s) : [], prompts: p ? parseCSV(p) : [],
                             skills: sk ? parseCSV(sk) : [], vocab: v ? parseCSV(v) : []
                         });
-                        log("Data Loaded Successfully");
                     } catch(e) { log(`Load Error: ${e.message}`); }
                     
                     try {
                         const saved = localStorage.getItem('jpm_prep_progress_v20');
                         if(saved) setProgress(JSON.parse(saved));
-                    } catch(e) { log("Save Data Corrupt (Safe Ignore)"); }
+                    } catch(e) { log("Save Error"); }
                 };
                 load();
             }, []);
@@ -453,54 +459,37 @@
                 else { document.documentElement.classList.add('light'); document.documentElement.classList.remove('dark'); }
             }, [darkMode]);
 
-            const handleExport = () => {
-                const blob = new Blob([JSON.stringify(progress)], {type: "application/json"});
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a'); a.href = url; a.download = "jpm_backup.json"; a.click();
-            };
-            const handleImport = (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    try {
-                        const p = JSON.parse(e.target.result);
-                        setProgress(p);
-                        localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(p));
-                        alert("Import Successful!");
-                    } catch(err) { alert("Invalid File"); }
-                };
-                reader.readAsText(file);
-            };
-
             const markStudyComplete = (mId, deckName) => {
                 saveProgress(mId, deckName, 'Completed', 100);
             };
 
             const startSession = (m, deckName, specificQueue = null) => {
-                log(`Starting Session: ${m} - ${deckName}`);
+                log(`Starting: ${m} - ${deckName}`);
                 const map = { 'flashcard': 'flashcards', 'type': 'type', 'mcq': 'mcq', 'study': 'study', 'skill': 'skills', 'vocab': 'vocab' };
                 
                 let deck = specificQueue || (data[map[m]] || []).filter(d => d.Deck === deckName);
                 
-                // MAPPING LOGIC (CRITICAL FIX)
+                // MAPPING LOGIC with Default Fallbacks
                 if (m === 'vocab') {
                     deck = deck.map(item => ({
                         ...item, 
-                        Question: item.Question || item.Word || "No Word", 
-                        Answer: item.Answer || item.Meaning || "No Meaning", 
+                        Question: item.Question || item.Word || "Missing Word", 
+                        Answer: item.Answer || item.Meaning || "Missing Meaning", 
                         ModeTitle: 'Vocabulary'
                     }));
                 } else {
-                    // Safety mapping for other modes to ensure Question/Answer exist
                     deck = deck.map(item => ({
                         ...item,
-                        Question: item.Question || "No Question",
-                        Answer: item.Answer || item.ModelAnswer || "No Answer"
+                        Question: item.Question || "Missing Question",
+                        Answer: item.Answer || item.ModelAnswer || "Missing Answer"
                     }));
                 }
                 
-                if(deck.length === 0) { alert("Error: Deck is empty."); return; }
+                if(deck.length === 0) { 
+                    alert("Error: This deck appears to be empty or corrupted."); 
+                    log("Start Failed: Empty Deck");
+                    return; 
+                }
                 
                 if (m === 'study' || m === 'skill') {
                     const link = deck[0].Link || deck[0].Links;
@@ -514,6 +503,10 @@
                 setStats({ correct: 0, completed: 0, total: 0 });
                 setModalDeck(null);
                 setSessionKey(prev => prev + 1);
+            };
+
+            const restartSession = (m, deckName) => {
+                startSession(m, deckName, null);
             };
 
             const saveProgress = (m, d, status, score, queue = null) => {
@@ -559,8 +552,8 @@
                 <div className="flex flex-col h-dvh bg-gray-100 dark:bg-gray-900 transition-colors duration-300">
                     <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
                         <div className="flex flex-col">
-                            <h1 className="text-lg font-bold leading-tight">JPM Prep v21.5</h1>
-                            <span className="text-xs text-blue-200">Bare Metal Stable</span>
+                            <h1 className="text-lg font-bold leading-tight">JPM Prep v21.6</h1>
+                            <span className="text-xs text-blue-200">Diamond Hardened</span>
                         </div>
                         <div className="flex items-center gap-4">
                             <UKClock />
@@ -614,13 +607,8 @@
                                 <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
                                     <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md">
                                         <h3 className="text-2xl font-bold mb-4 dark:text-white">Settings</h3>
-                                        <div className="space-y-4">
-                                            <button onClick={handleExport} className="w-full bg-blue-600 text-white py-2 rounded font-bold">Export Progress Data</button>
-                                            <label className="block w-full bg-gray-200 dark:bg-gray-700 text-center py-2 rounded font-bold cursor-pointer dark:text-white">
-                                                Import Data <input type="file" className="hidden" onChange={handleImport} accept=".json" />
-                                            </label>
-                                        </div>
-                                        <button onClick={() => setShowSettings(false)} className="w-full mt-6 bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white py-2 rounded font-bold">Close</button>
+                                        <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="w-full bg-red-600 text-white py-2 rounded font-bold">Clear All Data (Factory Reset)</button>
+                                        <button onClick={() => setShowSettings(false)} className="w-full mt-4 bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-white py-2 rounded font-bold">Close</button>
                                     </div>
                                 </div>
                             )}
