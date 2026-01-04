@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Prep v20.20 (UK Voice + Continuous)</title>
+    <title>JPM Prep v20.21 (Voice Perfected)</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -102,11 +102,20 @@
             }).filter(Boolean);
         };
 
-        // ENHANCED SPEECH MANAGER (UK + Male Preference)
+        // ENHANCED SPEECH MANAGER (Phonetic Fixes + UK Male)
         const SpeechManager = {
             hasRecognition: () => 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window,
             hasSynthesis: () => 'speechSynthesis' in window,
             voices: [],
+            
+            // Dictionary for tricky words
+            phoneticMap: {
+                "TUPE": "Too P", // Forces "Too-Pee" pronunciation
+                "SQL": "Sequel",
+                "JPM": "J P M",
+                "API": "A P I",
+                "OOPS": "Oops"
+            },
             
             init: function() {
                 if (this.hasSynthesis()) {
@@ -118,33 +127,41 @@
                 }
             },
 
+            getPhoneticText: function(text) {
+                if (!text) return "";
+                // Replace known acronyms with phonetic equivalents
+                return text.split(' ').map(word => {
+                    const cleanWord = word.replace(/[^a-zA-Z0-9]/g, ''); // Remove punctuation for lookup
+                    const mapping = this.phoneticMap[cleanWord.toUpperCase()];
+                    return mapping || word;
+                }).join(' ');
+            },
+
             speak: function(text) {
                 if (!this.hasSynthesis()) return;
                 window.speechSynthesis.cancel(); 
                 
-                const utterance = new SpeechSynthesisUtterance(text);
+                // Use phonetic version
+                const phoneticText = this.getPhoneticText(text);
+                const utterance = new SpeechSynthesisUtterance(phoneticText);
                 
-                // VOICE SELECTION LOGIC:
-                // 1. Try exact GB Male
-                // 2. Try any GB
-                // 3. Fallback to default
+                // Voice Selection: Prioritize "Google UK English Male" or "Daniel"
                 let voice = this.voices.find(v => v.lang === 'en-GB' && (v.name.includes('Male') || v.name.includes('Daniel')));
-                if (!voice) voice = this.voices.find(v => v.lang === 'en-GB');
+                if (!voice) voice = this.voices.find(v => v.lang === 'en-GB'); // Any UK
                 
                 if (voice) {
                     utterance.voice = voice;
                     utterance.lang = 'en-GB';
-                    utterance.rate = 0.9; // Slightly slower for clarity
+                    utterance.rate = 0.9; 
                     utterance.pitch = 1.0;
                 } else {
-                    utterance.lang = 'en-US'; // Fallback
+                    utterance.lang = 'en-GB'; // Fallback lang
                 }
                 
                 window.speechSynthesis.speak(utterance);
             }
         };
         
-        // Initialize voices on load
         SpeechManager.init();
 
         const getWordDistance = (s1, s2) => {
@@ -299,7 +316,7 @@
             );
         };
 
-        // --- 4. GAME ENGINES ---
+        // --- 4. GAME ENGINES (WITH CONTINUOUS VOICE) ---
 
         const FlashcardMode = ({ deckData, onEnd, onStatsUpdate, pressureMode }) => {
             const [currentIndex, setCurrentIndex] = useState(0);
@@ -432,56 +449,68 @@
             const [starData, setStarData] = useState({ s: '', t: '', a: '', r: '' }); 
             const [isListening, setIsListening] = useState(false);
             const recognitionRef = useRef(null);
+            
+            // NEW: Flag to track if user clicked stop
+            const isExplicitlyStopped = useRef(false);
 
             if (!deckData || deckData.length === 0) return <div>No data.</div>;
             const current = deckData[currentIndex];
             const currentRec = history[current.id] || { input: '', score: 0, submitted: false };
 
-            // IMPROVED VOICE LOGIC (Continuous)
             const toggleListening = () => {
                 if (isListening) {
+                    // USER CLICKED STOP
+                    isExplicitlyStopped.current = true;
                     if (recognitionRef.current) recognitionRef.current.stop();
                     setIsListening(false);
                 } else {
+                    // START
                     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
                         alert("Speech recognition not supported."); return;
                     }
                     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                     const recognition = new SpeechRecognition();
-                    recognition.continuous = true; // KEEP LISTENING
-                    recognition.interimResults = true; // Real-time feedback
+                    recognition.continuous = true; 
+                    recognition.interimResults = true; 
                     recognition.lang = 'en-US';
 
-                    let finalTranscript = '';
+                    isExplicitlyStopped.current = false; // Reset stop flag
 
                     recognition.onstart = () => setIsListening(true);
                     
-                    // On Result, we need to append to existing text CAREFULLY
                     recognition.onresult = (event) => {
-                        let interimTranscript = '';
+                        let finalTranscript = '';
                         for (let i = event.resultIndex; i < event.results.length; ++i) {
                             if (event.results[i].isFinal) {
                                 finalTranscript += event.results[i][0].transcript + ' ';
-                            } else {
-                                interimTranscript += event.results[i][0].transcript;
                             }
                         }
-                        
-                        // We construct the "New Input" as: [What was there before we started] + [What we just said]
-                        // Note: To make this robust for continuous editing, we usually append to the end.
-                        // Simplified Strategy: Just append final results to current input.
                         if (finalTranscript) {
                             const prefix = inputRef.current.trim() ? inputRef.current.trim() + ' ' : '';
                             const newVal = prefix + finalTranscript.trim();
-                            // Update State
                             setHistory(prev => ({ ...prev, [current.id]: { ...currentRec, input: newVal } }));
-                            // Reset local transcript accumulator so we don't double-append
-                            finalTranscript = ''; 
                         }
                     };
 
-                    recognition.onend = () => setIsListening(false);
-                    recognition.onerror = () => setIsListening(false);
+                    // AUTO-RESTART LOGIC
+                    recognition.onend = () => {
+                        if (!isExplicitlyStopped.current) {
+                            // If user didn't click stop, restart it!
+                            try { recognition.start(); } catch(e) {}
+                        } else {
+                            setIsListening(false);
+                        }
+                    };
+                    
+                    recognition.onerror = (e) => {
+                        console.error(e);
+                        // Optional: Restart on error too, or just stop
+                        if (!isExplicitlyStopped.current) {
+                             setTimeout(() => { try { recognition.start(); } catch(e) {} }, 100);
+                        } else {
+                            setIsListening(false);
+                        }
+                    };
                     
                     recognitionRef.current = recognition;
                     recognition.start();
@@ -504,6 +533,11 @@
                 if(pressureMode) setTimeLeft(60);
                 inputRef.current = history[current.id]?.input || "";
                 setStarData({ s: '', t: '', a: '', r: '' }); 
+                // Force stop recording on card change
+                if(recognitionRef.current) {
+                    isExplicitlyStopped.current = true;
+                    recognitionRef.current.stop();
+                }
                 setIsListening(false);
             }, [currentIndex, pressureMode, current.id, history]);
 
@@ -770,7 +804,7 @@
             const [streak, setStreak] = useState(0);
             const [pressureMode, setPressureMode] = useState(false);
 
-            // --- 4. REGRESSION SUITE V20.20 (40 TESTS) ---
+            // --- 4. REGRESSION SUITE V20.21 (40 TESTS) ---
             const runTests = () => {
                 const results = [];
                 // FIXED TEST DATA
@@ -1073,7 +1107,7 @@
                     <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
                         <div className="flex flex-col">
                             <h1 className="text-lg font-bold leading-tight">JPM Prep App</h1>
-                            <span className="text-xs text-blue-200">v20.20 (UK Voice + Continuous)</span>
+                            <span className="text-xs text-blue-200">v20.21 (Voice Perfected)</span>
                         </div>
                         <div className="flex items-center gap-4">
                             <UKClock />
