@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Prep v20.23 (Robust Voice)</title>
+    <title>JPM Prep v20.24 (Continuous Voice)</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -445,24 +445,29 @@
             const [isListening, setIsListening] = useState(false);
             const recognitionRef = useRef(null);
             
+            // TRACKER: Did the user click stop? If not, we restart automatically.
             const isExplicitlyStopped = useRef(false);
 
             if (!deckData || deckData.length === 0) return <div>No data.</div>;
             const current = deckData[currentIndex];
             const currentRec = history[current.id] || { input: '', score: 0, submitted: false };
 
-            // ROBUST CONTINUOUS DICTATION LOGIC
+            // --- ROBUST CONTINUOUS DICTATION LOGIC ---
             const toggleListening = () => {
                 if (isListening) {
+                    // STOP REQUEST: User clicked the button to stop.
                     isExplicitlyStopped.current = true;
                     if (recognitionRef.current) recognitionRef.current.stop();
                     setIsListening(false);
                 } else {
+                    // START REQUEST
                     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-                        alert("Speech recognition not supported."); return;
+                        alert("Speech recognition not supported in this browser."); return;
                     }
                     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                     const recognition = new SpeechRecognition();
+                    
+                    // CRITICAL: Keep connection open and show results immediately
                     recognition.continuous = true; 
                     recognition.interimResults = true; 
                     recognition.lang = 'en-US';
@@ -473,24 +478,45 @@
                     
                     recognition.onresult = (event) => {
                         let finalTranscript = '';
+                        let interimTranscript = '';
+
+                        // Loop through results to separate confirmed text from "in-progress" text
                         for (let i = event.resultIndex; i < event.results.length; ++i) {
                             if (event.results[i].isFinal) {
-                                finalTranscript += event.results[i][0].transcript + ' ';
+                                finalTranscript += event.results[i][0].transcript;
+                            } else {
+                                interimTranscript += event.results[i][0].transcript;
                             }
                         }
+
                         if (finalTranscript) {
-                            const prefix = inputRef.current.trim() ? inputRef.current.trim() + ' ' : '';
-                            const newVal = prefix + finalTranscript.trim();
-                            setHistory(prev => ({ ...prev, [current.id]: { ...currentRec, input: newVal } }));
+                            // Append ONLY finalized text to the main history state
+                            // We use a functional update to ensure we don't lose previous typed text
+                            setHistory(prev => {
+                                const oldVal = prev[current.id]?.input || "";
+                                // Add a space if the previous text didn't end with one
+                                const prefix = oldVal.trim() && !oldVal.endsWith(' ') ? oldVal + ' ' : oldVal;
+                                const newVal = prefix + finalTranscript.trim() + ' ';
+                                
+                                // Update the ref so the next loop knows the current state
+                                inputRef.current = newVal; 
+                                return { ...prev, [current.id]: { ...currentRec, input: newVal } };
+                            });
                         }
                     };
 
-                    // FIXED: BOUNCE LOGIC (50ms Delay to prevent browser blocking)
+                    // AUTO-RESTART LOGIC
                     recognition.onend = () => {
                         if (!isExplicitlyStopped.current) {
-                            setIsListening(true); // Keep UI active
+                            // If user didn't click stop, it was a silence timeout. Restart immediately.
+                            // We add a tiny delay to prevent browser CPU spikes
                             setTimeout(() => {
-                                try { recognition.start(); } catch(e) { /* Ignore start errors */ }
+                                try { 
+                                    recognition.start(); 
+                                } catch(e) { 
+                                    // Ignore errors if it's already started
+                                    console.log("Restarting speech engine..."); 
+                                }
                             }, 50);
                         } else {
                             setIsListening(false);
@@ -498,11 +524,13 @@
                     };
                     
                     recognition.onerror = (e) => {
-                        if (e.error === 'no-speech' && !isExplicitlyStopped.current) {
-                             // Just a pause, keep going
+                        console.error("Speech Error:", e.error);
+                        if (e.error === 'no-speech' || e.error === 'network') {
+                             // Ignore these errors and let onend handle the restart
                              return; 
                         }
-                        if (!isExplicitlyStopped.current) {
+                        // For other errors, we might want to stop to prevent infinite loops
+                        if (!isExplicitlyStopped.current && e.error !== 'aborted') {
                              setTimeout(() => { try { recognition.start(); } catch(e) {} }, 100);
                         } else {
                             setIsListening(false);
@@ -513,6 +541,7 @@
                     recognition.start();
                 }
             };
+            // ------------------------------------------
 
             useEffect(() => { inputRef.current = currentRec.input || ""; }, [currentRec.input]);
 
@@ -530,6 +559,8 @@
                 if(pressureMode) setTimeLeft(60);
                 inputRef.current = history[current.id]?.input || "";
                 setStarData({ s: '', t: '', a: '', r: '' }); 
+                
+                // Cleanup: Stop listening if we change questions
                 if(recognitionRef.current) {
                     isExplicitlyStopped.current = true;
                     recognitionRef.current.stop();
@@ -613,7 +644,7 @@
                                     <button 
                                         onClick={toggleListening} 
                                         className={`absolute bottom-6 right-4 p-3 rounded-full shadow-lg transition-all ${isListening ? 'bg-red-500 recording-active text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
-                                        title="Speak Answer (Continuous)"
+                                        title={isListening ? "Stop Recording" : "Start Recording"}
                                     >
                                         <i className={`fas ${isListening ? 'fa-microphone-slash' : 'fa-microphone'}`}></i>
                                     </button>
@@ -1105,7 +1136,7 @@
                     <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
                         <div className="flex flex-col">
                             <h1 className="text-lg font-bold leading-tight">JPM Prep App</h1>
-                            <span className="text-xs text-blue-200">v20.23 (Robust Voice)</span>
+                            <span className="text-xs text-blue-200">v20.24 (Continuous Voice)</span>
                         </div>
                         <div className="flex items-center gap-4">
                             <UKClock />
