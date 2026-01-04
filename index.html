@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Prep v20.12 (Steady & Fixed)</title>
+    <title>JPM Prep v20.13 (Pressure Timer)</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -38,10 +38,10 @@
         .card-object { width: 100%; height: 100%; position: relative; transition: transform 0.6s; transform-style: preserve-3d; cursor: pointer; }
         .card-face { position: absolute; height: 100%; width: 100%; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 1rem; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
         
-        /* FIXED: Force Scrollbar Track to prevent Layout Shift */
+        /* Card Content - Steady */
         .card-content { 
             flex-grow: 1; 
-            overflow-y: scroll; /* Forces scrollbar track to always exist */
+            overflow-y: scroll; /* Force scrollbar track */
             padding: 2rem; 
             display: flex; 
             flex-direction: column; 
@@ -50,7 +50,6 @@
             text-align: center;
         }
         
-        /* Custom Scrollbar Styling */
         .card-content::-webkit-scrollbar { width: 8px; }
         .card-content::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); }
         .card-content::-webkit-scrollbar-thumb { background-color: rgba(156, 163, 175, 0.5); border-radius: 4px; }
@@ -111,9 +110,7 @@
 
             if (rows.length < 2) return [];
             const headers = rows[0].map(h => h.trim());
-            
-            const results = [];
-            rows.slice(1).forEach((row, idx) => {
+            return rows.slice(1).map((row, idx) => {
                 const entry = { id: `row-${idx}` };
                 let hasData = false;
                 headers.forEach((h, i) => {
@@ -124,9 +121,9 @@
                     if(val) hasData = true;
                     entry[h] = val;
                 });
-                if(hasData && entry.Deck) results.push(entry);
-            });
-            return results;
+                if(hasData && entry.Deck) return entry;
+                return null;
+            }).filter(Boolean);
         };
 
         const calculateSimilarity = (s1, s2) => {
@@ -207,8 +204,8 @@
                         <div>
                             <p className="text-xs font-bold text-gray-500 mb-2 uppercase">Total Progress</p>
                             <div className="flex h-4 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700">
-                                <div style={{width: `${(completedCount/totalDecks)*100}%`}} className="bg-green-500" title="Completed"></div>
-                                <div style={{width: `${(inProgressCount/totalDecks)*100}%`}} className="bg-blue-500" title="In Progress"></div>
+                                <div style={{width: `${(completedCount/Math.max(1,totalDecks))*100}%`}} className="bg-green-500" title="Completed"></div>
+                                <div style={{width: `${(inProgressCount/Math.max(1,totalDecks))*100}%`}} className="bg-blue-500" title="In Progress"></div>
                             </div>
                             <div className="flex justify-between text-xs mt-2 text-gray-600 dark:text-gray-400 font-medium">
                                 <span className="text-green-600">{completedCount} Done</span>
@@ -233,17 +230,35 @@
             );
         };
 
-        // --- 3. GAME ENGINES ---
+        // --- 3. GAME ENGINES (Added PressureTimer Logic) ---
 
-        const FlashcardMode = ({ deckData, onEnd, onStatsUpdate }) => {
+        const FlashcardMode = ({ deckData, onEnd, onStatsUpdate, pressureMode }) => {
             const [currentIndex, setCurrentIndex] = useState(0);
             const [flipped, setFlipped] = useState(false);
             const [results, setResults] = useState({}); 
             const [maxIndex, setMaxIndex] = useState(0); 
+            const [timeLeft, setTimeLeft] = useState(60);
 
             if (!deckData || deckData.length === 0) return <div className="p-10 text-center text-gray-500">No cards in deck.</div>;
             const current = deckData[currentIndex];
             const currentRating = results[current.id];
+
+            // Timer Logic
+            useEffect(() => {
+                if (!pressureMode || flipped) return; // Don't tick if answered or off
+                setTimeLeft(60); // Reset on new card
+                const timer = setInterval(() => {
+                    setTimeLeft(prev => {
+                        if (prev <= 1) {
+                            clearInterval(timer);
+                            setFlipped(true); // Auto-flip
+                            return 0;
+                        }
+                        return prev - 1;
+                    });
+                }, 1000);
+                return () => clearInterval(timer);
+            }, [currentIndex, flipped, pressureMode]);
 
             useEffect(() => {
                 const handleEndSignal = () => {
@@ -267,6 +282,7 @@
             const handleRate = (rating) => {
                 setResults(prev => ({ ...prev, [current.id]: rating }));
                 setFlipped(false);
+                setTimeLeft(60); // Reset timer
                 if (currentIndex < deckData.length - 1) {
                     const next = currentIndex + 1;
                     setCurrentIndex(next);
@@ -296,13 +312,14 @@
                 <div className="flex flex-col items-center h-full w-full px-4 pt-4 overflow-y-auto pb-safe scroll-touch dark:text-white">
                     <div className="w-full max-w-4xl flex justify-between mb-4 text-gray-500 dark:text-gray-400 font-bold text-sm">
                         <span>{current.ModeTitle || 'Flashcard Mode'}</span>
+                        {pressureMode && !flipped && <span className={`font-mono ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-blue-500'}`}>⏳ 00:{timeLeft.toString().padStart(2,'0')}</span>}
                         <span>{currentIndex + 1} of {deckData.length}</span>
                     </div>
                     
                     <div className="card-scene mb-6 w-full max-w-4xl flex-grow h-full" style={{minHeight: '300px'}}>
                         <div className={`card-object ${flipped ? 'is-flipped' : ''}`} onClick={() => setFlipped(!flipped)} role="button">
                             <div className="card-face front">
-                                <div className="card-content no-scrollbar"><h3 className="text-2xl font-bold text-gray-800 dark:text-white">{current.Question}</h3></div>
+                                <div className="card-content"><h3 className="text-2xl font-bold text-gray-800 dark:text-white">{current.Question}</h3></div>
                                 <div className="absolute bottom-4 text-gray-400 text-xs uppercase tracking-widest">Tap to Flip</div>
                             </div>
                             <div className="card-face back">
@@ -312,7 +329,7 @@
                     </div>
 
                     <div className="w-full max-w-4xl pb-6 z-50 flex gap-4 items-center">
-                        <button onClick={() => { setCurrentIndex(p => Math.max(0, p-1)); setFlipped(false); }} disabled={currentIndex === 0} className="px-4 py-4 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-white rounded-xl font-bold shadow disabled:opacity-50"><i className="fas fa-arrow-left"></i></button>
+                        <button onClick={() => { setCurrentIndex(p => Math.max(0, p-1)); setFlipped(false); setTimeLeft(60); }} disabled={currentIndex === 0} className="px-4 py-4 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-white rounded-xl font-bold shadow disabled:opacity-50"><i className="fas fa-arrow-left"></i></button>
                         {flipped ? (
                             <div className="flex-1 flex gap-4">
                                 <button onClick={(e) => { e.stopPropagation(); handleRate('hard'); }} className={getBtnStyle('hard')}>
@@ -325,19 +342,42 @@
                         ) : (
                             <button onClick={() => setFlipped(true)} className="flex-1 px-8 py-4 bg-jpm-primary text-white rounded-lg font-bold shadow-lg hover:bg-jpm-dark transition active:scale-95">Show Answer</button>
                         )}
-                        <button onClick={() => { const n=currentIndex+1; if(n<=maxIndex) setCurrentIndex(n); setFlipped(false); }} disabled={currentIndex >= maxIndex} className="px-4 py-4 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-white rounded-xl font-bold shadow disabled:opacity-50"><i className="fas fa-arrow-right"></i></button>
+                        <button onClick={() => { const n=currentIndex+1; if(n<=maxIndex) setCurrentIndex(n); setFlipped(false); setTimeLeft(60); }} disabled={currentIndex >= maxIndex} className="px-4 py-4 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-white rounded-xl font-bold shadow disabled:opacity-50"><i className="fas fa-arrow-right"></i></button>
                     </div>
                 </div>
             );
         };
 
-        const TypeMode = ({ deckData, onEnd, onStatsUpdate }) => {
+        const TypeMode = ({ deckData, onEnd, onStatsUpdate, pressureMode }) => {
             const [currentIndex, setCurrentIndex] = useState(0);
             const [history, setHistory] = useState({}); 
+            const [timeLeft, setTimeLeft] = useState(60);
             
             if (!deckData || deckData.length === 0) return <div>No data.</div>;
             const current = deckData[currentIndex];
             const currentRec = history[current.id] || { input: '', score: 0, submitted: false };
+
+            const handleSubmit = useCallback(() => {
+                const inputVal = currentRec.input || ""; // Safe handle
+                const score = calculateSimilarity(inputVal, current.ModelAnswer);
+                setHistory(prev => ({ ...prev, [current.id]: { ...currentRec, input: inputVal, score, submitted: true } }));
+            }, [current, currentRec]);
+
+            useEffect(() => {
+                if (!pressureMode || currentRec.submitted) return;
+                setTimeLeft(60);
+                const timer = setInterval(() => {
+                    setTimeLeft(prev => {
+                        if (prev <= 1) {
+                            clearInterval(timer);
+                            handleSubmit(); // Auto submit
+                            return 0;
+                        }
+                        return prev - 1;
+                    });
+                }, 1000);
+                return () => clearInterval(timer);
+            }, [currentIndex, pressureMode, currentRec.submitted, handleSubmit]);
 
             useEffect(() => {
                 const handleEndSignal = () => {
@@ -355,15 +395,10 @@
                 onStatsUpdate({ completed: done, correct });
             }, [history, onStatsUpdate]);
 
-            const handleSubmit = () => {
-                if(!currentRec.input.trim()) return;
-                const score = calculateSimilarity(currentRec.input, current.ModelAnswer);
-                setHistory(prev => ({ ...prev, [current.id]: { ...currentRec, score, submitted: true } }));
-            };
-
             const handleNext = () => {
                 if (currentIndex < deckData.length - 1) {
                     setCurrentIndex(prev => prev + 1);
+                    setTimeLeft(60);
                 } else {
                     const avg = Object.values(history).reduce((a,b)=>a+b.score,0) / deckData.length;
                     const wrongItems = deckData.filter(d => (history[d.id]?.score || 0) < 50);
@@ -374,7 +409,10 @@
             return (
                 <div className="max-w-4xl mx-auto w-full pt-4 px-4 h-full flex flex-col pb-safe scroll-touch">
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 flex-grow flex flex-col overflow-y-auto mb-4">
-                        <span className="text-jpm-accent font-bold text-xs uppercase tracking-widest mb-2 block">Q{currentIndex + 1}/{deckData.length}</span>
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-jpm-accent font-bold text-xs uppercase tracking-widest block">Q{currentIndex + 1}/{deckData.length}</span>
+                            {pressureMode && !currentRec.submitted && <span className={`font-mono text-sm font-bold ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-blue-500'}`}>⏳ 00:{timeLeft.toString().padStart(2,'0')}</span>}
+                        </div>
                         <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">{current.Question}</h2>
                         
                         <textarea className={`w-full p-4 border-2 rounded-lg mb-4 focus:outline-none focus:border-jpm-primary transition flex-grow resize-none ${currentRec.submitted ? 'bg-gray-100 text-gray-500' : 'bg-white dark:bg-gray-700 dark:text-white'}`}
@@ -396,7 +434,7 @@
                         )}
                     </div>
                     <div className="flex gap-4 pb-6">
-                        <button onClick={() => setCurrentIndex(c => Math.max(0, c-1))} disabled={currentIndex === 0} className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-white rounded-lg font-bold hover:bg-gray-300 disabled:opacity-50"><i className="fas fa-arrow-left"></i></button>
+                        <button onClick={() => {setCurrentIndex(c => Math.max(0, c-1)); setTimeLeft(60);}} disabled={currentIndex === 0} className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-white rounded-lg font-bold hover:bg-gray-300 disabled:opacity-50"><i className="fas fa-arrow-left"></i></button>
                         
                         {!currentRec.submitted ? (
                             <button onClick={handleSubmit} className="flex-grow bg-jpm-primary text-white py-3 rounded-lg font-bold hover:bg-jpm-dark">Submit</button>
@@ -411,13 +449,49 @@
             );
         };
 
-        const MCQMode = ({ deckData, onEnd, onStatsUpdate }) => {
+        const MCQMode = ({ deckData, onEnd, onStatsUpdate, pressureMode }) => {
             const [currentIndex, setCurrentIndex] = useState(0);
             const [history, setHistory] = useState({}); 
+            const [timeLeft, setTimeLeft] = useState(60);
             
             if (!deckData || deckData.length === 0) return <div>No Data.</div>;
             const current = deckData[currentIndex];
             const currentRec = history[current.id] || { selected: null, isCorrect: false, shuffledOpts: [] };
+
+            const checkAnswer = useCallback((selectedText) => {
+                const correctVal = current.Correct.trim();
+                let isMatch = false;
+                
+                // Timeout case (null passed)
+                if (selectedText === null) {
+                    setHistory(prev => ({ ...prev, [current.id]: { ...currentRec, selected: "TIMEOUT", isCorrect: false } }));
+                    return;
+                }
+
+                const selectedOptObj = currentRec.shuffledOpts.find(o => o.text === selectedText);
+                if (correctVal.length === 1 && ['A','B','C','D'].includes(correctVal.toUpperCase())) {
+                     if (selectedOptObj && selectedOptObj.id === correctVal.toUpperCase()) isMatch = true;
+                } else {
+                    if (selectedText.trim() === correctVal) isMatch = true;
+                }
+                setHistory(prev => ({ ...prev, [current.id]: { ...currentRec, selected: selectedText, isCorrect: isMatch } }));
+            }, [current, currentRec]);
+
+            useEffect(() => {
+                if (!pressureMode || currentRec.selected) return;
+                setTimeLeft(60);
+                const timer = setInterval(() => {
+                    setTimeLeft(prev => {
+                        if (prev <= 1) {
+                            clearInterval(timer);
+                            checkAnswer(null); // Timeout triggers fail
+                            return 0;
+                        }
+                        return prev - 1;
+                    });
+                }, 1000);
+                return () => clearInterval(timer);
+            }, [currentIndex, pressureMode, currentRec.selected, checkAnswer]);
 
             useEffect(() => {
                 const handleEndSignal = () => {
@@ -450,21 +524,10 @@
                 onStatsUpdate({ completed: done, correct });
             }, [history, onStatsUpdate]);
 
-            const checkAnswer = (selectedText) => {
-                const correctVal = current.Correct.trim();
-                let isMatch = false;
-                const selectedOptObj = currentRec.shuffledOpts.find(o => o.text === selectedText);
-                if (correctVal.length === 1 && ['A','B','C','D'].includes(correctVal.toUpperCase())) {
-                     if (selectedOptObj && selectedOptObj.id === correctVal.toUpperCase()) isMatch = true;
-                } else {
-                    if (selectedText.trim() === correctVal) isMatch = true;
-                }
-                setHistory(prev => ({ ...prev, [current.id]: { ...currentRec, selected: selectedText, isCorrect: isMatch } }));
-            };
-
             const handleNext = () => {
                 if (currentIndex < deckData.length - 1) {
                     setCurrentIndex(prev => prev + 1);
+                    setTimeLeft(60);
                 } else {
                     const correctCount = Object.values(history).filter(v => v.isCorrect).length;
                     const score = Math.round((correctCount / deckData.length) * 100);
@@ -478,6 +541,8 @@
 
             const getOptionStyle = (optText) => {
                 if (!currentRec.selected) return "bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:border-blue-300";
+                
+                // Highlight correct answer even if timeout
                 const correctVal = current.Correct.trim();
                 const optObj = currentRec.shuffledOpts.find(o => o.text === optText);
                 let isThisCorrect = false;
@@ -486,6 +551,7 @@
                 } else {
                     if (optText === correctVal) isThisCorrect = true;
                 }
+                
                 if (isThisCorrect) return "bg-green-50 border-green-500 text-green-700 font-bold";
                 if (currentRec.selected === optText) return "bg-red-50 border-red-500 text-red-700";
                 return "bg-gray-50 border-gray-100 text-gray-300 opacity-50";
@@ -496,7 +562,10 @@
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 flex-grow overflow-y-auto mb-4 flex flex-col">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-xl font-bold text-gray-800 dark:text-white">{current.Question}</h2>
-                            <span className="text-sm font-bold text-gray-400">{currentIndex+1}/{deckData.length}</span>
+                            <div className="text-right">
+                                <span className="text-sm font-bold text-gray-400 block">{currentIndex+1}/{deckData.length}</span>
+                                {pressureMode && !currentRec.selected && <span className={`font-mono text-xs font-bold ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-blue-500'}`}>⏳ 00:{timeLeft.toString().padStart(2,'0')}</span>}
+                            </div>
                         </div>
                         <div className="space-y-3 flex-grow overflow-y-auto">
                             {currentRec.shuffledOpts.map((opt, i) => (
@@ -505,9 +574,10 @@
                                 </button>
                             ))}
                         </div>
+                        {currentRec.selected === "TIMEOUT" && <div className="mt-2 text-center text-red-500 font-bold text-sm">Time's Up!</div>}
                     </div>
                     <div className="flex gap-4 pb-6">
-                        <button onClick={() => setCurrentIndex(c => Math.max(0, c-1))} disabled={currentIndex === 0} className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-white rounded-lg font-bold hover:bg-gray-300 disabled:opacity-50"><i className="fas fa-arrow-left"></i></button>
+                        <button onClick={() => {setCurrentIndex(c => Math.max(0, c-1)); setTimeLeft(60);}} disabled={currentIndex === 0} className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-white rounded-lg font-bold hover:bg-gray-300 disabled:opacity-50"><i className="fas fa-arrow-left"></i></button>
                         <button onClick={handleNext} className="w-full bg-gray-800 text-white py-3 rounded-lg font-bold hover:bg-black disabled:opacity-50" disabled={!currentRec.selected}>{currentIndex === deckData.length -1 ? 'Finish' : 'Next'}</button>
                     </div>
                 </div>
@@ -528,13 +598,15 @@
             const [sessionKey, setSessionKey] = useState(0); 
             const [darkMode, setDarkMode] = useState(false);
             const [streak, setStreak] = useState(0);
+            
+            // NEW: Pressure Mode State
+            const [pressureMode, setPressureMode] = useState(false);
 
-            // --- 4. REGRESSION SUITE V20.12 (37 TESTS) ---
+            // --- 4. REGRESSION SUITE V20.13 (38 TESTS) ---
             const runTests = () => {
                 const results = [];
                 // FIXED TEST DATA: Added "Deck" column to prevent parser crash
                 const csv1 = 'Deck,H2\nTest,"V, 2"'; 
-                
                 try {
                     const parsed = parseCSV(csv1);
                     results.push({ id: 1, name: "Data: Comma Parser", pass: parsed.length > 0 && parsed[0].H2 === "V, 2" });
@@ -601,6 +673,9 @@
                 results.push({ id: 35, name: "Feat: Dark Mode Toggle", pass: document.documentElement.classList.contains('light') || document.documentElement.classList.contains('dark') });
                 results.push({ id: 36, name: "Feat: JSON Export Logic", pass: typeof JSON.stringify({}) === 'string' });
                 results.push({ id: 37, name: "Feat: Streak Calc", pass: streak >= 0 });
+                
+                // NEW TEST: Timer Logic
+                results.push({ id: 38, name: "Feat: Pressure Mode State", pass: typeof pressureMode === 'boolean' });
 
                 setTestResults(results);
             };
@@ -626,7 +701,14 @@
                     } catch(e) { console.error(e); }
                     
                     const saved = localStorage.getItem('jpm_prep_progress_v20');
-                    if(saved) setProgress(JSON.parse(saved));
+                    if(saved) {
+                        const parsed = JSON.parse(saved);
+                        setProgress(parsed);
+                        // RESTORE SETTINGS
+                        if(parsed._settings) {
+                            setPressureMode(parsed._settings.pressureMode || false);
+                        }
+                    }
 
                     // STREAK LOGIC
                     const today = new Date().toLocaleDateString();
@@ -682,11 +764,21 @@
                     try {
                         const p = JSON.parse(e.target.result);
                         setProgress(p);
+                        if(p._settings) setPressureMode(p._settings.pressureMode || false);
                         localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(p));
                         alert("Import Successful!");
                     } catch(err) { alert("Invalid File"); }
                 };
                 reader.readAsText(file);
+            };
+
+            // Save Settings
+            const togglePressureMode = () => {
+                const newVal = !pressureMode;
+                setPressureMode(newVal);
+                const newP = { ...progress, _settings: { ...(progress._settings || {}), pressureMode: newVal } };
+                setProgress(newP);
+                localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(newP));
             };
 
             const startSession = (m, deckName, specificQueue = null) => {
@@ -695,7 +787,6 @@
 
                 if(deck.length === 0) return;
                 
-                // --- STUDY & SKILL (Link based) ---
                 if (m === 'study' || m === 'skill') {
                     const link = deck[0].Link || deck[0].Links; 
                     if(link) window.open(link, '_blank');
@@ -704,7 +795,6 @@
                     return;
                 }
 
-                // --- VOCAB MAPPING ---
                 if (m === 'vocab') {
                     deck = deck.map(item => ({...item, Question: item.Word, Answer: item.Meaning, ModeTitle: 'Vocabulary'}));
                 }
@@ -814,7 +904,7 @@
                     <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
                         <div className="flex flex-col">
                             <h1 className="text-lg font-bold leading-tight">JPM Prep App</h1>
-                            <span className="text-xs text-blue-200">v20.12 (Steady & Fixed)</span>
+                            <span className="text-xs text-blue-200">v20.13 (Pressure Timer)</span>
                         </div>
                         <div className="flex items-center gap-4">
                             <UKClock />
@@ -880,6 +970,10 @@
                                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 max-w-sm w-full animate-slide-in">
                                         <h3 className="text-2xl font-bold mb-4 dark:text-white"><i className="fas fa-cog mr-2"></i>Settings</h3>
                                         <div className="space-y-4">
+                                            <button onClick={togglePressureMode} className={`w-full py-3 rounded-lg font-bold flex justify-between px-4 items-center ${pressureMode ? 'bg-red-100 text-red-600 border-2 border-red-500' : 'bg-gray-200 text-gray-700'}`}>
+                                                <span>⏳ Pressure Mode (60s Timer)</span>
+                                                {pressureMode ? <i className="fas fa-toggle-on text-2xl"></i> : <i className="fas fa-toggle-off text-2xl text-gray-400"></i>}
+                                            </button>
                                             <button onClick={handleExport} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700"><i className="fas fa-download mr-2"></i>Backup Data</button>
                                             <label className="block w-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white py-3 rounded-lg font-bold text-center cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600">
                                                 <i className="fas fa-upload mr-2"></i>Restore Data <input type="file" className="hidden" onChange={handleImport} accept=".json" />
@@ -911,7 +1005,7 @@
                             {testResults && (
                                 <div className="fixed inset-0 bg-black bg-opacity-80 z-[10000] flex items-center justify-center p-4">
                                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 max-w-lg w-full animate-slide-in">
-                                        <h3 className="text-2xl font-bold mb-4 dark:text-white">Regression Suite (37 Tests)</h3>
+                                        <h3 className="text-2xl font-bold mb-4 dark:text-white">Regression Suite (38 Tests)</h3>
                                         <div className="space-y-2 mb-6 max-h-96 overflow-y-auto">
                                             {testResults.map(r => (
                                                 <div key={r.id} className="flex justify-between items-center p-2 border-b dark:border-gray-700">
@@ -944,9 +1038,9 @@
                                 </div>
                             )}
 
-                            {(mode === 'flashcard' || mode === 'vocab') && activeDeck && <FlashcardMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} />}
-                            {mode === 'type' && activeDeck && <TypeMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} />}
-                            {mode === 'mcq' && activeDeck && <MCQMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} />}
+                            {(mode === 'flashcard' || mode === 'vocab') && activeDeck && <FlashcardMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} pressureMode={pressureMode} />}
+                            {mode === 'type' && activeDeck && <TypeMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} pressureMode={pressureMode} />}
+                            {mode === 'mcq' && activeDeck && <MCQMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} pressureMode={pressureMode} />}
                         </main>
                     </div>
                 </div>
