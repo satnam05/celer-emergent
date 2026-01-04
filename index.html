@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Prep v20.24 (Continuous Voice)</title>
+    <title>JPM Prep v20.25 (Streaming Voice)</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -445,7 +445,9 @@
             const [isListening, setIsListening] = useState(false);
             const recognitionRef = useRef(null);
             
-            // TRACKER: Did the user click stop? If not, we restart automatically.
+            // NEW STATE: Holds the incomplete sentence while you speak
+            const [interimText, setInterimText] = useState("");
+            
             const isExplicitlyStopped = useRef(false);
 
             if (!deckData || deckData.length === 0) return <div>No data.</div>;
@@ -455,19 +457,17 @@
             // --- ROBUST CONTINUOUS DICTATION LOGIC ---
             const toggleListening = () => {
                 if (isListening) {
-                    // STOP REQUEST: User clicked the button to stop.
                     isExplicitlyStopped.current = true;
                     if (recognitionRef.current) recognitionRef.current.stop();
                     setIsListening(false);
+                    setInterimText(""); // Clear any leftover visual
                 } else {
-                    // START REQUEST
                     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
                         alert("Speech recognition not supported in this browser."); return;
                     }
                     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                     const recognition = new SpeechRecognition();
                     
-                    // CRITICAL: Keep connection open and show results immediately
                     recognition.continuous = true; 
                     recognition.interimResults = true; 
                     recognition.lang = 'en-US';
@@ -477,63 +477,54 @@
                     recognition.onstart = () => setIsListening(true);
                     
                     recognition.onresult = (event) => {
-                        let finalTranscript = '';
-                        let interimTranscript = '';
+                        let finalChunk = '';
+                        let interimChunk = '';
 
-                        // Loop through results to separate confirmed text from "in-progress" text
+                        // Loop through results
                         for (let i = event.resultIndex; i < event.results.length; ++i) {
                             if (event.results[i].isFinal) {
-                                finalTranscript += event.results[i][0].transcript;
+                                finalChunk += event.results[i][0].transcript;
                             } else {
-                                interimTranscript += event.results[i][0].transcript;
+                                interimChunk += event.results[i][0].transcript;
                             }
                         }
 
-                        if (finalTranscript) {
-                            // Append ONLY finalized text to the main history state
-                            // We use a functional update to ensure we don't lose previous typed text
+                        // VISUAL UPDATE: Show the "Stream" (Interim) text immediately
+                        setInterimText(interimChunk);
+
+                        // PERMANENT UPDATE: Commit the "Final" chunk to history
+                        if (finalChunk) {
                             setHistory(prev => {
                                 const oldVal = prev[current.id]?.input || "";
-                                // Add a space if the previous text didn't end with one
                                 const prefix = oldVal.trim() && !oldVal.endsWith(' ') ? oldVal + ' ' : oldVal;
-                                const newVal = prefix + finalTranscript.trim() + ' ';
-                                
-                                // Update the ref so the next loop knows the current state
+                                const newVal = prefix + finalChunk.trim() + ' ';
                                 inputRef.current = newVal; 
                                 return { ...prev, [current.id]: { ...currentRec, input: newVal } };
                             });
+                            // Once committed, we clear the interim stream so it doesn't duplicate
+                            setInterimText(""); 
                         }
                     };
 
-                    // AUTO-RESTART LOGIC
                     recognition.onend = () => {
                         if (!isExplicitlyStopped.current) {
-                            // If user didn't click stop, it was a silence timeout. Restart immediately.
-                            // We add a tiny delay to prevent browser CPU spikes
+                            // Silently restart if the user paused
                             setTimeout(() => {
-                                try { 
-                                    recognition.start(); 
-                                } catch(e) { 
-                                    // Ignore errors if it's already started
-                                    console.log("Restarting speech engine..."); 
-                                }
+                                try { recognition.start(); } catch(e) {}
                             }, 50);
                         } else {
                             setIsListening(false);
+                            setInterimText("");
                         }
                     };
                     
                     recognition.onerror = (e) => {
-                        console.error("Speech Error:", e.error);
-                        if (e.error === 'no-speech' || e.error === 'network') {
-                             // Ignore these errors and let onend handle the restart
-                             return; 
-                        }
-                        // For other errors, we might want to stop to prevent infinite loops
+                        if (e.error !== 'no-speech' && e.error !== 'aborted') console.error("Speech Error:", e.error);
                         if (!isExplicitlyStopped.current && e.error !== 'aborted') {
                              setTimeout(() => { try { recognition.start(); } catch(e) {} }, 100);
                         } else {
                             setIsListening(false);
+                            setInterimText("");
                         }
                     };
                     
@@ -541,7 +532,6 @@
                     recognition.start();
                 }
             };
-            // ------------------------------------------
 
             useEffect(() => { inputRef.current = currentRec.input || ""; }, [currentRec.input]);
 
@@ -559,8 +549,7 @@
                 if(pressureMode) setTimeLeft(60);
                 inputRef.current = history[current.id]?.input || "";
                 setStarData({ s: '', t: '', a: '', r: '' }); 
-                
-                // Cleanup: Stop listening if we change questions
+                setInterimText("");
                 if(recognitionRef.current) {
                     isExplicitlyStopped.current = true;
                     recognitionRef.current.stop();
@@ -636,9 +625,15 @@
                             <div className="relative flex-grow flex flex-col">
                                 <textarea className={`w-full p-4 border-2 rounded-lg mb-4 focus:outline-none focus:border-jpm-primary transition flex-grow resize-none ${currentRec.submitted ? 'bg-gray-100 text-gray-500' : 'bg-white dark:bg-gray-700 dark:text-white'}`}
                                     placeholder="Type answer..." 
-                                    value={currentRec.input}
-                                    onChange={(e) => !currentRec.submitted && setHistory(h => ({...h, [current.id]: {...currentRec, input: e.target.value}}))}
-                                    readOnly={currentRec.submitted} 
+                                    // VISUAL FIX: Combine permanent Input + Streaming Interim Text
+                                    value={currentRec.input + interimText}
+                                    onChange={(e) => {
+                                        // Safety: Prevent manual typing while recording to avoid state conflict
+                                        if(!currentRec.submitted && !isListening) {
+                                            setHistory(h => ({...h, [current.id]: {...currentRec, input: e.target.value}}));
+                                        }
+                                    }}
+                                    readOnly={currentRec.submitted || isListening} 
                                 />
                                 {!currentRec.submitted && SpeechManager.hasRecognition() && (
                                     <button 
@@ -1136,7 +1131,7 @@
                     <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
                         <div className="flex flex-col">
                             <h1 className="text-lg font-bold leading-tight">JPM Prep App</h1>
-                            <span className="text-xs text-blue-200">v20.24 (Continuous Voice)</span>
+                            <span className="text-xs text-blue-200">v20.25 (Streaming Voice)</span>
                         </div>
                         <div className="flex items-center gap-4">
                             <UKClock />
