@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Prep v20.33 (Phase 2: Immersive Focus)</title>
+    <title>JPM Prep v20.34 (Focus Mode + Full Tests)</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -287,6 +287,7 @@
             );
         };
 
+        // --- DASHBOARD (GLASSMORPHISM APPLIED) ---
         const Dashboard = ({ active, stats, timer, progressData, streak, totalDecks }) => {
             const accuracy = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
             const completedCount = Object.values(progressData).filter(p => p.status === 'Completed').length;
@@ -961,6 +962,10 @@
                 const hasGlassPanel = document.querySelectorAll('.glass-panel').length > 0 || true; 
                 results.push({ id: 41, name: "UI: Glassmorphism Active", pass: hasGlassPanel });
 
+                // NEW TEST FOR PHASE 2
+                const hasBlobAnimation = tailwind.config.theme.extend.animation.blob !== undefined;
+                results.push({ id: 42, name: "UI: Focus Animations Loaded", pass: hasBlobAnimation });
+
                 setTestResults(results);
             };
 
@@ -1184,7 +1189,7 @@
                     <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
                         <div className="flex flex-col">
                             <h1 className="text-lg font-bold leading-tight">JPM Prep App</h1>
-                            <span className="text-xs text-blue-200">v20.33 (Phase 2: Immersive Focus)</span>
+                            <span className="text-xs text-blue-200">v20.34 (Focus Mode + Full Tests)</span>
                         </div>
                         <div className="flex items-center gap-4">
                             <UKClock />
