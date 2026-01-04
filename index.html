@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Prep v20.27 (Infinite Dictation)</title>
+    <title>JPM Prep v20.28 (Smart Voice)</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -311,7 +311,7 @@
             );
         };
 
-        // --- 4. GAME ENGINES (WITH INFINITE DICTATION) ---
+        // --- 4. GAME ENGINES (WITH INFINITE DICTATION & SMART INTELLIGENCE) ---
 
         const FlashcardMode = ({ deckData, onEnd, onStatsUpdate, pressureMode }) => {
             const [currentIndex, setCurrentIndex] = useState(0);
@@ -435,6 +435,28 @@
             );
         };
 
+        // --- NEW: Smart Correction Utility ---
+        const smartCorrect = (text) => {
+            if(!text) return "";
+            let corrected = text;
+            const replacements = [
+                // Domain Specific Fixes
+                { find: /cheese/gi, replace: "Chase" }, // Context: JP Morgan and "Cheese" -> Chase
+                { find: /sequel/gi, replace: "SQL" },
+                { find: /tie script/gi, replace: "TypeScript" },
+                { find: /jpm/gi, replace: "J.P. Morgan" },
+                { find: /react js/gi, replace: "React.js" },
+                { find: /no js/gi, replace: "Node.js" },
+                { find: /angula/gi, replace: "Angular" },
+                { find: /aws/gi, replace: "AWS" },
+                { find: /api/gi, replace: "API" }
+            ];
+            replacements.forEach(r => {
+                corrected = corrected.replace(r.find, r.replace);
+            });
+            return corrected;
+        };
+
         const TypeMode = ({ deckData, onEnd, onStatsUpdate, pressureMode }) => {
             const [currentIndex, setCurrentIndex] = useState(0);
             const [history, setHistory] = useState({}); 
@@ -479,14 +501,16 @@
                         }
                     }
 
-                    // 1. Show stream
+                    // 1. Show stream (raw)
                     setInterimText(interimChunk);
 
                     // 2. Commit Final using REF to avoid stale closures
                     if (finalChunk) {
+                        const smartChunk = smartCorrect(finalChunk); // APPLY INTELLIGENCE HERE
+                        
                         const oldVal = inputRef.current;
                         const prefix = oldVal.trim() && !oldVal.endsWith(' ') ? oldVal + ' ' : oldVal;
-                        const newVal = prefix + finalChunk.trim() + ' ';
+                        const newVal = prefix + smartChunk.trim() + ' ';
                         
                         // Update Truth
                         inputRef.current = newVal;
@@ -502,10 +526,9 @@
 
                 recognition.onend = () => {
                     if (!isExplicitlyStopped.current) {
-                        // RESTART IMMEDIATELY if we didn't press stop.
-                        // We use a small timeout to let the browser cleanup the socket,
-                        // but we keep the UI "Red" so it looks continuous.
-                        setTimeout(() => startSpeechEngine(), 100);
+                        // RESTART IMMEDIATELY (10ms)
+                        // Do NOT set isListening(false) here. Keep UI active.
+                        setTimeout(() => startSpeechEngine(), 10);
                     } else {
                         setIsListening(false);
                         setInterimText("");
@@ -514,17 +537,17 @@
                 
                 recognition.onerror = (e) => {
                     // Ignore 'no-speech' (user paused) and 'aborted' (we stopped it)
-                    // Treat everything else as a reason to restart via onend
                     if (e.error === 'not-allowed') {
                         setIsListening(false);
                         isExplicitlyStopped.current = true;
                         alert("Microphone access denied.");
                     }
+                    // For other errors like 'network' or 'no-speech', onend handles the restart
                 };
                 
                 recognitionRef.current = recognition;
                 try { recognition.start(); } catch(e) {}
-            }, [current.id]); // Only recreate if Question ID changes
+            }, [current.id]); 
 
             const toggleListening = () => {
                 if (isListening) {
@@ -1147,7 +1170,7 @@
                     <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
                         <div className="flex flex-col">
                             <h1 className="text-lg font-bold leading-tight">JPM Prep App</h1>
-                            <span className="text-xs text-blue-200">v20.27 (Infinite Dictation)</span>
+                            <span className="text-xs text-blue-200">v20.28 (Smart Voice)</span>
                         </div>
                         <div className="flex items-center gap-4">
                             <UKClock />
@@ -1258,25 +1281,6 @@
                                             ))}
                                         </div>
                                         <button onClick={() => setTestResults(null)} className="w-full bg-blue-600 text-white py-2 rounded font-bold">Close</button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {modalDeck && (
-                                <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4">
-                                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-8 max-w-md w-full animate-slide-in">
-                                        <h3 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">{modalDeck.name}</h3>
-                                        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded mb-6">
-                                            <p className="text-sm text-gray-600 dark:text-gray-300">Status: <span className="font-bold text-green-600 dark:text-green-400">Completed</span></p>
-                                            {(modalDeck.mode !== 'study' && modalDeck.mode !== 'skill') && <p className="text-sm text-gray-600 dark:text-gray-300">Last Score: <span className="font-bold">{modalDeck.stats.score}%</span></p>}
-                                            <p className="text-sm text-gray-600 dark:text-gray-300">Completed On: <span className="font-mono text-xs">{modalDeck.stats.date}</span></p>
-                                        </div>
-                                        <div className="flex gap-4">
-                                            <button onClick={() => setModalDeck(null)} className="flex-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-white py-3 rounded-lg font-bold hover:bg-gray-300">Close</button>
-                                            <button onClick={() => restartSession(modalDeck.mode, modalDeck.name)} className="flex-1 bg-jpm-primary text-white py-3 rounded-lg font-bold hover:bg-jpm-dark">
-                                                {(modalDeck.mode === 'study' || modalDeck.mode === 'skill') ? 'Re-Open' : 'Restart'}
-                                            </button>
-                                        </div>
                                     </div>
                                 </div>
                             )}
