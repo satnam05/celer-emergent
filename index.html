@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Prep v20.11 (Steady UI)</title>
+    <title>JPM Prep v20.12 (Steady & Fixed)</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -38,23 +38,23 @@
         .card-object { width: 100%; height: 100%; position: relative; transition: transform 0.6s; transform-style: preserve-3d; cursor: pointer; }
         .card-face { position: absolute; height: 100%; width: 100%; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 1rem; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
         
-        /* FIXED: Card Content with Stable Gutter to prevent shaking */
+        /* FIXED: Force Scrollbar Track to prevent Layout Shift */
         .card-content { 
             flex-grow: 1; 
-            overflow-y: auto; 
+            overflow-y: scroll; /* Forces scrollbar track to always exist */
             padding: 2rem; 
             display: flex; 
             flex-direction: column; 
             justify-content: center; 
             align-items: center; 
             text-align: center;
-            scrollbar-gutter: stable; /* Key Fix for Shaky Text */
         }
         
-        /* Custom Thin Scrollbar to look cleaner */
-        .card-content::-webkit-scrollbar { width: 6px; }
-        .card-content::-webkit-scrollbar-track { background: transparent; }
-        .card-content::-webkit-scrollbar-thumb { background-color: rgba(156, 163, 175, 0.5); border-radius: 20px; }
+        /* Custom Scrollbar Styling */
+        .card-content::-webkit-scrollbar { width: 8px; }
+        .card-content::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); }
+        .card-content::-webkit-scrollbar-thumb { background-color: rgba(156, 163, 175, 0.5); border-radius: 4px; }
+        .dark .card-content::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
         .dark .card-content::-webkit-scrollbar-thumb { background-color: rgba(75, 85, 99, 0.8); }
 
         .card-face.front { background: white; border: 2px solid #e5e7eb; transform: rotateY(0deg); }
@@ -111,7 +111,9 @@
 
             if (rows.length < 2) return [];
             const headers = rows[0].map(h => h.trim());
-            return rows.slice(1).map((row, idx) => {
+            
+            const results = [];
+            rows.slice(1).forEach((row, idx) => {
                 const entry = { id: `row-${idx}` };
                 let hasData = false;
                 headers.forEach((h, i) => {
@@ -122,9 +124,9 @@
                     if(val) hasData = true;
                     entry[h] = val;
                 });
-                if(hasData && entry.Deck) return entry;
-                return null;
-            }).filter(Boolean);
+                if(hasData && entry.Deck) results.push(entry);
+            });
+            return results;
         };
 
         const calculateSimilarity = (s1, s2) => {
@@ -527,13 +529,21 @@
             const [darkMode, setDarkMode] = useState(false);
             const [streak, setStreak] = useState(0);
 
-            // --- 4. REGRESSION SUITE V20.11 (37 TESTS) ---
+            // --- 4. REGRESSION SUITE V20.12 (37 TESTS) ---
             const runTests = () => {
                 const results = [];
-                // Original V20.7 Tests
-                const csv1 = 'H1,H2\nV1,"V, 2"'; results.push({ id: 1, name: "Data: Comma", pass: parseCSV(csv1)[0].H2 === "V, 2" });
-                results.push({ id: 2, name: "Data: Multiline", pass: parseCSV('H1\n"L\nB"')[0].H1.includes("\n") });
-                results.push({ id: 3, name: "Data: Pipe", pass: parseCSV('H1|H2\nV1|V2')[0].H2 === "V2" });
+                // FIXED TEST DATA: Added "Deck" column to prevent parser crash
+                const csv1 = 'Deck,H2\nTest,"V, 2"'; 
+                
+                try {
+                    const parsed = parseCSV(csv1);
+                    results.push({ id: 1, name: "Data: Comma Parser", pass: parsed.length > 0 && parsed[0].H2 === "V, 2" });
+                } catch(e) {
+                    results.push({ id: 1, name: "Data: Comma Parser", pass: false, err: e.message });
+                }
+
+                results.push({ id: 2, name: "Data: Multiline", pass: parseCSV('Deck,H1\nTest,"L\nB"')[0].H1.includes("\n") });
+                results.push({ id: 3, name: "Data: Pipe", pass: parseCSV('Deck|H2\nTest|V2')[0].H2 === "V2" });
                 results.push({ id: 4, name: "Algo: Smart Exact", pass: calculateSimilarity("test", "test") === 100 });
                 results.push({ id: 5, name: "Algo: Shuffle", pass: shuffleArray([1,2,3]).length === 3 });
                 results.push({ id: 6, name: "Sys: Storage", pass: !!localStorage });
@@ -804,7 +814,7 @@
                     <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
                         <div className="flex flex-col">
                             <h1 className="text-lg font-bold leading-tight">JPM Prep App</h1>
-                            <span className="text-xs text-blue-200">v20.11 (Steady UI)</span>
+                            <span className="text-xs text-blue-200">v20.12 (Steady & Fixed)</span>
                         </div>
                         <div className="flex items-center gap-4">
                             <UKClock />
