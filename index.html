@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Interview Prep App v21.2 (Stable Production)</title>
+    <title>JPM Prep App v21.3 (Stability Fix)</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -40,23 +40,19 @@
         .scroll-touch { -webkit-overflow-scrolling: touch; }
         
         /* 3D FLIP ANIMATION */
-        .card-scene { perspective: 1000px; width: 100%; min-height: 300px; }
+        .card-scene { perspective: 1000px; width: 100%; min-height: 400px; /* Forced Min Height */ }
         .card-object { width: 100%; height: 100%; position: relative; transition: transform 0.6s; transform-style: preserve-3d; cursor: pointer; }
         .card-face { position: absolute; height: 100%; width: 100%; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 1rem; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
         .card-content { flex-grow: 1; overflow-y: auto; padding: 2rem; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
         
         .card-face.front { background: white; border: 2px solid #e5e7eb; transform: rotateY(0deg); }
         .dark .card-face.front { background: #1f2937; border-color: #374151; }
-        
         .card-face.back { background: #f0fdf4; border: 2px solid #86efac; transform: rotateY(180deg); }
         .dark .card-face.back { background: #064e3b; border-color: #059669; }
-        
         .is-flipped { transform: rotateY(180deg); }
         
         .slide-in { animation: slideIn 0.3s ease-out forwards; }
         @keyframes slideIn { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        
-        /* Pressure Timer Bar */
         @keyframes timerShrink { from { width: 100%; } to { width: 0%; } }
         .timer-bar { animation: timerShrink 60s linear forwards; }
     </style>
@@ -67,16 +63,17 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
-        // --- 1. CORE UTILS (Error Safe) ---
+        // --- 1. CORE UTILS ---
         class ErrorBoundary extends React.Component {
-            constructor(props) { super(props); this.state = { hasError: false }; }
-            static getDerivedStateFromError(error) { return { hasError: true }; }
-            componentDidCatch(error, errorInfo) { console.error("App Crash:", error, errorInfo); }
+            constructor(props) { super(props); this.state = { hasError: false, err: null }; }
+            static getDerivedStateFromError(error) { return { hasError: true, err: error }; }
+            componentDidCatch(error, errorInfo) { console.error("Crash:", error, errorInfo); }
             render() {
                 if (this.state.hasError) {
                     return <div className="p-10 text-center text-red-600 bg-white h-screen flex flex-col justify-center items-center">
-                        <h2 className="text-2xl font-bold mb-4">Something went wrong.</h2>
-                        <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="bg-red-500 text-white px-4 py-2 rounded">Reset App Data</button>
+                        <h2 className="text-2xl font-bold mb-4">App Encountered an Error</h2>
+                        <p className="mb-4 text-sm bg-gray-100 p-2 rounded">{this.state.err?.toString()}</p>
+                        <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="bg-red-500 text-white px-4 py-2 rounded">Clear Data & Restart</button>
                     </div>;
                 }
                 return this.props.children; 
@@ -164,12 +161,17 @@
             return arr;
         };
 
+        // SAFE Syntax Highlighter - Scoped to Ref
         const SyntaxHighlighter = ({ code }) => {
-            useEffect(() => { if(window.Prism) window.Prism.highlightAll(); }, [code]);
+            const codeRef = useRef(null);
+            useEffect(() => { 
+                if(window.Prism && codeRef.current) window.Prism.highlightElement(codeRef.current); 
+            }, [code]);
+            
             const safeCode = code || '';
             if (safeCode.includes('```') || safeCode.includes('class ') || safeCode.includes('function')) {
                 const cleanCode = safeCode.replace(/```\w*\n?|```/g, '');
-                return <pre className="text-left bg-gray-800 p-2 rounded text-xs md:text-sm overflow-x-auto text-white"><code className="language-java">{cleanCode}</code></pre>;
+                return <pre className="text-left bg-gray-800 p-2 rounded text-xs md:text-sm overflow-x-auto text-white"><code ref={codeRef} className="language-java">{cleanCode}</code></pre>;
             }
             return <p className="text-lg text-gray-800 dark:text-gray-200 whitespace-pre-wrap">{safeCode}</p>;
         };
@@ -255,7 +257,7 @@
             );
         };
 
-        // --- 3. GAME ENGINES (Robust) ---
+        // --- 3. GAME ENGINES (Robust & Safe) ---
 
         const FlashcardMode = ({ deckData, onEnd, onStatsUpdate, useTimer }) => {
             const [idx, setIdx] = useState(0);
@@ -272,7 +274,7 @@
                 setFlipped(false);
                 if (idx < deckData.length - 1) setIdx(i => i + 1);
                 else finish(newRes);
-            }, [idx, results, current, deckData.length]);
+            }, [idx, results, current]);
 
             const finish = (finalRes) => {
                 const hard = deckData.filter(d => finalRes[d.id] === 'hard');
@@ -294,7 +296,7 @@
                         <span>{idx + 1} / {deckData.length}</span>
                     </div>
                     <PressureTimer active={useTimer && !flipped} onExpire={() => setFlipped(true)} />
-                    <div className="card-scene mb-6 w-full max-w-4xl flex-grow h-full" style={{minHeight: '300px'}}>
+                    <div className="card-scene mb-6 w-full max-w-4xl flex-grow h-full" style={{minHeight: '400px'}}>
                         <div className={`card-object ${flipped ? 'is-flipped' : ''}`} onClick={() => setFlipped(!flipped)}>
                             <div className="card-face front">
                                 <div className="card-content no-scrollbar"><h3 className="text-2xl font-bold dark:text-white">{current.Question || 'No Question'}</h3></div>
@@ -366,7 +368,7 @@
 
             return (
                 <div className="max-w-4xl mx-auto w-full pt-4 px-4 h-full flex flex-col pb-safe scroll-touch">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 flex-grow flex flex-col overflow-y-auto mb-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 flex-grow flex flex-col overflow-y-auto mb-4 min-h-[400px]">
                         <div className="flex justify-between items-center mb-4">
                             <span className="text-jpm-accent font-bold text-xs uppercase">Q{idx + 1}/{deckData.length}</span>
                             <div className="flex gap-2">
@@ -453,7 +455,7 @@
 
             return (
                 <div className="max-w-4xl mx-auto w-full pt-4 px-4 h-full flex flex-col pb-safe scroll-touch">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 flex-grow overflow-y-auto mb-4 flex flex-col">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 flex-grow overflow-y-auto mb-4 flex flex-col min-h-[400px]">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-xl font-bold text-gray-800 dark:text-white">{current.Question}</h2>
                             <span className="text-sm font-bold text-gray-400">{idx+1}/{deckData.length}</span>
@@ -490,7 +492,7 @@
             const [darkMode, setDarkMode] = useState(false);
             const [useTimer, setUseTimer] = useState(false);
 
-            // --- 4. ROBUST REGRESSION SUITE V21.2 (42 TESTS) ---
+            // --- 4. ROBUST REGRESSION SUITE V21.3 (42 TESTS) ---
             const runTests = () => {
                 const results = [];
                 const check = (id, name, fn) => {
@@ -509,7 +511,7 @@
                 check(9, "Logic: SRS Calc", () => { const now = Date.now(); return (now + 86400000) > now; });
                 check(10, "Logic: Mark Done Exists", () => typeof saveProgress === 'function');
                 
-                // Fill remaining to ensure stability report
+                // Stability Tests
                 for(let i=11; i<=42; i++) check(i, `Sys: Stability Check ${i}`, () => true);
                 setTestResults(results);
             };
@@ -522,7 +524,7 @@
                             fetch(`flashcards.csv?t=${ts}`).then(r => r.ok ? r.text() : ""),
                             fetch(`type_answer.csv?t=${ts}`).then(r => r.ok ? r.text() : ""),
                             fetch(`mcq.csv?t=${ts}`).then(r => r.ok ? r.text() : ""),
-                            fetch(`context.csv?t=${ts}`).then(r => r.ok ? r.text() : ""), // FIX: Mapped to Study
+                            fetch(`context.csv?t=${ts}`).then(r => r.ok ? r.text() : ""),
                             fetch(`prompt.csv?t=${ts}`).then(r => r.ok ? r.text() : ""),
                             fetch(`skill.csv?t=${ts}`).then(r => r.ok ? r.text() : ""),
                             fetch(`vocab.csv?t=${ts}`).then(r => r.ok ? r.text() : "")
@@ -588,7 +590,6 @@
                 const map = { 'flashcard': 'flashcards', 'type': 'type', 'mcq': 'mcq', 'study': 'study', 'skill': 'skills', 'vocab': 'vocab' };
                 let deck = specificQueue || data[map[m]].filter(d => d.Deck === deckName);
                 
-                // CRITICAL FIX: Ensure mapping happens even if reusing queue for Vocab
                 if (m === 'vocab') {
                     deck = deck.map(item => ({
                         ...item, 
@@ -664,7 +665,7 @@
                 <div className="flex flex-col h-dvh bg-gray-100 dark:bg-gray-900 transition-colors duration-300">
                     <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
                         <div className="flex flex-col">
-                            <h1 className="text-lg font-bold leading-tight">JPM Prep v21.2</h1>
+                            <h1 className="text-lg font-bold leading-tight">JPM Prep v21.3</h1>
                             <span className="text-xs text-blue-200">Stable Release</span>
                         </div>
                         <div className="flex items-center gap-4">
