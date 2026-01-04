@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Prep v20.26 (Always-On Voice)</title>
+    <title>JPM Prep v20.27 (Infinite Dictation)</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -311,7 +311,7 @@
             );
         };
 
-        // --- 4. GAME ENGINES (WITH CONTINUOUS VOICE) ---
+        // --- 4. GAME ENGINES (WITH INFINITE DICTATION) ---
 
         const FlashcardMode = ({ deckData, onEnd, onStatsUpdate, pressureMode }) => {
             const [currentIndex, setCurrentIndex] = useState(0);
@@ -439,25 +439,24 @@
             const [currentIndex, setCurrentIndex] = useState(0);
             const [history, setHistory] = useState({}); 
             const [timeLeft, setTimeLeft] = useState(60);
+            
+            // "TRUTH OF SOURCE": This ref holds the text, bypassing React's render cycle
             const inputRef = useRef(""); 
+            
             const [isStarMode, setIsStarMode] = useState(false); 
             const [starData, setStarData] = useState({ s: '', t: '', a: '', r: '' }); 
             const [isListening, setIsListening] = useState(false);
             const recognitionRef = useRef(null);
             
-            // NEW STATE: Holds the incomplete sentence while you speak
             const [interimText, setInterimText] = useState("");
             
-            // CRITICAL: This ref determines if we should auto-restart or truly stop.
             const isExplicitlyStopped = useRef(false);
 
             if (!deckData || deckData.length === 0) return <div>No data.</div>;
             const current = deckData[currentIndex];
             const currentRec = history[current.id] || { input: '', score: 0, submitted: false };
 
-            // --- RECURSIVE ENGINE PATTERN ---
-            // Instead of trying to restart the SAME instance (which browsers block),
-            // we spin up a NEW instance every time the previous one dies, forming an infinite loop.
+            // --- BULLETPROOF INFINITE DICTATION ---
             const startSpeechEngine = useCallback(() => {
                 if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) return;
                 
@@ -468,10 +467,6 @@
                 recognition.interimResults = true; 
                 recognition.lang = 'en-US';
 
-                recognition.onstart = () => {
-                    // We don't touch state here to avoid UI flicker during the restart gap.
-                };
-                
                 recognition.onresult = (event) => {
                     let finalChunk = '';
                     let interimChunk = '';
@@ -484,77 +479,82 @@
                         }
                     }
 
-                    // 1. Show streaming text immediately
+                    // 1. Show stream
                     setInterimText(interimChunk);
 
-                    // 2. Commit finalized text to history
+                    // 2. Commit Final using REF to avoid stale closures
                     if (finalChunk) {
-                        setHistory(prev => {
-                            const oldVal = prev[current.id]?.input || "";
-                            const prefix = oldVal.trim() && !oldVal.endsWith(' ') ? oldVal + ' ' : oldVal;
-                            const newVal = prefix + finalChunk.trim() + ' ';
-                            inputRef.current = newVal; 
-                            return { ...prev, [current.id]: { ...currentRec, input: newVal } };
-                        });
-                        setInterimText(""); // Clear interim once finalized
+                        const oldVal = inputRef.current;
+                        const prefix = oldVal.trim() && !oldVal.endsWith(' ') ? oldVal + ' ' : oldVal;
+                        const newVal = prefix + finalChunk.trim() + ' ';
+                        
+                        // Update Truth
+                        inputRef.current = newVal;
+                        
+                        // Update UI
+                        setHistory(prev => ({ 
+                            ...prev, 
+                            [current.id]: { ...prev[current.id], input: newVal } 
+                        }));
+                        setInterimText(""); 
                     }
                 };
 
                 recognition.onend = () => {
-                    // THE MAGIC: If user didn't click stop, we RESTART immediately.
                     if (!isExplicitlyStopped.current) {
-                        // Create a fresh instance to bypass browser timeouts
-                        startSpeechEngine();
+                        // RESTART IMMEDIATELY if we didn't press stop.
+                        // We use a small timeout to let the browser cleanup the socket,
+                        // but we keep the UI "Red" so it looks continuous.
+                        setTimeout(() => startSpeechEngine(), 100);
                     } else {
-                        // Only now do we update the UI to show "Stopped"
                         setIsListening(false);
                         setInterimText("");
                     }
                 };
                 
                 recognition.onerror = (e) => {
-                    // Ignore benign errors. "no-speech" just means we were silent.
-                    // "aborted" means we stopped it. 
-                    // For everything else, let 'onend' handle the restart.
-                    if (e.error !== 'no-speech' && e.error !== 'aborted') {
-                        console.warn("Speech warning:", e.error);
+                    // Ignore 'no-speech' (user paused) and 'aborted' (we stopped it)
+                    // Treat everything else as a reason to restart via onend
+                    if (e.error === 'not-allowed') {
+                        setIsListening(false);
+                        isExplicitlyStopped.current = true;
+                        alert("Microphone access denied.");
                     }
                 };
                 
                 recognitionRef.current = recognition;
-                try { recognition.start(); } catch(e) { /* Ignore start errors */ }
-            }, [current.id, currentRec]);
+                try { recognition.start(); } catch(e) {}
+            }, [current.id]); // Only recreate if Question ID changes
 
             const toggleListening = () => {
                 if (isListening) {
-                    // USER CLICKED STOP
                     isExplicitlyStopped.current = true;
                     if (recognitionRef.current) recognitionRef.current.stop();
                     setIsListening(false);
                     setInterimText(""); 
                 } else {
-                    // USER CLICKED START
                     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-                        alert("Speech recognition not supported in this browser."); return;
+                        alert("Not supported."); return;
                     }
                     isExplicitlyStopped.current = false;
-                    setIsListening(true); // Set UI to Red immediately
-                    startSpeechEngine(); // Kick off the infinite loop
+                    setIsListening(true); 
+                    startSpeechEngine(); 
                 }
             };
 
-            // Cleanup when component unmounts or changes
+            // Sync Ref with State when changing questions
             useEffect(() => {
                 inputRef.current = currentRec.input || ""; 
             }, [currentRec.input]);
 
+            // Cleanup when component unmounts
             useEffect(() => {
                 if(pressureMode) setTimeLeft(60);
                 inputRef.current = history[current.id]?.input || "";
                 setStarData({ s: '', t: '', a: '', r: '' }); 
                 setInterimText("");
                 
-                // Force stop when changing questions
+                // Hard Stop
                 if(recognitionRef.current) {
                     isExplicitlyStopped.current = true;
                     recognitionRef.current.stop();
@@ -640,10 +640,13 @@
                             <div className="relative flex-grow flex flex-col">
                                 <textarea className={`w-full p-4 border-2 rounded-lg mb-4 focus:outline-none focus:border-jpm-primary transition flex-grow resize-none ${currentRec.submitted ? 'bg-gray-100 text-gray-500' : 'bg-white dark:bg-gray-700 dark:text-white'}`}
                                     placeholder="Type answer..." 
+                                    // Combine confirmed Ref text + current streaming text
                                     value={currentRec.input + interimText}
                                     onChange={(e) => {
                                         if(!currentRec.submitted && !isListening) {
+                                            // Manual edit support
                                             setHistory(h => ({...h, [current.id]: {...currentRec, input: e.target.value}}));
+                                            inputRef.current = e.target.value; 
                                         }
                                     }}
                                     readOnly={currentRec.submitted || isListening} 
@@ -1144,7 +1147,7 @@
                     <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
                         <div className="flex flex-col">
                             <h1 className="text-lg font-bold leading-tight">JPM Prep App</h1>
-                            <span className="text-xs text-blue-200">v20.26 (Always-On Voice)</span>
+                            <span className="text-xs text-blue-200">v20.27 (Infinite Dictation)</span>
                         </div>
                         <div className="flex items-center gap-4">
                             <UKClock />
