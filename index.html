@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Prep v20.21 (Voice Perfected)</title>
+    <title>JPM Prep v20.22 (Aggressive Voice)</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -54,8 +54,10 @@
         
         .slide-in { animation: slideIn 0.3s ease-out forwards; }
         @keyframes slideIn { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
-        .animate-pulse-ring { animation: pulse-ring 1.5s cubic-bezier(0.24, 0, 0.38, 1) infinite; }
+        
+        /* Recording Pulse */
+        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+        .recording-active { animation: pulse-red 1.5s infinite; background-color: #ef4444; color: white; border-color: #b91c1c; }
         
         .dev-tools-btn { z-index: 9999 !important; }
     </style>
@@ -102,19 +104,19 @@
             }).filter(Boolean);
         };
 
-        // ENHANCED SPEECH MANAGER (Phonetic Fixes + UK Male)
+        // AGGRESSIVE SPEECH MANAGER
         const SpeechManager = {
             hasRecognition: () => 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window,
             hasSynthesis: () => 'speechSynthesis' in window,
             voices: [],
             
-            // Dictionary for tricky words
             phoneticMap: {
-                "TUPE": "Too P", // Forces "Too-Pee" pronunciation
+                "TUPE": "Too P",
                 "SQL": "Sequel",
                 "JPM": "J P M",
                 "API": "A P I",
-                "OOPS": "Oops"
+                "OOPS": "Oops",
+                "JDBC": "J D B C"
             },
             
             init: function() {
@@ -129,9 +131,8 @@
 
             getPhoneticText: function(text) {
                 if (!text) return "";
-                // Replace known acronyms with phonetic equivalents
                 return text.split(' ').map(word => {
-                    const cleanWord = word.replace(/[^a-zA-Z0-9]/g, ''); // Remove punctuation for lookup
+                    const cleanWord = word.replace(/[^a-zA-Z0-9]/g, ''); 
                     const mapping = this.phoneticMap[cleanWord.toUpperCase()];
                     return mapping || word;
                 }).join(' ');
@@ -141,21 +142,24 @@
                 if (!this.hasSynthesis()) return;
                 window.speechSynthesis.cancel(); 
                 
-                // Use phonetic version
                 const phoneticText = this.getPhoneticText(text);
                 const utterance = new SpeechSynthesisUtterance(phoneticText);
                 
-                // Voice Selection: Prioritize "Google UK English Male" or "Daniel"
-                let voice = this.voices.find(v => v.lang === 'en-GB' && (v.name.includes('Male') || v.name.includes('Daniel')));
-                if (!voice) voice = this.voices.find(v => v.lang === 'en-GB'); // Any UK
+                // UK Male Priority List
+                const priorities = ["Google UK English Male", "Daniel", "en-GB"];
+                let voice = null;
+                
+                for(let p of priorities) {
+                    voice = this.voices.find(v => v.name.includes(p) || v.lang === p);
+                    if(voice) break;
+                }
+                if (!voice) voice = this.voices.find(v => v.lang.includes('en-GB')); // Any UK
                 
                 if (voice) {
                     utterance.voice = voice;
                     utterance.lang = 'en-GB';
                     utterance.rate = 0.9; 
                     utterance.pitch = 1.0;
-                } else {
-                    utterance.lang = 'en-GB'; // Fallback lang
                 }
                 
                 window.speechSynthesis.speak(utterance);
@@ -316,7 +320,7 @@
             );
         };
 
-        // --- 4. GAME ENGINES (WITH CONTINUOUS VOICE) ---
+        // --- 4. GAME ENGINES (AGGRESSIVE VOICE) ---
 
         const FlashcardMode = ({ deckData, onEnd, onStatsUpdate, pressureMode }) => {
             const [currentIndex, setCurrentIndex] = useState(0);
@@ -459,12 +463,10 @@
 
             const toggleListening = () => {
                 if (isListening) {
-                    // USER CLICKED STOP
                     isExplicitlyStopped.current = true;
                     if (recognitionRef.current) recognitionRef.current.stop();
                     setIsListening(false);
                 } else {
-                    // START
                     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
                         alert("Speech recognition not supported."); return;
                     }
@@ -474,7 +476,7 @@
                     recognition.interimResults = true; 
                     recognition.lang = 'en-US';
 
-                    isExplicitlyStopped.current = false; // Reset stop flag
+                    isExplicitlyStopped.current = false;
 
                     recognition.onstart = () => setIsListening(true);
                     
@@ -492,20 +494,20 @@
                         }
                     };
 
-                    // AUTO-RESTART LOGIC
+                    // AGGRESSIVE RESTART LOGIC
                     recognition.onend = () => {
                         if (!isExplicitlyStopped.current) {
-                            // If user didn't click stop, restart it!
+                            // If user didn't click stop, RESTART IMMEDIATELY
                             try { recognition.start(); } catch(e) {}
                         } else {
                             setIsListening(false);
                         }
                     };
                     
+                    // IGNORE ERRORS & RESTART
                     recognition.onerror = (e) => {
-                        console.error(e);
-                        // Optional: Restart on error too, or just stop
                         if (!isExplicitlyStopped.current) {
+                             // Wait 100ms then restart to avoid instant loops
                              setTimeout(() => { try { recognition.start(); } catch(e) {} }, 100);
                         } else {
                             setIsListening(false);
@@ -533,7 +535,6 @@
                 if(pressureMode) setTimeLeft(60);
                 inputRef.current = history[current.id]?.input || "";
                 setStarData({ s: '', t: '', a: '', r: '' }); 
-                // Force stop recording on card change
                 if(recognitionRef.current) {
                     isExplicitlyStopped.current = true;
                     recognitionRef.current.stop();
@@ -616,7 +617,7 @@
                                 {!currentRec.submitted && SpeechManager.hasRecognition() && (
                                     <button 
                                         onClick={toggleListening} 
-                                        className={`absolute bottom-6 right-4 p-3 rounded-full shadow-lg transition-all ${isListening ? 'bg-red-500 animate-pulse-ring text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
+                                        className={`absolute bottom-6 right-4 p-3 rounded-full shadow-lg transition-all ${isListening ? 'bg-red-500 recording-active text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
                                         title="Speak Answer (Continuous)"
                                     >
                                         <i className={`fas ${isListening ? 'fa-microphone-slash' : 'fa-microphone'}`}></i>
@@ -804,7 +805,7 @@
             const [streak, setStreak] = useState(0);
             const [pressureMode, setPressureMode] = useState(false);
 
-            // --- 4. REGRESSION SUITE V20.21 (40 TESTS) ---
+            // --- 4. REGRESSION SUITE V20.22 (40 TESTS) ---
             const runTests = () => {
                 const results = [];
                 // FIXED TEST DATA
@@ -878,7 +879,6 @@
                 results.push({ id: 38, name: "Feat: Pressure Mode State", pass: typeof pressureMode === 'boolean' });
                 results.push({ id: 39, name: "Feat: STAR Mode Available", pass: true });
                 
-                // NEW TEST: Voice APIs Check (Safe)
                 const voiceSupported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
                 results.push({ id: 40, name: "Feat: Voice API Check", pass: voiceSupported || true });
 
@@ -912,7 +912,6 @@
                         if(parsed._settings) setPressureMode(parsed._settings.pressureMode || false);
                     }
 
-                    // STREAK LOGIC
                     const today = new Date().toLocaleDateString();
                     const lastLogin = localStorage.getItem('jpm_last_login');
                     let currentStreak = parseInt(localStorage.getItem('jpm_streak') || '0');
@@ -988,7 +987,6 @@
 
                 if(deck.length === 0) return;
                 
-                // --- STUDY & SKILL (Link based) ---
                 if (m === 'study' || m === 'skill') {
                     const link = deck[0].Link || deck[0].Links; 
                     if(link) window.open(link, '_blank');
@@ -997,7 +995,6 @@
                     return;
                 }
 
-                // --- VOCAB MAPPING ---
                 if (m === 'vocab') {
                     deck = deck.map(item => ({...item, Question: item.Word, Answer: item.Meaning, ModeTitle: 'Vocabulary'}));
                 }
@@ -1107,7 +1104,7 @@
                     <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
                         <div className="flex flex-col">
                             <h1 className="text-lg font-bold leading-tight">JPM Prep App</h1>
-                            <span className="text-xs text-blue-200">v20.21 (Voice Perfected)</span>
+                            <span className="text-xs text-blue-200">v20.22 (Aggressive Voice)</span>
                         </div>
                         <div className="flex items-center gap-4">
                             <UKClock />
