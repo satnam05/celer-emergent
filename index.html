@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Prep v20.54 (Final Fix)</title>
+    <title>JPM Prep v20.55 (Restored Reset Logic)</title>
     
     <script>
         window.onerror = function(msg, url, line, col, error) {
@@ -308,7 +308,7 @@
             );
         };
 
-        // --- 4. DECK LIST COMPONENT (FIXED) ---
+        // --- 4. DECK LIST COMPONENT ---
         const RenderDeckList = ({ items, mId, progress, onDeckClick, onStartSession, onMarkComplete }) => {
             const getDecks = (items) => [...new Set(items.map(i => i.Deck))].filter(Boolean);
             const decks = getDecks(items);
@@ -489,6 +489,15 @@
             };
 
             const handleStarSubmit = () => submit(`Situation: ${starData.s}\nTask: ${starData.t}\nAction: ${starData.a}\nResult: ${starData.r}`);
+
+            useEffect(() => {
+                // RESET STATE ON CARD CHANGE (RESTORED FROM v20.46)
+                setInput(history[current.id]?.input || "");
+                setStarData({ s: '', t: '', a: '', r: '' });
+                if(pressureMode) setTimeLeft(60);
+                setActiveField('main');
+                stop();
+            }, [currentIndex, current.id]); 
 
             useEffect(() => {
                 if (!pressureMode || currentRec.submitted || isListening) return; 
@@ -919,7 +928,7 @@
                     <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-30">
                         <div className="flex flex-col">
                             <h1 className="text-lg font-bold leading-tight tracking-tight">JPM Prep App</h1>
-                            <span className="text-xs text-blue-200 opacity-80">v20.54 (Final Fix)</span>
+                            <span className="text-xs text-blue-200 opacity-80">v20.55 (Restored Reset Logic)</span>
                         </div>
                         <div className="flex items-center gap-4">
                             <UKClock />
@@ -971,9 +980,9 @@
                                                     items={m.items} 
                                                     mId={m.id} 
                                                     progress={progress} 
-                                                    onDeckClick={handleDeckClick} // FIXED: Passed prop
-                                                    onStartSession={startSession} // FIXED: Passed prop
-                                                    onMarkComplete={markStudyComplete} // FIXED: Passed prop
+                                                    onDeckClick={handleDeckClick} 
+                                                    onStartSession={startSession} 
+                                                    onMarkComplete={markStudyComplete} 
                                                 />
                                             </div>
                                         ))}
