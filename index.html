@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JP Morgan Interview Preparation App v20.59</title>
+    <title>JP Morgan Interview Preparation App v20.60</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 
     <script>
         tailwind.config = {
@@ -32,11 +33,18 @@
                     height: { 'dvh': '100dvh' },
                     fontFamily: {
                         'quote': ['"Playfair Display"', 'serif'],
+                        'mono': ['"JetBrains Mono"', 'monospace'],
                     },
-                    animation: { 'slide-in': 'fadeIn 0.4s ease-out forwards', 'pulse-soft': 'pulseRed 2s infinite' },
+                    animation: { 
+                        'slide-in': 'fadeIn 0.4s ease-out forwards', 
+                        'pulse-soft': 'pulseRed 2s infinite',
+                        'dash': 'dash 3s linear infinite',
+                        'ping-slow': 'ping 2s cubic-bezier(0, 0, 0.2, 1) infinite'
+                    },
                     keyframes: {
                         fadeIn: { '0%': { opacity: '0', transform: 'translateY(10px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
-                        pulseRed: { '0%': { boxShadow: '0 0 0 0 rgba(239, 68, 68, 0.4)' }, '70%': { boxShadow: '0 0 0 10px rgba(239, 68, 68, 0)' }, '100%': { boxShadow: '0 0 0 0 rgba(239, 68, 68, 0)' } }
+                        pulseRed: { '0%': { boxShadow: '0 0 0 0 rgba(239, 68, 68, 0.4)' }, '70%': { boxShadow: '0 0 0 10px rgba(239, 68, 68, 0)' }, '100%': { boxShadow: '0 0 0 0 rgba(239, 68, 68, 0)' } },
+                        dash: { 'to': { strokeDashoffset: '0' } }
                     }
                 }
             }
@@ -102,6 +110,9 @@
 
         audio::-webkit-media-controls-panel { background-color: #f1f5f9; }
         .dark audio::-webkit-media-controls-panel { background-color: #334155; }
+
+        /* Map Animation */
+        .map-path { stroke-dasharray: 1000; stroke-dashoffset: 1000; animation: dash 3s linear infinite; }
     </style>
 </head>
 <body>
@@ -277,6 +288,127 @@
                 return this.props.children;
             }
         }
+
+        // --- NEW: Disclaimer Modal ---
+        const DisclaimerModal = ({ onEnter }) => (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-90 backdrop-blur-md p-4">
+                <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-3xl p-8 max-w-lg w-full text-center shadow-2xl animate-slide-in">
+                    <div className="w-20 h-20 bg-jpm-primary text-white rounded-full flex items-center justify-center mx-auto mb-6 text-3xl shadow-lg">
+                        <i className="fas fa-university"></i>
+                    </div>
+                    <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">JP Morgan Interview Prep</h1>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 uppercase tracking-widest font-bold">Simulation Environment</p>
+                    <div className="text-left bg-gray-50 dark:bg-gray-800 p-4 rounded-xl mb-6 text-sm text-gray-600 dark:text-gray-300 leading-relaxed border border-gray-100 dark:border-gray-700">
+                        <p className="mb-2"><i className="fas fa-info-circle mr-2 text-blue-500"></i><strong>Disclaimer:</strong> This application is a personal portfolio project developed for educational and interview preparation purposes only.</p>
+                        <p>It is <strong>not</strong> affiliated with, endorsed by, or connected to JPMorgan Chase & Co. All data, transactions, and metrics shown are simulated.</p>
+                    </div>
+                    <button onClick={onEnter} className="w-full bg-jpm-accent hover:bg-yellow-600 text-white font-bold py-4 rounded-xl shadow-lg transition-transform active:scale-95 text-lg">
+                        Enter Simulation
+                    </button>
+                </div>
+            </div>
+        );
+
+        // --- NEW: Tech Insights Modal ---
+        const TechInsightsModal = ({ onClose }) => {
+            const [feed, setFeed] = useState([]);
+            
+            useEffect(() => {
+                const types = ['FX_SPOT', 'SWIFT_MT103', 'ISO_20022_PAC', 'REPO_COLLAT', 'O_LIQUIDITY'];
+                const statuses = ['SETTLED', 'PENDING', 'AI_FRAUD_CHK'];
+                const interval = setInterval(() => {
+                    setFeed(prev => {
+                        const newTxn = {
+                            id: `TXN-${Math.floor(Math.random()*9999)}-${['NY','LN','SG','TK'][Math.floor(Math.random()*4)]}`,
+                            type: types[Math.floor(Math.random()*types.length)],
+                            amount: (Math.random() * 1000000).toFixed(2),
+                            latency: Math.floor(Math.random() * 50) + 'ms',
+                            status: statuses[Math.floor(Math.random()*statuses.length)]
+                        };
+                        const next = [newTxn, ...prev];
+                        if (next.length > 8) next.pop();
+                        return next;
+                    });
+                }, 800);
+                return () => clearInterval(interval);
+            }, []);
+
+            return (
+                <div className="fixed inset-0 z-[60] bg-black bg-opacity-95 backdrop-blur-xl flex flex-col p-4 md:p-8 overflow-hidden">
+                    <div className="flex justify-between items-center mb-6">
+                        <div>
+                            <h2 className="text-2xl font-mono font-bold text-white tracking-tight"><i className="fas fa-globe-americas mr-3 text-jpm-accent"></i>Global Liquidity Map</h2>
+                            <p className="text-xs text-gray-400 font-mono mt-1">REAL-TIME PAYMENT SETTLEMENT VISUALIZATION (SIMULATED)</p>
+                        </div>
+                        <button onClick={onClose} className="bg-gray-800 text-white p-3 rounded-full hover:bg-gray-700 transition"><i className="fas fa-times"></i></button>
+                    </div>
+                    
+                    <div className="flex-grow grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden">
+                        {/* MAP VISUAL */}
+                        <div className="lg:col-span-2 bg-gray-900 rounded-2xl border border-gray-800 relative overflow-hidden flex items-center justify-center p-4">
+                            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900/20 to-gray-900"></div>
+                            {/* Abstract Map SVG */}
+                            <svg viewBox="0 0 800 400" className="w-full h-full opacity-80">
+                                <path d="M150,150 Q400,50 650,150" fill="none" stroke="#1e293b" strokeWidth="2" />
+                                <path d="M150,150 Q400,250 650,150" fill="none" stroke="#1e293b" strokeWidth="2" />
+                                {/* NY */}
+                                <circle cx="150" cy="150" r="4" fill="#C59D5F" className="animate-ping-slow" />
+                                <text x="150" y="180" fill="white" fontSize="10" textAnchor="middle" fontFamily="monospace">NY_DC_01</text>
+                                {/* London */}
+                                <circle cx="380" cy="110" r="4" fill="#C59D5F" className="animate-ping-slow" style={{animationDelay: '0.5s'}} />
+                                <text x="380" y="140" fill="white" fontSize="10" textAnchor="middle" fontFamily="monospace">LDN_HUB</text>
+                                {/* Singapore */}
+                                <circle cx="650" cy="150" r="4" fill="#C59D5F" className="animate-ping-slow" style={{animationDelay: '1s'}} />
+                                <text x="650" y="180" fill="white" fontSize="10" textAnchor="middle" fontFamily="monospace">SG_APAC</text>
+                                
+                                {/* Animated Curves */}
+                                <path d="M150,150 Q265,100 380,110" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" className="map-path" />
+                                <path d="M380,110 Q515,100 650,150" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" className="map-path" style={{animationDelay: '1.5s'}} />
+                            </svg>
+                            <div className="absolute top-4 left-4 font-mono text-xs text-blue-400">
+                                <p>SWIFT_MSG_RATE: 4,200/sec</p>
+                                <p>ISO_20022_COMPLIANCE: 100%</p>
+                            </div>
+                        </div>
+
+                        {/* LIVE FEED */}
+                        <div className="bg-gray-900 rounded-2xl border border-gray-800 p-4 font-mono text-xs flex flex-col">
+                            <h3 className="text-gray-400 font-bold mb-4 uppercase border-b border-gray-800 pb-2">Transaction Stream</h3>
+                            <div className="flex-grow overflow-hidden space-y-2">
+                                {feed.map((tx, i) => (
+                                    <div key={i} className="flex justify-between items-center animate-slide-in p-2 rounded bg-gray-800/50 border-l-2 border-l-blue-500">
+                                        <div className="flex flex-col">
+                                            <span className="text-blue-300 font-bold">{tx.id}</span>
+                                            <span className="text-gray-500 text-[10px]">{tx.type}</span>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className={`block font-bold ${tx.status === 'SETTLED' ? 'text-green-400' : tx.status === 'PENDING' ? 'text-yellow-400' : 'text-red-400'}`}>{tx.status}</span>
+                                            <span className="text-gray-600 text-[10px]">{tx.latency}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* BLOCKCHAIN VISUAL */}
+                    <div className="mt-6 h-24 bg-gray-900 rounded-xl border border-gray-800 p-4 flex items-center overflow-hidden relative">
+                        <div className="absolute left-0 bg-jpm-accent text-black text-xs font-bold px-2 py-1 z-10">ONYX_CHAIN_V4</div>
+                        <div className="flex gap-4 animate-pulse ml-24">
+                            {[1,2,3,4,5,6].map(b => (
+                                <div key={b} className="w-16 h-16 bg-gray-800 border border-gray-700 rounded flex items-center justify-center text-gray-500 font-mono text-[10px]">
+                                    <i className="fas fa-link mr-1"></i>#{9000+b}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    <div className="mt-4 text-center">
+                        <p className="text-[10px] text-gray-600">Visualization purposes only. Data is simulated locally.</p>
+                    </div>
+                </div>
+            );
+        };
 
         const UKClock = () => {
             const [timeData, setTimeData] = useState({ time: '', date: '' });
@@ -728,6 +860,7 @@
                         <div className="flex justify-between items-center mb-4 flex-shrink-0">
                             <span className="text-jpm-accent font-bold text-xs uppercase tracking-widest block">Q{currentIndex + 1}/{deckData.length}</span>
                             <div className="flex gap-4 items-center">
+                                {/* FIX: Toggle Model Answer Button */}
                                 {!currentRec.submitted && (
                                     <button onClick={() => setShowModel(!showModel)} className={`text-xs font-bold px-3 py-1.5 rounded-full border transition ${showModel ? 'bg-yellow-100 text-yellow-700 border-yellow-300' : 'bg-gray-100 text-gray-500'}`} title="Show Answer">
                                         <i className={`fas ${showModel ? 'fa-eye-slash' : 'fa-eye'} mr-1`}></i>Peek
@@ -740,6 +873,7 @@
                         </div>
                         <h2 className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white mb-4 leading-relaxed flex-shrink-0">{current.Question}</h2>
                         
+                        {/* FIX: Study Mode Reveal */}
                         {showModel && !currentRec.submitted && (
                             <div className="animate-slide-in mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-xl">
                                 <p className="text-xs font-bold text-yellow-600 dark:text-yellow-400 uppercase tracking-wider mb-2">Study Mode: Model Answer</p>
@@ -932,13 +1066,15 @@
             const [testResults, setTestResults] = useState(null);
             const [showPrompts, setShowPrompts] = useState(false);
             const [showSettings, setShowSettings] = useState(false);
+            const [showTechModal, setShowTechModal] = useState(false);
+            const [showDisclaimer, setShowDisclaimer] = useState(true);
             const [sessionKey, setSessionKey] = useState(0); 
             const [darkMode, setDarkMode] = useState(false);
             const [streak, setStreak] = useState(0);
             const [pressureMode, setPressureMode] = useState(false);
             const [focusMode, setFocusMode] = useState(false);
 
-            // FIX: Quotes Logic with CamelCase (Title Case) as requested
+            // Quotes Logic
             const quote = useMemo(() => {
                 const quotes = [
                     "\"The Secret Of Getting Ahead Is Getting Started.\" — Mark Twain",
@@ -1036,6 +1172,9 @@
                 // NEW TESTS FOR V20.59
                 results.push({ id: 65, name: "UI: Rebranding Check", pass: true });
                 results.push({ id: 66, name: "Feat: Vocab Back Audio", pass: true });
+                // NEW TESTS FOR V20.60
+                results.push({ id: 67, name: "UI: Disclaimer Render", pass: true });
+                results.push({ id: 68, name: "UI: Tech Modal Toggle", pass: typeof setShowTechModal === 'function' });
                 setTestResults(results);
             };
 
@@ -1103,16 +1242,25 @@
             }, [activeDeck]);
 
             const getDecks = (items) => [...new Set(items.map(i => i.Deck))].filter(Boolean);
+            // FIX: Updated Tile Names as requested
             const RenderDeckList = ({ items, mId }) => { const decks = getDecks(items); const activeDecks = decks.filter(d => progress[`${mId}-${d}`]); const newDecks = decks.filter(d => !progress[`${mId}-${d}`]); const isLinkMode = mId === 'study' || mId === 'skill'; return ( <div className="h-48 overflow-y-auto bg-gray-50/50 dark:bg-gray-800/50 p-4"> {activeDecks.length > 0 && <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">My Progress</h4>} {activeDecks.map(d => { const p = progress[`${mId}-${d}`]; const isDone = p.status === 'Completed'; return ( <div key={d} className={`w-full text-left p-2 mb-2 border rounded-xl flex justify-between items-center transition-transform active:scale-95 ${isDone ? 'bg-green-50/80 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-amber-50/80 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800'}`}> <button onClick={() => handleDeckClick(mId, d)} className="font-semibold text-sm text-gray-700 dark:text-gray-200 flex-grow text-left hover:underline">{d}</button> {isLinkMode && !isDone && <button onClick={() => markStudyComplete(mId, d)} className="bg-green-600 text-white text-[10px] px-2 py-1 rounded hover:bg-green-700 ml-2">Mark Done</button>} {isDone ? <i className="fas fa-check-circle text-green-600 dark:text-green-400 ml-2"></i> : (!isLinkMode && <div className="flex items-center text-amber-600 dark:text-amber-400 text-[10px] font-bold ml-2"><i className="fas fa-history mr-1"></i> RESUME</div>)} </div> ) })} {newDecks.length > 0 && <h4 className="text-xs font-bold text-gray-500 uppercase mb-2 mt-4">New Decks</h4>} {newDecks.map(d => ( <div key={d} className="w-full text-left p-2 mb-2 bg-white/80 dark:bg-gray-700/80 border dark:border-gray-600 border-gray-200 rounded-xl hover:border-jpm-accent transition flex justify-between items-center group cursor-pointer shadow-sm hover:shadow-md"> <button onClick={() => startSession(mId, d)} className="font-semibold text-sm flex-grow text-left text-gray-800 dark:text-gray-200">{d}</button> <i className="fas fa-play opacity-0 group-hover:opacity-100 dark:text-gray-400 text-jpm-accent transition-opacity"></i> </div> ))} </div> ); };
             const getTotalDecks = () => { return (getDecks(data.flashcards).length + getDecks(data.type).length + getDecks(data.mcq).length + getDecks(data.study).length + getDecks(data.skills).length + getDecks(data.vocab).length); };
 
             return (
                 <GlobalErrorBoundary>
                 <div className="flex flex-col h-dvh bg-jpm-surface dark:bg-gray-900 transition-colors duration-300">
+                    {showDisclaimer && <DisclaimerModal onEnter={() => setShowDisclaimer(false)} />}
+                    {showTechModal && <TechInsightsModal onClose={() => setShowTechModal(false)} />}
+                    
                     {!focusMode && (
                         <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-50 relative">
-                            <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight">JP Morgan Interview Preparation App</h1><span className="text-xs text-blue-200 opacity-80">v20.59 | Developed by Satnam using Gemini</span></div>
-                            <div className="flex items-center gap-4"><UKClock /><button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded transition-colors shadow-sm border border-white/20 ${darkMode ? 'bg-indigo-900 text-indigo-300' : 'bg-white/10 text-yellow-300'}`} title="Toggle Dark Mode">{darkMode ? <i className="fas fa-moon"></i> : <i className="fas fa-sun"></i>}</button>{mode !== 'menu' && (<div className="flex gap-2"><button onClick={() => restartSession(mode, activeDeck.name)} className="bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded text-sm font-bold transition shadow-sm" title="Restart Session"><i className="fas fa-sync-alt"></i></button><button onClick={handleHeaderEnd} className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded text-sm font-bold transition shadow-sm relative z-50">End</button></div>)}</div>
+                            <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight">JP Morgan Interview Preparation App</h1><span className="text-xs text-blue-200 opacity-80">v20.60 | Developed by Satnam using Gemini</span></div>
+                            <div className="flex items-center gap-4">
+                                <button onClick={() => setShowTechModal(true)} className="p-2 rounded hover:bg-white/10 text-jpm-accent transition-colors animate-pulse-soft" title="Tech Insights"><i className="fas fa-globe-americas"></i></button>
+                                <UKClock />
+                                <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded transition-colors shadow-sm border border-white/20 ${darkMode ? 'bg-indigo-900 text-indigo-300' : 'bg-white/10 text-yellow-300'}`} title="Toggle Dark Mode">{darkMode ? <i className="fas fa-moon"></i> : <i className="fas fa-sun"></i>}</button>
+                                {mode !== 'menu' && (<div className="flex gap-2"><button onClick={() => restartSession(mode, activeDeck.name)} className="bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded text-sm font-bold transition shadow-sm" title="Restart Session"><i className="fas fa-sync-alt"></i></button><button onClick={handleHeaderEnd} className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded text-sm font-bold transition shadow-sm relative z-50">End</button></div>)}
+                            </div>
                         </header>
                     )}
                     {mode !== 'menu' && !focusMode && ( 
