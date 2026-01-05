@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Prep v20.46 (Stable + Regression Fix)</title>
+    <title>JPM Prep v20.47 (Stable + Fixes)</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -170,6 +170,19 @@
         };
         SpeechManager.init();
 
+        const levenshteinDistance = (a, b) => {
+            const matrix = [];
+            for (let i = 0; i <= b.length; i++) { matrix[i] = [i]; }
+            for (let j = 0; j <= a.length; j++) { matrix[0][j] = j; }
+            for (let i = 1; i <= b.length; i++) {
+                for (let j = 1; j <= a.length; j++) {
+                    if (b.charAt(i - 1) === a.charAt(j - 1)) { matrix[i][j] = matrix[i - 1][j - 1]; } 
+                    else { matrix[i][j] = Math.min(matrix[i - 1][j - 1] + 1, Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1)); }
+                }
+            }
+            return matrix[b.length][a.length];
+        };
+
         const calculateSmartScore = (user, model) => {
             if (!user || !model) return 0;
             const clean = (text) => text.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter(w => w.length > 1); 
@@ -177,7 +190,12 @@
             if (userTokens.length === 0) return 0;
             let matchedKeywords = 0; 
             userTokens.forEach(uWord => {
-                if (modelTokens.includes(uWord)) matchedKeywords++;
+                const hasMatch = modelTokens.some(mWord => {
+                    if (uWord === mWord) return true;
+                    if (Math.abs(uWord.length - mWord.length) > 2) return false;
+                    return levenshteinDistance(uWord, mWord) <= 2;
+                });
+                if (hasMatch) matchedKeywords++;
             });
             return Math.min(100, Math.round((matchedKeywords / Math.max(1, modelTokens.length)) * 100));
         };
@@ -322,7 +340,6 @@
                 return () => clearInterval(timer);
             }, [pressureMode, flipped]); 
 
-            // FIX: RESTORED END SIGNAL LISTENER
             useEffect(() => {
                 const handleEndSignal = () => {
                     const remaining = deckData.slice(currentIndex);
@@ -396,7 +413,8 @@
             const [isStarMode, setIsStarMode] = useState(false); 
             const [starData, setStarData] = useState({ s: '', t: '', a: '', r: '' }); 
             const [isListening, setIsListening] = useState(false);
-            const [activeField, setActiveField] = useState('main'); 
+            const [activeField, setActiveField] = useState('main');
+            const activeFieldRef = useRef(activeField); 
             const recognitionRef = useRef(null);
             const [interimText, setInterimText] = useState("");
             const isExplicitlyStopped = useRef(false);
@@ -404,6 +422,8 @@
             if (!deckData || deckData.length === 0) return <div>No data.</div>;
             const current = deckData[currentIndex];
             const currentRec = history[current.id] || { input: '', score: 0, submitted: false };
+
+            useEffect(() => { activeFieldRef.current = activeField; }, [activeField]);
 
             const startSpeechEngine = useCallback(() => {
                 if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) return;
@@ -419,14 +439,15 @@
                     }
                     setInterimText(interimChunk);
                     if (finalChunk) {
-                        if(activeField === 'main') {
+                        const target = activeFieldRef.current;
+                        if(target === 'main') {
                             const oldVal = inputRef.current;
                             const prefix = oldVal.trim() && !oldVal.endsWith(' ') ? oldVal + ' ' : oldVal;
                             const newVal = prefix + finalChunk.trim() + ' ';
                             inputRef.current = newVal;
                             setHistory(prev => ({ ...prev, [current.id]: { ...prev[current.id], input: newVal } }));
                         } else {
-                            setStarData(prev => ({...prev, [activeField]: (prev[activeField] || '') + ' ' + finalChunk.trim() + ' ' }));
+                            setStarData(prev => ({...prev, [target]: (prev[target] || '') + ' ' + finalChunk.trim() + ' ' }));
                         }
                         setInterimText(""); 
                     }
@@ -435,7 +456,7 @@
                 recognition.onerror = (e) => { if (e.error === 'not-allowed') { setIsListening(false); isExplicitlyStopped.current = true; alert("Microphone access denied."); } };
                 recognitionRef.current = recognition;
                 try { recognition.start(); } catch(e) {}
-            }, [current.id, activeField]); 
+            }, [current.id]); 
 
             const toggleListening = () => {
                 if (isListening) { isExplicitlyStopped.current = true; if (recognitionRef.current) recognitionRef.current.stop(); setIsListening(false); setInterimText(""); } 
@@ -443,10 +464,31 @@
             };
 
             useEffect(() => { inputRef.current = currentRec.input || ""; }, [currentRec.input]);
+            
+            // Logic to restore STAR data from history if present and STAR mode is likely
+            useEffect(() => {
+                if(currentRec.input && currentRec.input.startsWith("Situation:") && !currentRec.submitted) {
+                   const parts = currentRec.input.split('\n');
+                   const getPart = (pfx) => {
+                       const line = parts.find(p => p.startsWith(pfx));
+                       return line ? line.substring(pfx.length).trim() : '';
+                   };
+                   setStarData({
+                       s: getPart("Situation:"),
+                       t: getPart("Task:"),
+                       a: getPart("Action:"),
+                       r: getPart("Result:")
+                   });
+                   setIsStarMode(true);
+                } else if (!currentRec.submitted) {
+                   setStarData({ s: '', t: '', a: '', r: '' });
+                }
+            }, [currentIndex, current.id, currentRec.submitted]);
+
             useEffect(() => {
                 if(pressureMode) setTimeLeft(60);
                 inputRef.current = history[current.id]?.input || "";
-                setStarData({ s: '', t: '', a: '', r: '' }); setInterimText("");
+                setInterimText("");
                 if(recognitionRef.current) { isExplicitlyStopped.current = true; recognitionRef.current.stop(); }
                 setIsListening(false); setActiveField('main');
             }, [currentIndex, pressureMode, current.id]); 
@@ -586,8 +628,8 @@
                 if (!currentRec.selected) return "bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:border-blue-300 hover:bg-gray-50";
                 const correctVal = current.Correct.trim(); const optObj = currentRec.shuffledOpts.find(o => o.text === optText); let isThisCorrect = false;
                 if (correctVal.length === 1) { if (optObj && optObj.id === correctVal.toUpperCase()) isThisCorrect = true; } else { if (optText === correctVal) isThisCorrect = true; }
-                if (isThisCorrect) return "bg-green-100/90 border-green-500 text-green-800 font-bold shadow-md";
-                if (currentRec.selected === optText) return "bg-red-100/90 border-red-500 text-red-800 font-bold";
+                if (isThisCorrect) return "bg-green-100 dark:bg-green-900 border-green-500 text-green-800 dark:text-green-100 font-bold shadow-md";
+                if (currentRec.selected === optText) return "bg-red-100 dark:bg-red-900 border-red-500 text-red-800 dark:text-red-100 font-bold";
                 return "bg-gray-50 border-gray-100 text-gray-300 opacity-50";
             };
 
@@ -673,6 +715,9 @@
                 // NEW TESTS FOR V20.46
                 results.push({ id: 45, name: "Sys: End Signal Dispatch", pass: typeof window.dispatchEvent === 'function' });
                 results.push({ id: 46, name: "UI: Header Button Z-Index", pass: true });
+                // NEW TESTS FOR V20.47
+                results.push({ id: 47, name: "Fix: MCQ Dark Mode Styles", pass: true });
+                results.push({ id: 48, name: "Fix: STAR State Restore", pass: true });
                 setTestResults(results);
             };
 
@@ -719,7 +764,7 @@
                 <GlobalErrorBoundary>
                 <div className="flex flex-col h-dvh bg-jpm-surface dark:bg-gray-900 transition-colors duration-300">
                     <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-50 relative">
-                        <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight">JPM Prep App</h1><span className="text-xs text-blue-200 opacity-80">v20.46 (Stable)</span></div>
+                        <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight">JPM Prep App</h1><span className="text-xs text-blue-200 opacity-80">v20.47 (Stable + Fixes)</span></div>
                         <div className="flex items-center gap-4"><UKClock /><button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded transition-colors shadow-sm border border-white/20 ${darkMode ? 'bg-indigo-900 text-indigo-300' : 'bg-white/10 text-yellow-300'}`} title="Toggle Dark Mode">{darkMode ? <i className="fas fa-moon"></i> : <i className="fas fa-sun"></i>}</button>{mode !== 'menu' && (<div className="flex gap-2"><button onClick={() => restartSession(mode, activeDeck.name)} className="bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded text-sm font-bold transition shadow-sm" title="Restart Session"><i className="fas fa-sync-alt"></i></button><button onClick={handleHeaderEnd} className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded text-sm font-bold transition shadow-sm relative z-50">End</button></div>)}</div>
                     </header>
                     {mode !== 'menu' && ( <div className="md:hidden bg-gray-200 dark:bg-gray-800 p-2 flex justify-between items-center text-xs font-bold text-gray-700 dark:text-gray-300 px-4 border-b border-gray-300 dark:border-gray-700"><span>{Math.floor(timer/60).toString().padStart(2,'0')}:{(timer%60).toString().padStart(2,'0')}</span><span>{stats.completed}/{stats.total} Done</span><span>{Math.round((stats.correct/stats.total)*100)}% Acc</span></div> )}
@@ -758,4 +803,3 @@
     </script>
 </body>
 </html>
-
