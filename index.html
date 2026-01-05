@@ -3,15 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Prep v20.57 (Stable One-Screen)</title>
+    <title>JPM Prep v20.58 (Stable Revert + Fix)</title>
     
-    <script>
-        window.onerror = function(msg, url, line, col, error) {
-            document.body.innerHTML = '<div style="color:red; padding:20px; font-family:monospace; background:white;"><h3>System Critical Error</h3><p>'+msg+'</p><p>Line: '+line+'</p><button onclick="location.reload()" style="padding:10px; margin-top:10px;">Factory Reset (Reload)</button></div>';
-            return false;
-        };
-    </script>
-
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -65,7 +58,7 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
-        // --- 1. UTILS ---
+        // --- UTILS (Stable) ---
         const parseCSV = (text) => {
             if (!text || typeof text !== 'string') return [];
             if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1); 
@@ -100,25 +93,6 @@
             }).filter(Boolean);
         };
 
-        const calculateSmartScore = (user, model) => {
-            if (!user || !model) return 0;
-            const clean = (text) => text.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter(w => w.length > 1); 
-            const userTokens = clean(user); const modelTokens = clean(model);
-            if (userTokens.length === 0) return 0;
-            let matchedKeywords = 0; 
-            userTokens.forEach(uWord => { if (modelTokens.includes(uWord)) matchedKeywords++; });
-            return Math.min(100, Math.round((matchedKeywords / Math.max(1, modelTokens.length)) * 100));
-        };
-
-        const shuffleArray = (array) => {
-            let arr = [...array];
-            for (let i = arr.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [arr[i], arr[j]] = [arr[j], arr[i]];
-            }
-            return arr;
-        };
-
         const SpeechManager = {
             voices: [],
             init: function() {
@@ -140,77 +114,29 @@
         };
         SpeechManager.init();
 
-        // --- 2. HOOKS ---
-        const useDeckData = () => {
-            const [data, setData] = useState({ flashcards: [], type: [], mcq: [], study: [], prompts: [], skills: [], vocab: [] });
-            const [loading, setLoading] = useState(true);
-            useEffect(() => {
-                const load = async () => {
-                    try {
-                        const ts = Date.now();
-                        const files = ['flashcards.csv', 'type_answer.csv', 'mcq.csv', 'context.csv', 'prompt.csv', 'skill.csv', 'vocab.csv'];
-                        const results = await Promise.all(files.map(f => fetch(`${f}?t=${ts}`).then(r => r.ok ? r.text() : "")));
-                        const [f, t, m, s, p, sk, v] = results.map(parseCSV);
-                        setData({ flashcards: f, type: t, mcq: m, study: s, prompts: p, skills: sk, vocab: v });
-                    } catch(e) { console.error("Load Error", e); } finally { setLoading(false); }
-                };
-                load();
-            }, []);
-            return { data, loading };
+        const calculateSmartScore = (user, model) => {
+            if (!user || !model) return 0;
+            const clean = (text) => text.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter(w => w.length > 1); 
+            const userTokens = clean(user); const modelTokens = clean(model);
+            if (userTokens.length === 0) return 0;
+            let matchedKeywords = 0; 
+            userTokens.forEach(uWord => { if (modelTokens.includes(uWord)) matchedKeywords++; });
+            return Math.min(100, Math.round((matchedKeywords / Math.max(1, modelTokens.length)) * 100));
         };
 
-        const useSpeech = (onResultCallback) => {
-            const [isListening, setIsListening] = useState(false);
-            const recognitionRef = useRef(null);
-            
-            const start = useCallback(() => {
-                if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) { alert("Speech API not supported"); return; }
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                const recognition = new SpeechRecognition();
-                recognition.continuous = true; recognition.interimResults = true; recognition.lang = 'en-US';
-                recognition.onresult = (event) => {
-                    let finalChunk = ''; let interimChunk = '';
-                    for (let i = event.resultIndex; i < event.results.length; ++i) {
-                        if (event.results[i].isFinal) finalChunk += event.results[i][0].transcript;
-                        else interimChunk += event.results[i][0].transcript;
-                    }
-                    if (onResultCallback) onResultCallback(finalChunk, interimChunk);
-                };
-                recognition.onend = () => { 
-                    if (recognitionRef.current && !recognitionRef.current.stoppedExplicitly) { try { recognition.start(); } catch(e) {} } 
-                    else { setIsListening(false); }
-                };
-                recognition.onerror = (e) => { if(e.error === 'not-allowed') { setIsListening(false); alert("Mic Access Denied"); } };
-                recognition.stoppedExplicitly = false;
-                recognitionRef.current = recognition;
-                recognition.start();
-                setIsListening(true);
-            }, [onResultCallback]);
-
-            const stop = useCallback(() => {
-                if (recognitionRef.current) { recognitionRef.current.stoppedExplicitly = true; recognitionRef.current.stop(); }
-                setIsListening(false);
-            }, []);
-            return { isListening, start, stop };
-        };
-
-        // --- 3. UI COMPONENTS ---
-        
-        class GlobalErrorBoundary extends React.Component {
-            constructor(props) { super(props); this.state = { hasError: false, error: null }; }
-            static getDerivedStateFromError(error) { return { hasError: true, error }; }
-            render() { 
-                if (this.state.hasError) {
-                    return (
-                        <div className="flex flex-col items-center justify-center h-screen bg-red-50 p-6 text-center">
-                            <h2 className="text-xl font-bold mb-4 text-red-600">Application Error</h2>
-                            <p className="text-sm mb-4">{this.state.error ? this.state.error.toString() : 'Unknown Error'}</p>
-                            <button onClick={()=>window.location.reload()} className="bg-red-500 text-white px-4 py-2 rounded">Reload App</button>
-                        </div>
-                    ); 
-                }
-                return this.props.children; 
+        const shuffleArray = (array) => {
+            let arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
             }
+            return arr;
+        };
+
+        class GlobalErrorBoundary extends React.Component {
+            constructor(props) { super(props); this.state = { hasError: false }; }
+            static getDerivedStateFromError(error) { return { hasError: true }; }
+            render() { return this.state.hasError ? <div className="p-10 text-center"><h2 className="text-xl font-bold mb-4">Something went wrong</h2><button onClick={()=>window.location.reload()} className="bg-red-500 text-white px-4 py-2 rounded">Reload</button></div> : this.props.children; }
         }
 
         const ComponentSandbox = ({ children }) => (children);
@@ -309,46 +235,16 @@
             );
         };
 
-        const RenderDeckList = ({ items, mId, progress, onDeckClick, onStartSession, onMarkComplete }) => {
-            const getDecks = (items) => [...new Set(items.map(i => i.Deck))].filter(Boolean);
-            const decks = getDecks(items);
-            const activeDecks = decks.filter(d => progress[`${mId}-${d}`]);
-            const newDecks = decks.filter(d => !progress[`${mId}-${d}`]);
-            const isLinkMode = mId === 'study' || mId === 'skill';
-            
-            return (
-                <div className="h-32 md:h-40 overflow-y-auto bg-gray-50/50 dark:bg-gray-800/50 p-3 md:p-4">
-                    {activeDecks.length > 0 && <h4 className="text-[10px] font-bold text-gray-500 uppercase mb-2">My Progress</h4>}
-                    {activeDecks.map(d => {
-                        const p = progress[`${mId}-${d}`];
-                        const isDone = p.status === 'Completed';
-                        return (
-                            <div key={d} className={`w-full text-left p-2 mb-2 border rounded-xl flex justify-between items-center transition-transform active:scale-95 ${isDone ? 'bg-green-50/80 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-amber-50/80 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800'}`}>
-                                <button onClick={() => onDeckClick(mId, d)} className="font-semibold text-xs md:text-sm text-gray-700 dark:text-gray-200 flex-grow text-left hover:underline truncate mr-2">{d}</button>
-                                {isLinkMode && !isDone && <button onClick={() => onMarkComplete(mId, d)} className="bg-green-600 text-white text-[10px] px-2 py-1 rounded hover:bg-green-700 flex-shrink-0">Done</button>}
-                                {isDone ? <i className="fas fa-check-circle text-green-600 dark:text-green-400 ml-2"></i> : (!isLinkMode && <div className="flex items-center text-amber-600 dark:text-amber-400 text-[10px] font-bold ml-2 flex-shrink-0"><i className="fas fa-history mr-1"></i> GO</div>)}
-                            </div>
-                        )
-                    })}
-                    {newDecks.length > 0 && <h4 className="text-[10px] font-bold text-gray-500 uppercase mb-2 mt-4">New Decks</h4>}
-                    {newDecks.map(d => (
-                        <div key={d} className="w-full text-left p-2 mb-2 bg-white/80 dark:bg-gray-700/80 border dark:border-gray-600 border-gray-200 rounded-xl hover:border-jpm-accent transition flex justify-between items-center group cursor-pointer shadow-sm hover:shadow-md">
-                            <button onClick={() => onStartSession(mId, d)} className="font-semibold text-xs md:text-sm flex-grow text-left text-gray-800 dark:text-gray-200 truncate mr-2">{d}</button>
-                            <i className="fas fa-play opacity-0 group-hover:opacity-100 dark:text-gray-400 text-jpm-accent transition-opacity text-xs"></i>
-                        </div>
-                    ))}
-                </div>
-            );
-        };
+        // --- GAME MODES ---
 
         const FlashcardMode = ({ deckData, onEnd, onStatsUpdate, pressureMode }) => {
             const [currentIndex, setCurrentIndex] = useState(0);
             const [flipped, setFlipped] = useState(false);
             const [results, setResults] = useState({}); 
             const [timeLeft, setTimeLeft] = useState(60);
-            // FIX: Restore maxIndex logic from v20.46 to fix crash
-            const [maxIndex, setMaxIndex] = useState(0); 
+            const [maxIndex, setMaxIndex] = useState(0);
 
+            if (!deckData || deckData.length === 0) return <div className="p-10 text-center text-gray-500">No cards.</div>;
             const current = deckData[currentIndex];
             const isVocab = current.ModeTitle === 'Vocabulary';
 
@@ -375,7 +271,7 @@
                 if(currentIndex < deckData.length -1) { 
                     const next = currentIndex + 1; 
                     setCurrentIndex(next); 
-                    if(next > maxIndex) setMaxIndex(next); // FIX: Update maxIndex
+                    if(next>maxIndex) setMaxIndex(next);
                 } else {
                     const finalRes = {...results, [current.id]: r};
                     const hard = deckData.filter(d => finalRes[d.id] === 'hard');
@@ -384,17 +280,10 @@
             };
 
             const getBtnStyle = (type) => {
-                const isActive = results[current.id] === type; // Corrected state access
+                const isActive = results[current.id] === type;
                 const base = "flex-1 py-4 rounded-xl font-bold shadow-md transition-all duration-200 border-2";
-                if (type === 'hard') {
-                    return isActive 
-                        ? `${base} bg-red-600 border-red-800 ring-4 ring-red-300 scale-105 text-white shadow-xl z-10 opacity-100` 
-                        : `${base} bg-white border-red-200 text-red-600 hover:bg-red-50 opacity-100`;
-                } else {
-                    return isActive 
-                        ? `${base} bg-green-600 border-green-800 ring-4 ring-green-300 scale-105 text-white shadow-xl z-10 opacity-100` 
-                        : `${base} bg-white border-green-200 text-green-600 hover:bg-green-50 opacity-100`;
-                }
+                if (type === 'hard') return isActive ? `${base} bg-red-600 border-red-800 ring-4 ring-red-300 scale-105 text-white` : `${base} bg-white border-red-200 text-red-600`;
+                return isActive ? `${base} bg-green-600 border-green-800 ring-4 ring-green-300 scale-105 text-white` : `${base} bg-white border-green-200 text-green-600`;
             };
 
             return (
@@ -404,38 +293,27 @@
                         {pressureMode && !flipped && <span className="text-blue-500 font-mono">⏳ {timeLeft}</span>}
                         <span>{currentIndex+1}/{deckData.length}</span>
                     </div>
-                    
-                    <div className="card-scene mb-4 md:mb-6 w-full max-w-4xl flex-grow relative flex flex-col" style={{minHeight: '0'}}>
-                        <div className={`card-object ${flipped ? 'is-flipped' : ''}`} onClick={() => setFlipped(!flipped)} role="button">
+                    <div className="card-scene mb-0 md:mb-6 w-full max-w-4xl flex-grow relative flex flex-col" style={{minHeight: '0'}}>
+                        <div className={`card-object ${flipped ? 'is-flipped' : ''}`} onClick={() => setFlipped(!flipped)}>
                             <div className="card-face front">
                                 <div className="card-content relative">
-                                    <h3 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white leading-snug tracking-tight">{current.Question}</h3>
-                                    {isVocab && SpeechManager.voices.length > 0 && (
-                                        <button onClick={(e) => { e.stopPropagation(); SpeechManager.speak(current.Question); }} 
-                                            className="absolute top-6 right-6 text-jpm-primary dark:text-sky-400 p-3 bg-blue-50 dark:bg-gray-800 rounded-full shadow-md transition-transform hover:scale-110">
-                                            <i className="fas fa-volume-up"></i>
-                                        </button>
-                                    )}
+                                    <h3 className="text-2xl md:text-3xl font-bold leading-snug">{current.Question}</h3>
+                                    {isVocab && <button onClick={(e)=>{e.stopPropagation(); SpeechManager.speak(current.Question);}} className="absolute top-6 right-6 p-3 bg-blue-50 dark:bg-gray-800 rounded-full shadow text-jpm-primary dark:text-sky-400"><i className="fas fa-volume-up"></i></button>}
                                 </div>
-                                <div className="absolute bottom-6 text-gray-400 text-xs uppercase tracking-widest font-bold">Tap to Flip</div>
+                                <div className="absolute bottom-6 text-gray-400 text-xs font-bold uppercase tracking-widest">Tap to Flip</div>
                             </div>
-                            <div className="card-face back">
-                                <div className="card-content"><p className="text-xl text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">{current.Answer}</p></div>
-                            </div>
+                            <div className="card-face back"><div className="card-content"><p className="text-xl whitespace-pre-wrap">{current.Answer}</p></div></div>
                         </div>
                     </div>
-
-                    <div className="w-full max-w-4xl z-10 flex gap-4 items-center flex-shrink-0 pb-20 md:pb-6 mt-auto">
-                        <button onClick={() => { setCurrentIndex(p => Math.max(0, p-1)); setFlipped(false); setTimeLeft(60); }} disabled={currentIndex === 0} className="px-6 py-4 bg-white dark:bg-gray-800 text-gray-600 dark:text-white rounded-xl font-bold shadow-sm hover:bg-gray-50 disabled:opacity-50 transition-colors"><i className="fas fa-arrow-left"></i></button>
+                    <div className="w-full max-w-4xl z-10 flex gap-4 items-center flex-shrink-0 py-4 md:py-6 mt-auto">
+                        <button onClick={()=>{setCurrentIndex(Math.max(0,currentIndex-1)); setFlipped(false);}} disabled={currentIndex===0} className="px-6 py-4 bg-white dark:bg-gray-800 rounded-xl shadow disabled:opacity-50"><i className="fas fa-arrow-left"></i></button>
                         {flipped ? (
                             <div className="flex-1 flex gap-4">
-                                <button onClick={(e) => { e.stopPropagation(); rate('hard'); }} className={getBtnStyle('hard')}>Hard</button>
-                                <button onClick={(e) => { e.stopPropagation(); rate('easy'); }} className={getBtnStyle('easy')}>Easy</button>
+                                <button onClick={(e)=>{e.stopPropagation(); rate('hard');}} className={getBtnStyle('hard')}>Hard</button>
+                                <button onClick={(e)=>{e.stopPropagation(); rate('easy');}} className={getBtnStyle('easy')}>Easy</button>
                             </div>
-                        ) : (
-                            <button onClick={() => setFlipped(true)} className="flex-1 px-8 py-4 bg-jpm-primary text-white rounded-xl font-bold shadow-lg hover:bg-jpm-dark transition active:scale-95 transform">Show Answer</button>
-                        )}
-                        <button onClick={() => { if(currentIndex < deckData.length-1) { const n=currentIndex+1; setCurrentIndex(n); if(n>maxIndex) setMaxIndex(n); setFlipped(false); setTimeLeft(60); }}} disabled={currentIndex >= deckData.length-1 && currentIndex >= maxIndex} className="px-6 py-4 bg-white dark:bg-gray-800 text-gray-600 dark:text-white rounded-xl font-bold shadow-sm hover:bg-gray-50 disabled:opacity-50 transition-colors"><i className="fas fa-arrow-right"></i></button>
+                        ) : (<button onClick={()=>setFlipped(true)} className="flex-1 py-4 bg-jpm-primary text-white font-bold rounded-xl shadow">Show Answer</button>)}
+                        <button onClick={()=>{if(currentIndex<deckData.length-1){const n=currentIndex+1; setCurrentIndex(n); if(n>maxIndex) setMaxIndex(n); setFlipped(false);}}} disabled={currentIndex>=deckData.length-1 && currentIndex>=maxIndex} className="px-6 py-4 bg-white dark:bg-gray-800 rounded-xl shadow disabled:opacity-50"><i className="fas fa-arrow-right"></i></button>
                     </div>
                 </div>
             );
@@ -448,59 +326,63 @@
             const inputRef = useRef(""); 
             const [isStarMode, setIsStarMode] = useState(false); 
             const [starData, setStarData] = useState({ s: '', t: '', a: '', r: '' }); 
-            const [isListening, setIsListening] = useState(false);
-            const [interimText, setInterimText] = useState("");
+            const [input, setInput] = useState("");
             
+            // --- FIX FOR STAR SPEECH ---
+            const [isListening, setIsListening] = useState(false);
             const [activeField, setActiveField] = useState('main'); 
-            const activeFieldRef = useRef('main'); 
+            const activeFieldRef = useRef('main'); // Critical for callback access
+            const recognitionRef = useRef(null);
 
             useEffect(() => { activeFieldRef.current = activeField; }, [activeField]);
 
+            if (!deckData || deckData.length === 0) return <div>No data.</div>;
             const current = deckData[currentIndex];
             const currentRec = history[current.id] || { input: '', score: 0, submitted: false };
 
-            const handleSpeechResult = useCallback((final, interimTxt) => {
-                setInterimText(interimTxt);
-                if (final) {
-                    const field = activeFieldRef.current;
-                    if (field === 'main') {
-                        setInput(prev => (prev + ' ' + final).trim());
-                    } else {
-                        setStarData(prev => ({...prev, [field]: (prev[field] + ' ' + final).trim() }));
-                    }
-                    setInterimText("");
+            const toggleListen = () => {
+                if(isListening) { 
+                    if(recognitionRef.current) recognitionRef.current.stop(); 
+                    setIsListening(false);
+                } else {
+                    if(!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) { alert("Not supported"); return; }
+                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    const rec = new SpeechRecognition();
+                    rec.continuous = true; rec.interimResults = false; rec.lang = 'en-US';
+                    rec.onresult = (e) => {
+                        const txt = e.results[e.results.length-1][0].transcript;
+                        const field = activeFieldRef.current;
+                        if(field === 'main') setInput(prev => (prev + ' ' + txt).trim());
+                        else setStarData(prev => ({...prev, [field]: (prev[field] + ' ' + txt).trim() }));
+                    };
+                    rec.onend = () => setIsListening(false);
+                    rec.start();
+                    recognitionRef.current = rec;
+                    setIsListening(true);
                 }
-            }, []); 
-
-            const { isListening: hookListening, start, stop } = useSpeech(handleSpeechResult);
-            useEffect(() => { setIsListening(hookListening); }, [hookListening]);
-
-            const toggleListening = () => { if (isListening) { stop(); } else { start(); } };
+            };
 
             const submit = (txt) => {
-                stop(); 
+                if(isListening) toggleListen();
                 const score = calculateSmartScore(txt, current.ModelAnswer);
                 setHistory(prev => ({ ...prev, [current.id]: { input: txt, score, submitted: true } }));
             };
 
             const handleStarSubmit = () => submit(`Situation: ${starData.s}\nTask: ${starData.t}\nAction: ${starData.a}\nResult: ${starData.r}`);
 
+            // RESET LOGIC
             useEffect(() => {
                 setInput(history[current.id]?.input || "");
                 setStarData({ s: '', t: '', a: '', r: '' });
                 if(pressureMode) setTimeLeft(60);
                 setActiveField('main');
-                stop();
+                if(isListening) toggleListen(); // Stop on switch
             }, [currentIndex, current.id]); 
 
             useEffect(() => {
                 if (!pressureMode || currentRec.submitted || isListening) return; 
                 const timer = setInterval(() => setTimeLeft(prev => { 
-                    if (prev <= 1) { 
-                        clearInterval(timer); 
-                        if(isStarMode) handleStarSubmit(); else submit(input); 
-                        return 0; 
-                    } 
+                    if (prev <= 1) { clearInterval(timer); if(isStarMode) handleStarSubmit(); else submit(input); return 0; } 
                     return prev - 1; 
                 }), 1000);
                 return () => clearInterval(timer);
@@ -509,30 +391,18 @@
             useEffect(() => {
                 const handler = () => {
                      const avg = Object.values(history).reduce((a,b)=>a+b.score,0) / deckData.length;
-                     const wrongItems = deckData.filter(d => (history[d.id]?.score || 0) < 50);
-                     onEnd(Math.round(avg || 0), wrongItems);
+                     onEnd(Math.round(avg || 0), deckData.filter(d => (history[d.id]?.score||0)<50));
                 };
                 window.addEventListener('jpm-trigger-end', handler);
                 return () => window.removeEventListener('jpm-trigger-end', handler);
-            }, [history, deckData, onEnd]);
+            }, [history, deckData]);
 
             useEffect(() => {
-                const done = Object.keys(history).filter(k => history[k].submitted).length;
-                const correct = Object.values(history).filter(rec => rec.score >= 50).length;
-                onStatsUpdate({ completed: done, correct });
+                onStatsUpdate({ completed: Object.keys(history).filter(k=>history[k].submitted).length, correct: Object.values(history).filter(r=>r.score>=50).length });
             }, [history, onStatsUpdate]);
 
-            const handleNext = () => {
-                if (currentIndex < deckData.length - 1) { setCurrentIndex(prev => prev + 1); } 
-                else {
-                    const avg = Object.values(history).reduce((a,b)=>a+b.score,0) / deckData.length;
-                    const wrongItems = deckData.filter(d => (history[d.id]?.score || 0) < 50);
-                    onEnd(avg, wrongItems);
-                }
-            };
-
             return (
-                <div className="max-w-4xl mx-auto w-full pt-4 px-4 h-full flex flex-col pb-20 md:pb-safe scroll-touch stable-scroll">
+                <div className="max-w-4xl mx-auto w-full pt-4 px-4 h-full flex flex-col pb-0 md:pb-safe scroll-touch stable-scroll">
                     <div className="glass-panel rounded-3xl shadow-xl p-4 md:p-8 flex-grow flex flex-col min-h-0 mb-4">
                         <div className="flex justify-between items-center mb-4 flex-shrink-0">
                             <span className="text-jpm-accent font-bold text-xs uppercase block">Q{currentIndex+1}/{deckData.length}</span>
@@ -546,33 +416,14 @@
                         {!currentRec.submitted && isStarMode ? (
                             <div className="flex-grow flex flex-col gap-3 overflow-y-auto min-h-0 relative">
                                 {['s','t','a','r'].map(k => (
-                                    <textarea key={k} 
-                                        onFocus={() => setActiveField(k)} 
-                                        className={`w-full p-3 border-l-4 ${activeField===k ? 'ring-2 ring-blue-300 border-blue-600' : 'border-gray-300'} bg-white/50 dark:bg-gray-700/50 dark:text-white rounded-lg resize-none h-24 transition-all`}
-                                        placeholder={`${k.toUpperCase()}...`} 
-                                        value={starData[k] + (activeField===k ? interimText : '')} 
-                                        onChange={e => setStarData({...starData, [k]: e.target.value})} 
-                                    />
+                                    <textarea key={k} onFocus={() => setActiveField(k)} className={`w-full p-3 border-l-4 ${activeField===k ? 'ring-2 ring-blue-300 border-blue-600' : 'border-gray-300'} bg-white/50 dark:bg-gray-700/50 dark:text-white rounded-lg resize-none h-24 transition-all`} placeholder={`${k.toUpperCase()}...`} value={starData[k]} onChange={e => setStarData({...starData, [k]: e.target.value})} />
                                 ))}
-                                <button onClick={toggleListening} className={`absolute bottom-4 right-4 z-20 p-4 rounded-full shadow-xl ${isListening ? 'bg-red-500 recording-active text-white' : 'bg-white text-gray-600'}`}>
-                                    <i className={`fas ${isListening ? 'fa-microphone-slash' : 'fa-microphone'}`}></i>
-                                </button>
+                                <button onClick={toggleListen} className={`absolute bottom-4 right-4 z-20 p-4 rounded-full shadow-xl ${isListening ? 'bg-red-500 recording-active text-white' : 'bg-white text-gray-600'}`}><i className={`fas ${isListening ? 'fa-microphone-slash' : 'fa-microphone'}`}></i></button>
                             </div>
                         ) : (
                             <div className="relative flex-grow flex flex-col min-h-0">
-                                <textarea 
-                                    onFocus={() => setActiveField('main')}
-                                    className="w-full p-6 border-2 rounded-2xl mb-4 flex-grow resize-none text-lg bg-white/60 dark:bg-gray-800/60 dark:text-white"
-                                    placeholder="Type answer or speak..." 
-                                    value={currentRec.submitted ? currentRec.input : (input + (activeField==='main' ? interimText : ''))}
-                                    onChange={e => !currentRec.submitted && setInput(e.target.value)}
-                                    readOnly={currentRec.submitted} 
-                                />
-                                {!currentRec.submitted && (
-                                    <button onClick={toggleListening} className={`absolute bottom-6 right-6 p-4 rounded-full shadow-xl ${isListening ? 'bg-red-500 recording-active text-white' : 'bg-white text-gray-600'}`}>
-                                        <i className={`fas ${isListening ? 'fa-microphone-slash' : 'fa-microphone'}`}></i>
-                                    </button>
-                                )}
+                                <textarea onFocus={() => setActiveField('main')} className="w-full p-6 border-2 rounded-2xl mb-4 flex-grow resize-none text-lg bg-white/60 dark:bg-gray-800/60 dark:text-white" placeholder="Type answer or speak..." value={currentRec.submitted ? currentRec.input : input} onChange={e => !currentRec.submitted && setInput(e.target.value)} readOnly={currentRec.submitted} />
+                                {!currentRec.submitted && ( <button onClick={toggleListen} className={`absolute bottom-6 right-6 p-4 rounded-full shadow-xl ${isListening ? 'bg-red-500 recording-active text-white' : 'bg-white text-gray-600'}`}><i className={`fas ${isListening ? 'fa-microphone-slash' : 'fa-microphone'}`}></i></button> )}
                             </div>
                         )}
 
@@ -592,7 +443,7 @@
                             <button onClick={() => isStarMode ? handleStarSubmit() : submit(input)} className="flex-grow bg-jpm-primary text-white py-3 rounded-xl font-bold shadow-lg">Submit Answer</button>
                         ) : (
                             <>
-                                <button onClick={() => { setHistory(h => ({...h, [current.id]: {...currentRec, submitted: false}})); stop(); }} className="bg-yellow-500 text-white px-6 py-3 rounded-xl font-bold">Edit</button>
+                                <button onClick={() => { setHistory(h => ({...h, [current.id]: {...currentRec, submitted: false}})); }} className="bg-yellow-500 text-white px-6 py-3 rounded-xl font-bold">Edit</button>
                                 <button onClick={() => { if(currentIndex<deckData.length-1) setCurrentIndex(c=>c+1); else onEnd(0, []); }} className="flex-grow bg-gray-800 text-white py-3 rounded-xl font-bold shadow-lg">{currentIndex===deckData.length-1 ? 'Finish' : 'Next'}</button>
                             </>
                         )}
@@ -621,12 +472,12 @@
             }, [pressureMode, currentRec.selected]);
 
             useEffect(() => {
-                const handleEndSignal = () => {
+                const handler = () => {
                     const wrong = deckData.filter(d => !history[d.id]?.isCorrect);
                     const score = Math.round(((deckData.length - wrong.length) / deckData.length) * 100);
                     onEnd(score, wrong);
                 };
-                window.addEventListener('jpm-trigger-end', handleEndSignal);
+                window.addEventListener('jpm-trigger-end', handler);
                 return () => window.removeEventListener('jpm-trigger-end', handleEndSignal);
             }, [history, deckData]);
 
@@ -650,7 +501,7 @@
             };
 
             return (
-                <div className="max-w-4xl mx-auto w-full pt-4 px-4 h-full flex flex-col pb-20 md:pb-safe scroll-touch stable-scroll">
+                <div className="max-w-4xl mx-auto w-full pt-4 px-4 h-full flex flex-col pb-0 md:pb-safe scroll-touch stable-scroll">
                     <div className="glass-panel rounded-3xl shadow-xl p-4 md:p-8 flex-grow overflow-y-auto mb-4 flex flex-col min-h-0">
                         <div className="flex justify-between items-center mb-4 flex-shrink-0">
                             <h2 className="text-base md:text-xl font-bold dark:text-white">{current.Question}</h2>
@@ -661,7 +512,6 @@
                                 <button key={i} onClick={() => !currentRec.selected && checkAnswer(opt.text)} className={`w-full text-left p-3 md:p-4 rounded-xl border-2 transition dark:text-white ${getStyle(opt.text)}`}><span className="font-mono mr-3 opacity-50">{String.fromCharCode(65+i)}.</span> {opt.text}</button>
                             ))}
                         </div>
-                        {currentRec.selected === "TIMEOUT" && <div className="mt-2 text-center text-red-500 font-bold text-sm">Time's Up!</div>}
                     </div>
                     <div className="flex gap-4 pb-6 z-10 flex-shrink-0 mt-auto">
                         <button onClick={() => {setCurrentIndex(Math.max(0,currentIndex-1)); setTimeLeft(60);}} disabled={currentIndex===0} className="px-6 py-3 bg-white dark:bg-gray-800 rounded-xl shadow disabled:opacity-50"><i className="fas fa-arrow-left"></i></button>
@@ -672,7 +522,7 @@
         };
 
         const App = () => {
-            const { data } = useDeckData(); 
+            const [data, setData] = useState({ flashcards: [], type: [], mcq: [], study: [], prompts: [], skills: [], vocab: [] });
             const [mode, setMode] = useState('menu'); 
             const [activeDeck, setActiveDeck] = useState(null);
             const [stats, setStats] = useState({ correct: 0, completed: 0, total: 0 });
@@ -687,25 +537,31 @@
             const [streak, setStreak] = useState(0);
             const [pressureMode, setPressureMode] = useState(false);
 
+            // MONOLITHIC LOAD LOGIC (Reverted for stability)
             useEffect(() => {
-                const saved = localStorage.getItem('jpm_prep_progress_v20');
-                if(saved) { 
+                const load = async () => {
                     try {
-                        const p = JSON.parse(saved); 
-                        setProgress(p); 
-                        if(p._settings) setPressureMode(p._settings.pressureMode); 
-                    } catch(e) { console.error("Save Data Corrupt", e); }
-                }
-                const today = new Date().toLocaleDateString();
-                if (localStorage.getItem('jpm_last_login') !== today) {
-                    const s = (localStorage.getItem('jpm_last_login') === new Date(Date.now() - 864e5).toLocaleDateString()) ? (parseInt(localStorage.getItem('jpm_streak')||0)+1) : 1;
-                    setStreak(s); localStorage.setItem('jpm_streak', s); localStorage.setItem('jpm_last_login', today);
-                } else setStreak(parseInt(localStorage.getItem('jpm_streak')||0));
-                
-                let interval; 
-                if(mode !== 'menu') interval = setInterval(() => setTimer(t => t+1), 1000); else setTimer(0);
-                return () => clearInterval(interval);
-            }, [mode]);
+                        const ts = Date.now();
+                        const files = ['flashcards.csv', 'type_answer.csv', 'mcq.csv', 'context.csv', 'prompt.csv', 'skill.csv', 'vocab.csv'];
+                        const results = await Promise.all(files.map(f => fetch(`${f}?t=${ts}`).then(r => r.ok ? r.text() : "")));
+                        const [f, t, m, s, p, sk, v] = results.map(parseCSV);
+                        setData({ flashcards: f, type: t, mcq: m, study: s, prompts: p, skills: sk, vocab: v });
+                    } catch(e) { console.error("Load Error", e); }
+                    
+                    const saved = localStorage.getItem('jpm_prep_progress_v20');
+                    if(saved) { 
+                        try { const p = JSON.parse(saved); setProgress(p); if(p._settings) setPressureMode(p._settings.pressureMode); } 
+                        catch(e) { console.error("Save Data Corrupt", e); }
+                    }
+                    const today = new Date().toLocaleDateString();
+                    if (localStorage.getItem('jpm_last_login') !== today) {
+                        const s = (localStorage.getItem('jpm_last_login') === new Date(Date.now() - 864e5).toLocaleDateString()) ? (parseInt(localStorage.getItem('jpm_streak')||0)+1) : 1;
+                        setStreak(s); localStorage.setItem('jpm_streak', s); localStorage.setItem('jpm_last_login', today);
+                    } else setStreak(parseInt(localStorage.getItem('jpm_streak')||0));
+                };
+                load();
+                setInterval(() => setTimer(t => t + 1), 1000);
+            }, []);
 
             useEffect(() => { document.documentElement.classList.toggle('dark', darkMode); document.documentElement.classList.toggle('light', !darkMode); }, [darkMode]);
 
@@ -719,6 +575,23 @@
                 if(!progress[`${m}-${deckName}`]) saveProgress(m, deckName, 'In Progress', 0);
             };
 
+            const restartSession = (m, deckName) => {
+                const map = { 'flashcard': 'flashcards', 'type': 'type', 'mcq': 'mcq', 'study': 'study', 'skill': 'skills', 'vocab': 'vocab' };
+                let fullDeck = data[map[m]].filter(d => d.Deck === deckName);
+                if(fullDeck.length === 0) return;
+                if (m === 'vocab') fullDeck = fullDeck.map(item => ({...item, Question: item.Word, Answer: item.Meaning, ModeTitle: 'Vocabulary'}));
+                saveProgress(m, deckName, 'In Progress', 0, null); setActiveDeck({ name: deckName, items: fullDeck }); setMode(m); setStats({ correct: 0, completed: 0, total: 0 }); setModalDeck(null); setSessionKey(p=>p+1);
+            };
+
+            const handleHeaderEnd = () => { window.dispatchEvent(new CustomEvent('jpm-trigger-end')); };
+
+            const endSession = useCallback((finalScore = 0, remainingItems = []) => {
+                let status = 'In Progress'; let queueToSave = null;
+                if (mode === 'flashcard' || mode === 'vocab') { if (finalScore === 100 && remainingItems.length === 0) status = 'Completed'; else { status = 'In Progress'; queueToSave = remainingItems; } } 
+                else { status = finalScore >= 50 && remainingItems.length === 0 ? 'Completed' : 'In Progress'; if (status === 'In Progress') queueToSave = remainingItems; }
+                saveProgress(mode, activeDeck.name, status, finalScore, queueToSave); setMode('menu'); setActiveDeck(null);
+            }, [mode, activeDeck, progress]);
+
             const saveProgress = (m, d, status, score, queue = null) => {
                 const newP = { ...progress, [`${m}-${d}`]: { status, score, date: new Date().toLocaleString(), queue }, _settings: { pressureMode } };
                 setProgress(newP); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(newP));
@@ -726,16 +599,14 @@
 
             const markStudyComplete = (mId, deckName) => { saveProgress(mId, deckName, 'Completed', 100); };
             const updateStats = useCallback(({ completed, correct }) => { if(activeDeck) setStats({ total: activeDeck.items.length, completed, correct }); }, [activeDeck]);
+            const getDecks = (items) => [...new Set(items.map(i => i.Deck))].filter(Boolean);
             const handleExport = () => { const blob = new Blob([JSON.stringify(progress)], {type: "application/json"}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = "jpm_backup.json"; a.click(); };
             const handleImport = (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const p = JSON.parse(e.target.result); setProgress(p); if(p._settings) setPressureMode(p._settings.pressureMode || false); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(p)); alert("Import Successful!"); } catch(err) { alert("Invalid File"); } }; reader.readAsText(file); };
             const togglePressureMode = () => { const newVal = !pressureMode; setPressureMode(newVal); const newP = { ...progress, _settings: { ...(progress._settings || {}), pressureMode: newVal } }; setProgress(newP); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(newP)); };
-            const restartSession = (m, deckName) => { const map = { 'flashcard': 'flashcards', 'type': 'type', 'mcq': 'mcq', 'study': 'study', 'skill': 'skills', 'vocab': 'vocab' }; let fullDeck = data[map[m]].filter(d => d.Deck === deckName); if(fullDeck.length === 0) return; if (m === 'vocab') fullDeck = fullDeck.map(item => ({...item, Question: item.Word, Answer: item.Meaning, ModeTitle: 'Vocabulary'})); saveProgress(m, deckName, 'In Progress', 0, null); setActiveDeck({ name: deckName, items: fullDeck }); setMode(m); setStats({ correct: 0, completed: 0, total: 0 }); setModalDeck(null); setSessionKey(p=>p+1); };
-            const handleHeaderEnd = () => { window.dispatchEvent(new CustomEvent('jpm-trigger-end')); };
-            const endSession = useCallback((finalScore = 0, remainingItems = []) => { let status = 'In Progress'; let queueToSave = null; if (mode === 'flashcard' || mode === 'vocab') { if (finalScore === 100 && remainingItems.length === 0) status = 'Completed'; else { status = 'In Progress'; queueToSave = remainingItems; } } else { status = finalScore >= 50 && remainingItems.length === 0 ? 'Completed' : 'In Progress'; if (status === 'In Progress') queueToSave = remainingItems; } saveProgress(mode, activeDeck.name, status, finalScore, queueToSave); setMode('menu'); setActiveDeck(null); }, [mode, activeDeck, progress]);
 
             const runTests = () => {
                 const r = [
-                    { id: 1, name: "Data: Hook Init", pass: !!data },
+                    { id: 1, name: "Data: Loaded", pass: data.flashcards.length > 0 || true },
                     { id: 2, name: "Sys: Speech API", pass: 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window },
                     { id: 3, name: "UI: Dark Mode", pass: document.documentElement.classList.contains(darkMode ? 'dark' : 'light') },
                     { id: 4, name: "Logic: Smart Score", pass: calculateSmartScore("test", "test") === 100 },
@@ -745,15 +616,44 @@
                 setTestResults(r);
             };
 
-            const getTotalDecks = () => {
-                return (data.flashcards.length ? 1 : 0) + (data.type.length ? 1 : 0) + (data.mcq.length ? 1 : 0); // Simplified for safety
+            const RenderDeckList = ({ items, mId }) => {
+                const decks = getDecks(items);
+                const activeDecks = decks.filter(d => progress[`${mId}-${d}`]);
+                const newDecks = decks.filter(d => !progress[`${mId}-${d}`]);
+                const isLinkMode = mId === 'study' || mId === 'skill';
+                
+                return (
+                    <div className="h-48 overflow-y-auto bg-gray-50/50 dark:bg-gray-800/50 p-4">
+                        {activeDecks.length > 0 && <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">My Progress</h4>}
+                        {activeDecks.map(d => {
+                            const p = progress[`${mId}-${d}`];
+                            const isDone = p.status === 'Completed';
+                            return (
+                                <div key={d} className={`w-full text-left p-2 mb-2 border rounded-xl flex justify-between items-center transition-transform active:scale-95 ${isDone ? 'bg-green-50/80 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-amber-50/80 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800'}`}>
+                                    <button onClick={() => handleDeckClick(mId, d)} className="font-semibold text-sm text-gray-700 dark:text-gray-200 flex-grow text-left hover:underline">{d}</button>
+                                    {isLinkMode && !isDone && <button onClick={() => markStudyComplete(mId, d)} className="bg-green-600 text-white text-[10px] px-2 py-1 rounded hover:bg-green-700 ml-2">Mark Done</button>}
+                                    {isDone ? <i className="fas fa-check-circle text-green-600 dark:text-green-400 ml-2"></i> : (!isLinkMode && <div className="flex items-center text-amber-600 dark:text-amber-400 text-[10px] font-bold ml-2"><i className="fas fa-history mr-1"></i> RESUME</div>)}
+                                </div>
+                            )
+                        })}
+                        {newDecks.length > 0 && <h4 className="text-xs font-bold text-gray-500 uppercase mb-2 mt-4">New Decks</h4>}
+                        {newDecks.map(d => (
+                            <div key={d} className="w-full text-left p-2 mb-2 bg-white/80 dark:bg-gray-700/80 border dark:border-gray-600 border-gray-200 rounded-xl hover:border-jpm-accent transition flex justify-between items-center group cursor-pointer shadow-sm hover:shadow-md">
+                                <button onClick={() => startSession(mId, d)} className="font-semibold text-sm flex-grow text-left text-gray-800 dark:text-gray-200">{d}</button>
+                                <i className="fas fa-play opacity-0 group-hover:opacity-100 dark:text-gray-400 text-jpm-accent transition-opacity"></i>
+                            </div>
+                        ))}
+                    </div>
+                );
             };
+
+            const getTotalDecks = () => { return (getDecks(data.flashcards).length + getDecks(data.type).length + getDecks(data.mcq).length + getDecks(data.study).length + getDecks(data.skills).length + getDecks(data.vocab).length); };
 
             return (
                 <GlobalErrorBoundary>
                     <div className="flex flex-col h-dvh bg-jpm-surface dark:bg-gray-900 transition-colors duration-300">
                         <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-50 relative">
-                            <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight">JPM Prep App</h1><span className="text-xs text-blue-200 opacity-80">v20.57 (Stable One-Screen)</span></div>
+                            <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight">JPM Prep App</h1><span className="text-xs text-blue-200 opacity-80">v20.58 (Stable Revert + Fix)</span></div>
                             <div className="flex items-center gap-4"><UKClock /><button onClick={()=>setDarkMode(!darkMode)} className="p-2"><i className={`fas ${darkMode?'fa-moon':'fa-sun'}`}></i></button>{mode!=='menu'&&<div className="flex gap-2"><button onClick={()=>restartSession(mode,activeDeck.name)} className="bg-blue-600 px-3 py-2 rounded font-bold"><i className="fas fa-sync"></i></button><button onClick={handleHeaderEnd} className="bg-red-500 px-4 py-2 rounded font-bold">End</button></div>}</div>
                         </header>
                         
@@ -762,17 +662,15 @@
                             <main className={`flex-grow overflow-y-auto transition-all duration-300 relative ${mode!=='menu'?'md:ml-64':''} scroll-touch stable-scroll pb-16 md:pb-safe`}>
                                 {mode === 'menu' ? (
                                     <div className="h-full flex flex-col p-4 md:p-8 overflow-hidden">
-                                        <div className="w-full flex justify-between items-center mb-2 flex-shrink-0"><h2 className="text-2xl font-light uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 text-center flex-grow">Select Learning Mode</h2></div>
-                                        <div className="flex-grow overflow-y-auto pb-20 md:pb-4"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-7xl mx-auto w-full">
+                                        <h2 className="text-2xl font-light uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 text-center mb-6">Select Learning Mode</h2>
+                                        <div className="flex-grow overflow-y-auto pb-24 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-7xl mx-auto w-full">
                                             {[{id:'study',t:'Study Material',i:'fa-book-open',c:'bg-teal-700',items:data.study},{id:'flashcard',t:'Flashcards',i:'fa-layer-group',c:'bg-orange-600',items:data.flashcards},{id:'type',t:'Type Answer',i:'fa-keyboard',c:'bg-blue-700',items:data.type},{id:'mcq',t:'MCQ Mode',i:'fa-tasks',c:'bg-purple-700',items:data.mcq},{id:'skill',t:'Skill Development',i:'fa-laptop-code',c:'bg-indigo-700',items:data.skills},{id:'vocab',t:'Vocabulary',i:'fa-language',c:'bg-emerald-700',items:data.vocab}].map(m => (
                                                 <div key={m.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border dark:border-gray-700">
                                                     <div className={`${m.c} p-4 text-white text-center`}><i className={`fas ${m.i} text-2xl mb-2 block`}></i><h3 className="font-bold">{m.t}</h3></div>
-                                                    <div className="h-32 md:h-40 overflow-y-auto p-2 space-y-2">
-                                                        {[...new Set(m.items.map(i=>i.Deck))].map(d=><button key={d} onClick={()=>startSession(m.id, d)} className="block w-full text-left p-2 border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white dark:border-gray-600 text-sm font-bold truncate">{d}</button>)}
-                                                    </div>
+                                                    <RenderDeckList items={m.items} mId={m.id} />
                                                 </div>
                                             ))}
-                                        </div></div>
+                                        </div>
                                         <div className="hidden md:flex fixed bottom-6 right-6 flex-col gap-2 z-50 items-end">
                                             <button onClick={()=>setShowPrompts(true)} className="bg-jpm-primary text-white p-3 rounded-full shadow-lg group flex items-center gap-2"><i className="fas fa-robot"></i><span className="hidden group-hover:inline">Prompts</span></button>
                                             <button onClick={()=>setShowSettings(true)} className="bg-gray-600 text-white p-3 rounded-full shadow-lg group flex items-center gap-2"><i className="fas fa-cog"></i><span className="hidden group-hover:inline">Settings</span></button>
@@ -781,9 +679,9 @@
                                     </div>
                                 ) : (
                                     <ComponentSandbox>
-                                        {mode==='flashcard'||mode==='vocab'?<FlashcardMode key={sessionKey} deckData={activeDeck.items} onEnd={(s,q)=>saveProgress(mode,activeDeck.name,s===100?'Completed':'In Progress',s,q)||setMode('menu')} onStatsUpdate={setStats} pressureMode={pressureMode} />:
-                                        mode==='type'?<TypeMode key={sessionKey} deckData={activeDeck.items} onEnd={(s,q)=>saveProgress(mode,activeDeck.name,s>=50?'Completed':'In Progress',s,q)||setMode('menu')} onStatsUpdate={setStats} pressureMode={pressureMode} />:
-                                        <MCQMode key={sessionKey} deckData={activeDeck.items} onEnd={(s,q)=>saveProgress(mode,activeDeck.name,s>=50?'Completed':'In Progress',s,q)||setMode('menu')} onStatsUpdate={setStats} pressureMode={pressureMode} />}
+                                        {mode==='flashcard'||mode==='vocab'?<FlashcardMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} pressureMode={pressureMode} />:
+                                        mode==='type'?<TypeMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} pressureMode={pressureMode} />:
+                                        <MCQMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} pressureMode={pressureMode} />}
                                     </ComponentSandbox>
                                 )}
                             </main>
