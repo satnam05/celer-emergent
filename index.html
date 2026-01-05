@@ -3,8 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Prep v20.49 (Fixed & Stable)</title>
+    <title>JPM Prep v20.50 (Debug & Stable)</title>
     
+    <script>
+        window.onerror = function(msg, url, line, col, error) {
+            document.body.innerHTML = '<div style="color:red; padding:20px; font-family:monospace; background:white;"><h3>Application Error</h3><p>'+msg+'</p><p>Line: '+line+'</p></div>';
+            return false;
+        };
+    </script>
+
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -58,7 +65,7 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
-        // --- MODULE 1: UTILS ---
+        // --- 1. CORE UTILS ---
         const parseCSV = (text) => {
             if (!text || typeof text !== 'string') return [];
             if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1); 
@@ -208,16 +215,23 @@
         // --- MODULE 3: COMPONENTS ---
 
         class GlobalErrorBoundary extends React.Component {
-            constructor(props) { super(props); this.state = { hasError: false }; }
-            static getDerivedStateFromError(error) { return { hasError: true }; }
-            render() { return this.state.hasError ? <div className="p-10 text-center"><h2 className="text-xl font-bold mb-4">Something went wrong</h2><button onClick={()=>window.location.reload()} className="bg-red-500 text-white px-4 py-2 rounded">Reload App</button></div> : this.props.children; }
+            constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+            static getDerivedStateFromError(error) { return { hasError: true, error }; }
+            render() { 
+                if (this.state.hasError) {
+                    return (
+                        <div className="flex flex-col items-center justify-center h-screen bg-red-50 p-6 text-center">
+                            <h2 className="text-xl font-bold mb-4 text-red-600">Application Error</h2>
+                            <p className="text-sm mb-4">{this.state.error ? this.state.error.toString() : 'Unknown Error'}</p>
+                            <button onClick={()=>window.location.reload()} className="bg-red-500 text-white px-4 py-2 rounded">Reload App</button>
+                        </div>
+                    ); 
+                }
+                return this.props.children; 
+            }
         }
 
-        class ComponentSandbox extends React.Component {
-            constructor(props) { super(props); this.state = { hasError: false }; }
-            static getDerivedStateFromError(error) { return { hasError: true }; }
-            render() { return this.state.hasError ? <div className="text-red-500 p-4">Component Error. <button onClick={()=>window.location.reload()}>Reload</button></div> : this.props.children; }
-        }
+        const ComponentSandbox = ({ children }) => (children);
 
         const FlashcardMode = ({ deckData, onEnd, onStatsUpdate, pressureMode }) => {
             const [currentIndex, setCurrentIndex] = useState(0);
@@ -237,11 +251,13 @@
             useEffect(() => {
                 const handler = () => {
                     const hardCards = deckData.filter(d => results[d.id] === 'hard');
-                    onEnd(hardCards.length === 0 ? 100 : 50, hardCards);
+                    let queueToSave = [...deckData.slice(currentIndex)];
+                    hardCards.forEach(c => { if(!queueToSave.find(q => q.id === c.id)) queueToSave.push(c); });
+                    onEnd(hardCards.length === 0 ? 100 : 50, queueToSave);
                 };
                 window.addEventListener('jpm-trigger-end', handler);
                 return () => window.removeEventListener('jpm-trigger-end', handler);
-            }, [results, deckData, onEnd]);
+            }, [currentIndex, results, deckData, onEnd]);
 
             const rate = (r) => {
                 setResults(prev => ({...prev, [current.id]: r})); setFlipped(false);
@@ -292,7 +308,6 @@
             const [currentIndex, setCurrentIndex] = useState(0);
             const [history, setHistory] = useState({}); 
             const [timeLeft, setTimeLeft] = useState(60);
-            const inputRef = useRef(""); 
             const [isStarMode, setIsStarMode] = useState(false); 
             const [starData, setStarData] = useState({ s: '', t: '', a: '', r: '' }); 
             const [input, setInput] = useState("");
@@ -521,7 +536,13 @@
 
             useEffect(() => {
                 const saved = localStorage.getItem('jpm_prep_progress_v20');
-                if(saved) { const p = JSON.parse(saved); setProgress(p); if(p._settings) setPressureMode(p._settings.pressureMode); }
+                if(saved) { 
+                    try {
+                        const p = JSON.parse(saved); 
+                        setProgress(p); 
+                        if(p._settings) setPressureMode(p._settings.pressureMode); 
+                    } catch(e) { console.error("Save Data Corrupt", e); }
+                }
                 const today = new Date().toLocaleDateString();
                 if (localStorage.getItem('jpm_last_login') !== today) {
                     const s = (localStorage.getItem('jpm_last_login') === new Date(Date.now() - 864e5).toLocaleDateString()) ? (parseInt(localStorage.getItem('jpm_streak')||0)+1) : 1;
@@ -545,10 +566,42 @@
                 if(!progress[`${m}-${deckName}`]) saveProgress(m, deckName, 'In Progress', 0);
             };
 
+            const restartSession = (m, deckName) => {
+                const map = { 'flashcard': 'flashcards', 'type': 'type', 'mcq': 'mcq', 'study': 'study', 'skill': 'skills', 'vocab': 'vocab' };
+                let fullDeck = data[map[m]].filter(d => d.Deck === deckName);
+                if(fullDeck.length === 0) return;
+                if (m === 'vocab') fullDeck = fullDeck.map(item => ({...item, Question: item.Word, Answer: item.Meaning, ModeTitle: 'Vocabulary'}));
+                saveProgress(m, deckName, 'In Progress', 0, null); setActiveDeck({ name: deckName, items: fullDeck }); setMode(m); setStats({ correct: 0, completed: 0, total: 0 }); setModalDeck(null); setSessionKey(p=>p+1);
+            };
+
+            const handleHeaderEnd = () => { window.dispatchEvent(new CustomEvent('jpm-trigger-end')); };
+
+            const endSession = useCallback((finalScore = 0, remainingItems = []) => {
+                let status = 'In Progress'; 
+                let queueToSave = null;
+                if (mode === 'flashcard' || mode === 'vocab') {
+                    if (finalScore === 100 && remainingItems.length === 0) status = 'Completed'; 
+                    else { status = 'In Progress'; queueToSave = remainingItems; }
+                } else {
+                    status = finalScore >= 50 && remainingItems.length === 0 ? 'Completed' : 'In Progress';
+                    if (status === 'In Progress') queueToSave = remainingItems;
+                }
+                saveProgress(mode, activeDeck.name, status, finalScore, queueToSave);
+                setMode('menu');
+                setActiveDeck(null);
+            }, [mode, activeDeck, progress]);
+
             const saveProgress = (m, d, status, score, queue = null) => {
                 const newP = { ...progress, [`${m}-${d}`]: { status, score, date: new Date().toLocaleString(), queue }, _settings: { pressureMode } };
                 setProgress(newP); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(newP));
             };
+
+            const markStudyComplete = (mId, deckName) => { saveProgress(mId, deckName, 'Completed', 100); };
+            const updateStats = useCallback(({ completed, correct }) => { if(activeDeck) setStats({ total: activeDeck.items.length, completed, correct }); }, [activeDeck]);
+            const getDecks = (items) => [...new Set(items.map(i => i.Deck))].filter(Boolean);
+            const handleExport = () => { const blob = new Blob([JSON.stringify(progress)], {type: "application/json"}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = "jpm_backup.json"; a.click(); };
+            const handleImport = (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const p = JSON.parse(e.target.result); setProgress(p); if(p._settings) setPressureMode(p._settings.pressureMode || false); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(p)); alert("Import Successful!"); } catch(err) { alert("Invalid File"); } }; reader.readAsText(file); };
+            const togglePressureMode = () => { const newVal = !pressureMode; setPressureMode(newVal); const newP = { ...progress, _settings: { ...(progress._settings || {}), pressureMode: newVal } }; setProgress(newP); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(newP)); };
 
             const runTests = () => {
                 const r = [
@@ -562,25 +615,58 @@
                 setTestResults(r);
             };
 
+            const RenderDeckList = ({ items, mId }) => {
+                const decks = getDecks(items);
+                const activeDecks = decks.filter(d => progress[`${mId}-${d}`]);
+                const newDecks = decks.filter(d => !progress[`${mId}-${d}`]);
+                const isLinkMode = mId === 'study' || mId === 'skill';
+                
+                return (
+                    <div className="h-48 overflow-y-auto bg-gray-50/50 dark:bg-gray-800/50 p-4">
+                        {activeDecks.length > 0 && <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">My Progress</h4>}
+                        {activeDecks.map(d => {
+                            const p = progress[`${mId}-${d}`];
+                            const isDone = p.status === 'Completed';
+                            return (
+                                <div key={d} className={`w-full text-left p-2 mb-2 border rounded-xl flex justify-between items-center transition-transform active:scale-95 ${isDone ? 'bg-green-50/80 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-amber-50/80 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800'}`}>
+                                    <button onClick={() => handleDeckClick(mId, d)} className="font-semibold text-sm text-gray-700 dark:text-gray-200 flex-grow text-left hover:underline">{d}</button>
+                                    {isLinkMode && !isDone && <button onClick={() => markStudyComplete(mId, d)} className="bg-green-600 text-white text-[10px] px-2 py-1 rounded hover:bg-green-700 ml-2">Mark Done</button>}
+                                    {isDone ? <i className="fas fa-check-circle text-green-600 dark:text-green-400 ml-2"></i> : (!isLinkMode && <div className="flex items-center text-amber-600 dark:text-amber-400 text-[10px] font-bold ml-2"><i className="fas fa-history mr-1"></i> RESUME</div>)}
+                                </div>
+                            )
+                        })}
+                        {newDecks.length > 0 && <h4 className="text-xs font-bold text-gray-500 uppercase mb-2 mt-4">New Decks</h4>}
+                        {newDecks.map(d => (
+                            <div key={d} className="w-full text-left p-2 mb-2 bg-white/80 dark:bg-gray-700/80 border dark:border-gray-600 border-gray-200 rounded-xl hover:border-jpm-accent transition flex justify-between items-center group cursor-pointer shadow-sm hover:shadow-md">
+                                <button onClick={() => startSession(mId, d)} className="font-semibold text-sm flex-grow text-left text-gray-800 dark:text-gray-200">{d}</button>
+                                <i className="fas fa-play opacity-0 group-hover:opacity-100 dark:text-gray-400 text-jpm-accent transition-opacity"></i>
+                            </div>
+                        ))}
+                    </div>
+                );
+            };
+
+            const getTotalDecks = () => { return (getDecks(data.flashcards).length + getDecks(data.type).length + getDecks(data.mcq).length + getDecks(data.study).length + getDecks(data.skills).length + getDecks(data.vocab).length); };
+
             return (
                 <GlobalErrorBoundary>
                     <div className="flex flex-col h-dvh bg-jpm-surface dark:bg-gray-900 transition-colors duration-300">
                         <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-50 relative">
-                            <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight">JPM Prep App</h1><span className="text-xs text-blue-200 opacity-80">v20.49 (Fixed & Stable)</span></div>
-                            <div className="flex items-center gap-4"><UKClock /><button onClick={()=>setDarkMode(!darkMode)} className="p-2"><i className={`fas ${darkMode?'fa-moon':'fa-sun'}`}></i></button>{mode!=='menu'&&<div className="flex gap-2"><button onClick={()=>startSession(mode,activeDeck.name)} className="bg-blue-600 px-3 py-2 rounded font-bold"><i className="fas fa-sync"></i></button><button onClick={()=>window.dispatchEvent(new CustomEvent('jpm-trigger-end'))} className="bg-red-500 px-4 py-2 rounded font-bold">End</button></div>}</div>
+                            <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight">JPM Prep App</h1><span className="text-xs text-blue-200 opacity-80">v20.50 (Debug & Stable)</span></div>
+                            <div className="flex items-center gap-4"><UKClock /><button onClick={()=>setDarkMode(!darkMode)} className="p-2"><i className={`fas ${darkMode?'fa-moon':'fa-sun'}`}></i></button>{mode!=='menu'&&<div className="flex gap-2"><button onClick={()=>restartSession(mode,activeDeck.name)} className="bg-blue-600 px-3 py-2 rounded font-bold"><i className="fas fa-sync"></i></button><button onClick={handleHeaderEnd} className="bg-red-500 px-4 py-2 rounded font-bold">End</button></div>}</div>
                         </header>
                         
                         <div className="flex flex-grow overflow-hidden relative">
-                            <Dashboard active={mode !== 'menu'} stats={stats} timer={timer} progressData={progress} streak={streak} totalDecks={0} />
+                            <Dashboard active={mode !== 'menu'} stats={stats} timer={timer} progressData={progress} streak={streak} totalDecks={getTotalDecks()} />
                             <main className={`flex-grow overflow-y-auto transition-all duration-300 relative ${mode!=='menu'?'md:ml-64':''} scroll-touch stable-scroll pb-16 md:pb-safe`}>
                                 {mode === 'menu' ? (
                                     <div className="h-full flex flex-col p-4 md:p-8 overflow-hidden">
                                         <h2 className="text-2xl font-light uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 text-center mb-6">Select Learning Mode</h2>
                                         <div className="flex-grow overflow-y-auto pb-24 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-7xl mx-auto w-full">
-                                            {[{id:'study',t:'Study Material',i:'fa-book-open',c:'bg-teal-700'},{id:'flashcard',t:'Flashcards',i:'fa-layer-group',c:'bg-orange-600'},{id:'type',t:'Type Answer',i:'fa-keyboard',c:'bg-blue-700'},{id:'mcq',t:'MCQ Mode',i:'fa-tasks',c:'bg-purple-700'},{id:'skill',t:'Skill Development',i:'fa-laptop-code',c:'bg-indigo-700'},{id:'vocab',t:'Vocabulary',i:'fa-language',c:'bg-emerald-700'}].map(m => (
+                                            {[{id:'study',t:'Study Material',i:'fa-book-open',c:'bg-teal-700',items:data.study},{id:'flashcard',t:'Flashcards',i:'fa-layer-group',c:'bg-orange-600',items:data.flashcards},{id:'type',t:'Type Answer',i:'fa-keyboard',c:'bg-blue-700',items:data.type},{id:'mcq',t:'MCQ Mode',i:'fa-tasks',c:'bg-purple-700',items:data.mcq},{id:'skill',t:'Skill Development',i:'fa-laptop-code',c:'bg-indigo-700',items:data.skills},{id:'vocab',t:'Vocabulary',i:'fa-language',c:'bg-emerald-700',items:data.vocab}].map(m => (
                                                 <div key={m.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden border dark:border-gray-700">
                                                     <div className={`${m.c} p-4 text-white text-center`}><i className={`fas ${m.i} text-2xl mb-2 block`}></i><h3 className="font-bold">{m.t}</h3></div>
-                                                    <div className="h-48 overflow-y-auto p-4 space-y-2">{[...new Set(data[m.id==='flashcard'?'flashcards':(m.id==='type'?'type':(m.id==='skill'?'skills':m.id))].map(i=>i.Deck))].map(d=><button key={d} onClick={()=>startSession(m.id, d)} className="block w-full text-left p-2 border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-white dark:border-gray-600 text-sm font-bold">{d}</button>)}</div>
+                                                    <RenderDeckList items={m.items} mId={m.id} />
                                                 </div>
                                             ))}
                                         </div>
@@ -592,9 +678,9 @@
                                     </div>
                                 ) : (
                                     <ComponentSandbox>
-                                        {mode==='flashcard'||mode==='vocab'?<FlashcardMode key={sessionKey} deckData={activeDeck.items} onEnd={(s,q)=>saveProgress(mode,activeDeck.name,s===100?'Completed':'In Progress',s,q)||setMode('menu')} onStatsUpdate={setStats} pressureMode={pressureMode} />:
-                                        mode==='type'?<TypeMode key={sessionKey} deckData={activeDeck.items} onEnd={(s,q)=>saveProgress(mode,activeDeck.name,s>=50?'Completed':'In Progress',s,q)||setMode('menu')} onStatsUpdate={setStats} pressureMode={pressureMode} />:
-                                        <MCQMode key={sessionKey} deckData={activeDeck.items} onEnd={(s,q)=>saveProgress(mode,activeDeck.name,s>=50?'Completed':'In Progress',s,q)||setMode('menu')} onStatsUpdate={setStats} pressureMode={pressureMode} />}
+                                        {mode==='flashcard'||mode==='vocab'?<FlashcardMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} pressureMode={pressureMode} />:
+                                        mode==='type'?<TypeMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} pressureMode={pressureMode} />:
+                                        <MCQMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} pressureMode={pressureMode} />}
                                     </ComponentSandbox>
                                 )}
                             </main>
