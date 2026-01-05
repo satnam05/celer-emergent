@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JP Morgan Interview Preparation App v20.61</title>
+    <title>JP Morgan Interview Preparation App v20.62</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -27,6 +27,7 @@
                             accent: '#C59D5F', 
                             surface: '#F8FAFC'
                         },
+                        // Using Slate for the Premium Navy look
                         dark: { bg: '#0f172a', card: '#1e293b', text: '#f1f5f9' }
                     },
                     padding: { 'safe': 'env(safe-area-inset-bottom)' },
@@ -34,6 +35,7 @@
                     fontFamily: {
                         'quote': ['"Playfair Display"', 'serif'],
                         'mono': ['"JetBrains Mono"', 'monospace'],
+                        'sans': ['"Segoe UI"', 'system-ui', 'sans-serif']
                     },
                     animation: { 
                         'slide-in': 'fadeIn 0.4s ease-out forwards', 
@@ -61,7 +63,8 @@
             -webkit-tap-highlight-color: transparent; 
             transition: background 0.3s; 
         }
-        .dark body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); }
+        /* Premium Dark Gradient Background */
+        .dark body { background: linear-gradient(135deg, #020617 0%, #0f172a 100%); }
 
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -76,8 +79,8 @@
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
         .dark .glass-panel {
-            background: rgba(30, 41, 59, 0.7);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(15, 23, 42, 0.7); /* Slate-900 base */
+            border: 1px solid rgba(148, 163, 184, 0.1); /* Slate-400 border */
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
         }
 
@@ -295,25 +298,20 @@
             }
         }
 
-        // --- NEW: Disclaimer Modal (Force Dark Mode Premium) ---
+        // --- Disclaimer Modal (Premium Dark) ---
         const DisclaimerModal = ({ onEnter }) => (
             <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-95 backdrop-blur-md p-4">
                 <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8 max-w-lg w-full text-center shadow-2xl animate-slide-in relative overflow-hidden">
-                    {/* Decorative Background Elements */}
                     <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-jpm-primary via-jpm-accent to-jpm-primary"></div>
-                    
                     <div className="w-20 h-20 bg-jpm-primary text-jpm-accent border-2 border-jpm-accent rounded-full flex items-center justify-center mx-auto mb-6 text-3xl shadow-[0_0_15px_rgba(197,157,95,0.3)]">
                         <i className="fas fa-university"></i>
                     </div>
-                    
                     <h1 className="text-3xl font-bold text-white mb-2 font-quote tracking-wide">JP Morgan</h1>
                     <h2 className="text-sm text-jpm-accent mb-6 font-mono tracking-[0.2em] uppercase">Interview Preparation Simulation</h2>
-                    
                     <div className="text-left bg-slate-800/80 p-5 rounded-xl mb-8 text-xs text-gray-300 leading-relaxed border-l-4 border-jpm-accent font-mono shadow-inner">
                         <p className="mb-3 flex items-start"><i className="fas fa-gavel mr-3 mt-1 text-jpm-accent"></i> <span>This application is a <strong>personal portfolio project</strong> developed solely for educational purposes.</span></p>
                         <p className="flex items-start"><i className="fas fa-ban mr-3 mt-1 text-red-400"></i> <span>It is <strong>NOT</strong> affiliated with, endorsed by, or connected to JPMorgan Chase & Co. All data, transaction streams, and metrics shown are simulated.</span></p>
                     </div>
-                    
                     <button onClick={onEnter} className="w-full bg-[#C59D5F] hover:bg-[#b08d55] text-slate-900 font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95 text-lg font-mono tracking-tighter">
                         ENTER SIMULATION
                     </button>
@@ -321,7 +319,7 @@
             </div>
         );
 
-        // --- NEW: Tech Insights Modal (Kinexys + Compliance Pipeline) ---
+        // --- Tech Insights Modal (MX Data + Premium UI) ---
         const TechInsightsModal = ({ onClose }) => {
             const [feed, setFeed] = useState([]);
             const [blocks, setBlocks] = useState([]);
@@ -336,38 +334,37 @@
                         if(next.length > 5) next.shift();
                         return next;
                     });
-                    // Reset Mempool
                     setMempoolHash("0x" + Math.random().toString(16).substring(2, 10).toUpperCase());
                 }, 3000);
-
-                // Mempool Flicker
                 const hashInterval = setInterval(() => {
                     setMempoolHash("0x" + Math.random().toString(16).substring(2, 10).toUpperCase());
                 }, 100);
-
                 return () => { clearInterval(blockInterval); clearInterval(hashInterval); };
             }, [blocks]);
             
-            // Transaction Feed Logic
+            // Transaction Feed Logic (ISO 20022 MX Messages)
             useEffect(() => {
-                const types = ['FX_SPOT', 'SWIFT_MT103', 'ISO_20022', 'REPO_COLLAT', 'O_LIQUIDITY'];
+                const types = [
+                    'pain.001 (Init)', 'pacs.008 (Clear)', 'pacs.009 (FI)', 
+                    'camt.053 (Rpt)', 'camt.054 (Notif)', 'FX_SPOT', 'REPO_C'
+                ];
                 const interval = setInterval(() => {
                     setFeed(prev => {
                         const risk = Math.random();
-                        const isHighRisk = risk > 0.90; // 1 in 10 chance (Simulated Red Flag)
+                        const isHighRisk = risk > 0.90; 
                         
                         const newTxn = {
-                            id: `TXN-${Math.floor(Math.random()*9999)}-${['NY','LN','SG','TK'][Math.floor(Math.random()*4)]}`,
+                            id: `MX-${Math.floor(Math.random()*9999)}-${['NY','LN','SG','TK'][Math.floor(Math.random()*4)]}`,
                             type: types[Math.floor(Math.random()*types.length)],
                             riskScore: isHighRisk ? (0.8 + Math.random()*0.19).toFixed(4) : (Math.random()*0.05).toFixed(4),
-                            amlStatus: isHighRisk ? 'AML_FLAG_HOLD' : 'CLEARED',
+                            amlStatus: isHighRisk ? 'AML_HOLD' : 'CLEARED',
                             kycLevel: isHighRisk ? 'EDD_REQ' : 'VERIFIED',
-                            isoTag: 'pacs.008',
+                            isoTag: 'ISO20022',
                             status: isHighRisk ? 'BLOCKED' : 'SETTLED',
                             ofac: isHighRisk ? 'REVIEW' : 'PASS'
                         };
                         const next = [newTxn, ...prev];
-                        if (next.length > 12) next.pop(); // Keep list manageable
+                        if (next.length > 12) next.pop(); 
                         return next;
                     });
                 }, 800);
@@ -376,15 +373,15 @@
 
             return (
                 <div className="fixed inset-0 z-[60] bg-slate-950/95 backdrop-blur-xl flex flex-col p-4 md:p-8 overflow-hidden font-mono text-gray-200">
-                    <div className="flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
+                    <div className="flex justify-between items-center mb-6 border-b border-slate-800 pb-4">
                         <div className="flex items-center gap-4">
                             <div className="w-12 h-12 bg-blue-900/30 rounded flex items-center justify-center text-blue-400 border border-blue-800"><i className="fas fa-network-wired text-xl"></i></div>
                             <div>
-                                <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight">GLOBAL PAYMENTS & COMPLIANCE RADAR</h2>
+                                <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight font-quote">GLOBAL PAYMENTS & COMPLIANCE RADAR</h2>
                                 <p className="text-[10px] text-gray-400 uppercase">System Status: <span className="text-green-400">OPERATIONAL</span> | TPS: 4,289 | FIN_CRIME_AI: ACTIVE</p>
                             </div>
                         </div>
-                        <button onClick={onClose} className="bg-gray-800 text-white p-3 rounded-full hover:bg-gray-700 transition border border-gray-700"><i className="fas fa-times"></i></button>
+                        <button onClick={onClose} className="bg-slate-800 text-white p-3 rounded-full hover:bg-slate-700 transition border border-slate-700"><i className="fas fa-times"></i></button>
                     </div>
                     
                     <div className="flex-grow grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden">
@@ -392,9 +389,9 @@
                         {/* LEFT COLUMN: VISUALS */}
                         <div className="lg:col-span-2 flex flex-col gap-6 overflow-hidden">
                             {/* 1. KINEXYS BLOCKCHAIN */}
-                            <div className="bg-slate-900 rounded-xl border border-slate-700 p-4 relative overflow-hidden">
+                            <div className="bg-slate-900 rounded-xl border border-slate-700 p-4 relative overflow-hidden shadow-lg">
                                 <div className="flex justify-between items-center mb-4">
-                                    <h3 className="text-jpm-accent font-bold text-sm"><i className="fas fa-link mr-2"></i>KINEXYS DIGITAL ASSETS (f.k.a Onyx)</h3>
+                                    <h3 className="text-jpm-accent font-bold text-sm tracking-widest"><i className="fas fa-link mr-2"></i>KINEXYS DIGITAL ASSETS (f.k.a Onyx)</h3>
                                     <span className="text-[10px] bg-green-900/30 text-green-400 px-2 py-1 rounded border border-green-800">Finality: &lt; 800ms</span>
                                 </div>
                                 <div className="flex items-center gap-2 h-20 overflow-hidden relative">
@@ -407,8 +404,8 @@
                                             <i className="fas fa-check-circle text-green-500 text-xs mt-1"></i>
                                         </div>
                                     ))}
-                                    {/* Ghost Block (Mempool) */}
-                                    <div className="min-w-[100px] h-16 border-2 border-dashed border-gray-600 rounded flex flex-col items-center justify-center opacity-50 ml-4">
+                                    {/* Ghost Block */}
+                                    <div className="min-w-[100px] h-16 border-2 border-dashed border-slate-600 rounded flex flex-col items-center justify-center opacity-50 ml-4">
                                         <i className="fas fa-circle-notch fa-spin text-jpm-accent mb-1"></i>
                                         <span className="text-[8px] text-gray-400">{mempoolHash}</span>
                                         <span className="text-[8px] text-jpm-accent font-bold">CONSENSUS</span>
@@ -417,29 +414,27 @@
                             </div>
 
                             {/* 2. LIQUIDITY MAP */}
-                            <div className="flex-grow bg-slate-900 rounded-xl border border-slate-700 p-4 relative overflow-hidden flex items-center justify-center">
+                            <div className="flex-grow bg-slate-900 rounded-xl border border-slate-700 p-4 relative overflow-hidden flex items-center justify-center shadow-lg">
                                 <div className="absolute top-4 left-4 z-10">
-                                    <h3 className="text-blue-400 font-bold text-sm"><i className="fas fa-globe mr-2"></i>LIQUIDITY CORRIDORS (ISO 20022)</h3>
+                                    <h3 className="text-blue-400 font-bold text-sm tracking-widest"><i className="fas fa-globe mr-2"></i>LIQUIDITY CORRIDORS (ISO 20022)</h3>
                                 </div>
                                 {/* SVG Map */}
                                 <svg viewBox="0 0 800 400" className="w-full h-full opacity-60">
                                     <path d="M150,150 Q400,50 650,150" fill="none" stroke="#334155" strokeWidth="2" />
                                     <path d="M150,150 Q400,250 650,150" fill="none" stroke="#334155" strokeWidth="2" />
-                                    {/* Nodes */}
                                     <circle cx="150" cy="150" r="6" fill="#C59D5F" className="animate-ping-slow"><title>NY</title></circle>
                                     <circle cx="380" cy="110" r="6" fill="#C59D5F" className="animate-ping-slow" style={{animationDelay: '0.8s'}}><title>LDN</title></circle>
                                     <circle cx="650" cy="150" r="6" fill="#C59D5F" className="animate-ping-slow" style={{animationDelay: '1.2s'}}><title>SG</title></circle>
-                                    {/* Flow Lines */}
                                     <path d="M150,150 Q265,100 380,110" fill="none" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" className="map-path" />
                                     <path d="M380,110 Q515,100 650,150" fill="none" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" className="map-path" style={{animationDelay: '1.5s'}} />
                                 </svg>
                             </div>
                         </div>
 
-                        {/* RIGHT COLUMN: TRANSACTION PIPELINE (The Killer Feature) */}
-                        <div className="bg-slate-900 rounded-xl border border-slate-700 p-0 flex flex-col h-full overflow-hidden">
+                        {/* RIGHT COLUMN: TRANSACTION PIPELINE */}
+                        <div className="bg-slate-900 rounded-xl border border-slate-700 p-0 flex flex-col h-full overflow-hidden shadow-lg">
                             <div className="p-3 border-b border-slate-800 bg-slate-950/50">
-                                <h3 className="text-xs font-bold text-gray-300 uppercase flex justify-between">
+                                <h3 className="text-xs font-bold text-gray-300 uppercase flex justify-between tracking-widest">
                                     <span>Validation Pipeline</span>
                                     <span className="text-gray-500">Live Feed</span>
                                 </h3>
@@ -452,9 +447,7 @@
                                             <span className="text-[10px] text-gray-500">{tx.type}</span>
                                         </div>
                                         
-                                        {/* Pipeline Steps */}
                                         <div className="flex justify-between items-center text-[9px] uppercase tracking-wide mt-2">
-                                            {/* Step 1: AML AI */}
                                             <div className="flex flex-col items-center">
                                                 <span className="text-gray-500 mb-0.5">AML_AI</span>
                                                 <span className={`px-1 rounded ${tx.riskScore > 0.1 ? 'bg-red-900 text-red-200' : 'bg-green-900 text-green-200'}`}>
@@ -462,31 +455,24 @@
                                                 </span>
                                             </div>
                                             <div className="text-gray-700">→</div>
-                                            
-                                            {/* Step 2: KYC */}
                                             <div className="flex flex-col items-center">
                                                 <span className="text-gray-500 mb-0.5">KYC</span>
                                                 <span className="text-blue-300">{tx.kycLevel}</span>
                                             </div>
                                             <div className="text-gray-700">→</div>
-
-                                            {/* Step 3: ISO/OFAC */}
                                             <div className="flex flex-col items-center">
                                                 <span className="text-gray-500 mb-0.5">OFAC</span>
                                                 <span className={`${tx.ofac === 'PASS' ? 'text-gray-300' : 'text-orange-400'}`}>{tx.ofac}</span>
                                             </div>
                                             <div className="text-gray-700">→</div>
-
-                                            {/* Step 4: Status */}
                                             <div className="flex flex-col items-center">
                                                 <span className="text-gray-500 mb-0.5">Settlement</span>
                                                 <span className={`font-bold ${tx.status === 'SETTLED' ? 'text-green-400' : 'text-red-500'}`}>{tx.status}</span>
                                             </div>
                                         </div>
-                                        
                                         {tx.riskScore > 0.1 && (
                                             <div className="mt-1 text-[9px] text-red-400 font-bold bg-red-900/10 p-1 text-center">
-                                                <i className="fas fa-exclamation-triangle mr-1"></i> SUSPICIOUS ACTIVITY REPORT GENERATED
+                                                <i className="fas fa-exclamation-triangle mr-1"></i> SUSPICIOUS ACTIVITY REPORT
                                             </div>
                                         )}
                                     </div>
@@ -514,8 +500,8 @@
             }, []);
             return (
                 <div className="text-right hidden md:block">
-                    <p className="text-xs text-blue-200 font-bold uppercase"><i className="fas fa-map-marker-alt mr-1"></i>Edinburgh</p>
-                    <p className="text-sm font-mono font-bold">{timeData.date} <span className="text-jpm-accent">|</span> {timeData.time}</p>
+                    <p className="text-xs text-blue-200 font-bold uppercase font-mono tracking-widest"><i className="fas fa-map-marker-alt mr-1"></i>Edinburgh</p>
+                    <p className="text-sm font-mono font-bold text-gray-300">{timeData.date} <span className="text-jpm-accent">|</span> {timeData.time}</p>
                 </div>
             );
         };
@@ -524,9 +510,7 @@
             const radius = (size - strokeWidth) / 2;
             const circumference = radius * 2 * Math.PI;
             const offset = circumference - (value / 100) * circumference;
-            // FIX: Aggressive font sizing to prevent spill
             const textSizeClass = value >= 100 ? "text-[10px] md:text-xs leading-none" : "text-sm md:text-base leading-none";
-            
             return (
                 <div className="flex flex-col items-center">
                     <div className="relative" style={{ width: size, height: size }}>
@@ -534,9 +518,9 @@
                             <circle className="text-gray-200 dark:text-gray-700" strokeWidth={strokeWidth} stroke="currentColor" fill="transparent" r={radius} cx={size / 2} cy={size / 2} />
                             <circle className={`${color} progress-ring__circle`} strokeWidth={strokeWidth} strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" stroke="currentColor" fill="transparent" r={radius} cx={size / 2} cy={size / 2} />
                         </svg>
-                        <div className="absolute inset-0 flex items-center justify-center"><span className={`${textSizeClass} font-bold text-gray-700 dark:text-white`}>{value}%</span></div>
+                        <div className="absolute inset-0 flex items-center justify-center"><span className={`${textSizeClass} font-bold text-gray-700 dark:text-white font-mono`}>{value}%</span></div>
                     </div>
-                    {label && <span className="text-[10px] font-bold text-gray-500 mt-2 uppercase">{label}</span>}
+                    {label && <span className="text-[10px] font-bold text-gray-500 mt-2 uppercase font-mono">{label}</span>}
                 </div>
             );
         };
@@ -544,12 +528,12 @@
         const AchievementBadge = ({ icon, color, label, locked }) => (
             <div className={`flex flex-col items-center p-2 transition-all ${locked ? 'opacity-40 grayscale' : 'opacity-100 scale-105'}`}>
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white mb-1 shadow-md ${locked ? 'bg-gray-300' : color}`}><i className={`fas ${icon}`}></i></div>
-                <span className="text-[10px] font-bold text-center leading-tight dark:text-gray-300">{label}</span>
+                <span className="text-[10px] font-bold text-center leading-tight dark:text-gray-300 font-mono">{label}</span>
             </div>
         );
 
         const MobileNavBar = ({ currentMode, setMode, onPrompt, onSettings }) => (
-            <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex justify-around items-center px-2 z-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+            <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-800 flex justify-around items-center px-2 z-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
                 <button onClick={() => setMode('menu')} className={`flex flex-col items-center w-16 ${currentMode === 'menu' ? 'nav-item-active' : 'nav-item-inactive'}`}>
                     <i className="fas fa-home text-xl mb-1"></i><span className="text-[10px] font-bold">Home</span>
                 </button>
@@ -565,13 +549,10 @@
         const Dashboard = ({ active, stats, timer, progressData, streak, totalDecks, pressureMode, onTogglePressure }) => {
             const accuracy = stats.completed > 0 ? Math.round((stats.correct / stats.completed) * 100) : 0;
             const completedCount = Object.values(progressData).filter(p => p.status === 'Completed').length;
-            
             const globalCompletion = totalDecks > 0 ? Math.round((completedCount / totalDecks) * 100) : 0;
             const sessionCompletion = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
-            
             const displayProgress = active ? sessionCompletion : globalCompletion;
             const progressLabel = active ? "Deck Prog" : "Total Prog";
-
             const badges = [
                 { id: 1, label: "First Step", icon: "fa-shoe-prints", color: "bg-blue-500", condition: completedCount >= 1 },
                 { id: 2, label: "On Fire", icon: "fa-fire", color: "bg-orange-500", condition: streak >= 3 },
@@ -581,32 +562,25 @@
 
             return (
                 <div className={`hidden md:flex fixed inset-y-0 left-0 w-64 glass-panel shadow-2xl z-20 flex-col transition-transform duration-300 ${active ? 'translate-x-0' : '-translate-x-full'}`}>
-                    <div className="p-6 bg-jpm-primary text-white backdrop-blur-md"><h2 className="text-xl font-bold tracking-tight"><i className="fas fa-chart-line mr-2 text-jpm-accent"></i> Analytics</h2></div>
+                    <div className="p-6 bg-jpm-primary text-white backdrop-blur-md"><h2 className="text-xl font-bold tracking-tight font-quote"><i className="fas fa-chart-line mr-2 text-jpm-accent"></i> Analytics</h2></div>
                     <div className="p-6 space-y-6 flex-grow overflow-y-auto">
-                        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border-l-4 border-jpm-accent shadow-sm flex items-center justify-between">
-                            <div><p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Current Streak</p><p className="text-3xl font-black text-jpm-primary dark:text-white">{streak} <span className="text-sm font-medium text-gray-400">Days</span></p></div>
+                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border-l-4 border-jpm-accent shadow-sm flex items-center justify-between">
+                            <div><p className="text-xs text-gray-500 font-bold uppercase tracking-wider font-mono">Current Streak</p><p className="text-3xl font-black text-jpm-primary dark:text-white font-mono">{streak} <span className="text-sm font-medium text-gray-400">Days</span></p></div>
                             <i className="fas fa-fire text-3xl text-orange-400 opacity-90"></i>
                         </div>
-                        <div className="flex flex-wrap justify-between items-center bg-white/50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm backdrop-blur-md gap-2">
+                        <div className="flex flex-wrap justify-between items-center bg-white/50 dark:bg-slate-800/50 p-4 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm backdrop-blur-md gap-2">
                             <CircularProgress value={accuracy} color="text-green-600" label="Accuracy" size={50} strokeWidth={6} />
                             <CircularProgress value={sessionCompletion} color="text-blue-600" label="Session" size={50} strokeWidth={6} />
                             <CircularProgress value={globalCompletion} color="text-jpm-accent" label="Total Prep" size={50} strokeWidth={6} />
                         </div>
-                        <div><p className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wider">Trophy Room</p><div className="grid grid-cols-4 gap-2 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-xl border border-gray-200 dark:border-gray-700">{badges.map(b => <AchievementBadge key={b.id} {...b} locked={!b.condition} />)}</div></div>
-                        
-                        <button onClick={onTogglePressure} className={`w-full p-4 rounded-xl border flex items-center justify-between transition-all shadow-sm group ${pressureMode ? 'bg-red-50 border-red-200' : 'bg-white/50 border-gray-100 dark:bg-gray-700/50 dark:border-gray-600'}`}>
-                            <div className="text-left">
-                                <p className={`text-xs font-bold uppercase ${pressureMode ? 'text-red-600' : 'text-gray-500 dark:text-gray-300'}`}>Pressure Mode</p>
-                                <p className="text-[10px] text-gray-400">60s Timer</p>
-                            </div>
-                            <div className={`w-10 h-6 rounded-full p-1 transition-colors ${pressureMode ? 'bg-red-500' : 'bg-gray-300'}`}>
-                                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${pressureMode ? 'translate-x-4' : ''}`}></div>
-                            </div>
+                        <div><p className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wider font-mono">Trophy Room</p><div className="grid grid-cols-4 gap-2 bg-gray-50 dark:bg-slate-800/50 p-3 rounded-xl border border-gray-200 dark:border-slate-700">{badges.map(b => <AchievementBadge key={b.id} {...b} locked={!b.condition} />)}</div></div>
+                        <button onClick={onTogglePressure} className={`w-full p-4 rounded-xl border flex items-center justify-between transition-all shadow-sm group ${pressureMode ? 'bg-red-50 border-red-200' : 'bg-white/50 border-gray-100 dark:bg-slate-700/50 dark:border-slate-600'}`}>
+                            <div className="text-left"><p className={`text-xs font-bold uppercase font-mono ${pressureMode ? 'text-red-600' : 'text-gray-500 dark:text-gray-300'}`}>Pressure Mode</p><p className="text-[10px] text-gray-400">60s Timer</p></div>
+                            <div className={`w-10 h-6 rounded-full p-1 transition-colors ${pressureMode ? 'bg-red-500' : 'bg-gray-300'}`}><div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${pressureMode ? 'translate-x-4' : ''}`}></div></div>
                         </button>
-
-                        <div className="bg-white/50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm text-center backdrop-blur-md">
-                            <p className="text-xs text-gray-500 font-bold uppercase mb-1">Session Duration</p>
-                            <div className="font-mono text-3xl font-bold text-gray-700 dark:text-white tracking-widest">{Math.floor(timer/60).toString().padStart(2,'0')}<span className="animate-pulse text-jpm-accent">:</span>{(timer%60).toString().padStart(2,'0')}</div>
+                        <div className="bg-white/50 dark:bg-slate-800/50 p-4 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm text-center backdrop-blur-md flex flex-col items-center">
+                            <p className="text-xs text-gray-500 font-bold uppercase mb-1 font-mono">Session Duration</p>
+                            <div className="font-mono text-xl xl:text-2xl font-bold text-gray-700 dark:text-white tracking-widest truncate w-full">{Math.floor(timer/60).toString().padStart(2,'0')}<span className="animate-pulse text-jpm-accent">:</span>{(timer%60).toString().padStart(2,'0')}</div>
                         </div>
                     </div>
                 </div>
@@ -619,8 +593,6 @@
             const [results, setResults] = useState({}); 
             const [maxIndex, setMaxIndex] = useState(0); 
             const [timeLeft, setTimeLeft] = useState(60);
-            
-            // Vocab Recording State
             const [isRecording, setIsRecording] = useState(false);
             const [audioUrl, setAudioUrl] = useState(null);
             const mediaRecorderRef = useRef(null);
@@ -638,147 +610,50 @@
                 return () => clearInterval(timer);
             }, [pressureMode, flipped]); 
 
-            // Clear recording when changing cards
-            useEffect(() => {
-                setAudioUrl(null);
-                setIsRecording(false);
-                if(mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-                    mediaRecorderRef.current.stop();
-                }
-            }, [currentIndex]);
+            useEffect(() => { setAudioUrl(null); setIsRecording(false); if(mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') { mediaRecorderRef.current.stop(); } }, [currentIndex]);
 
-            // Recording Logic
-            const startAudioRec = async (e) => {
-                e.stopPropagation();
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    mediaRecorderRef.current = new MediaRecorder(stream);
-                    audioChunksRef.current = [];
-                    mediaRecorderRef.current.ondataavailable = (event) => { if (event.data.size > 0) audioChunksRef.current.push(event.data); };
-                    mediaRecorderRef.current.onstop = () => {
-                        const type = mediaRecorderRef.current.mimeType || 'audio/webm';
-                        const audioBlob = new Blob(audioChunksRef.current, { type });
-                        const url = URL.createObjectURL(audioBlob);
-                        setAudioUrl(url);
-                        stream.getTracks().forEach(track => track.stop());
-                    };
-                    mediaRecorderRef.current.start();
-                    setIsRecording(true);
-                } catch (err) { console.warn("Audio denied", err); alert("Microphone access denied"); }
-            };
+            const startAudioRec = async (e) => { e.stopPropagation(); try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); mediaRecorderRef.current = new MediaRecorder(stream); audioChunksRef.current = []; mediaRecorderRef.current.ondataavailable = (event) => { if (event.data.size > 0) audioChunksRef.current.push(event.data); }; mediaRecorderRef.current.onstop = () => { const type = mediaRecorderRef.current.mimeType || 'audio/webm'; const audioBlob = new Blob(audioChunksRef.current, { type }); const url = URL.createObjectURL(audioBlob); setAudioUrl(url); stream.getTracks().forEach(track => track.stop()); }; mediaRecorderRef.current.start(); setIsRecording(true); } catch (err) { console.warn("Audio denied", err); alert("Microphone access denied"); } };
+            const stopAudioRec = (e) => { e.stopPropagation(); if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") { mediaRecorderRef.current.stop(); setIsRecording(false); } };
 
-            const stopAudioRec = (e) => {
-                e.stopPropagation();
-                if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-                    mediaRecorderRef.current.stop();
-                    setIsRecording(false);
-                }
-            };
+            useEffect(() => { const done = Object.keys(results).length; const correct = Object.values(results).filter(r => r === 'easy').length; onStatsUpdate({ completed: done, correct }); }, [results, onStatsUpdate]);
+            useEffect(() => { const handleEndSignal = () => { const remaining = deckData.slice(currentIndex); const hardCards = deckData.filter(item => results[item.id] === 'hard'); let queueToSave = [...remaining]; hardCards.forEach(c => { if(!queueToSave.find(q => q.id === c.id)) queueToSave.push(c); }); const score = queueToSave.length === 0 ? 100 : 50; onEnd(score, queueToSave); }; window.addEventListener('jpm-trigger-end', handleEndSignal); return () => window.removeEventListener('jpm-trigger-end', handleEndSignal); }, [currentIndex, results, deckData, onEnd]);
 
-            // Update Stats for Flashcards
-            useEffect(() => {
-                const done = Object.keys(results).length;
-                const correct = Object.values(results).filter(r => r === 'easy').length; 
-                onStatsUpdate({ completed: done, correct });
-            }, [results, onStatsUpdate]);
+            const handleRate = (rating) => { setResults(prev => ({ ...prev, [current.id]: rating })); setFlipped(false); if (currentIndex < deckData.length - 1) { const next = currentIndex + 1; setCurrentIndex(next); if (next > maxIndex) setMaxIndex(next); } else { const finalResults = { ...results, [current.id]: rating }; const hardCards = deckData.filter(item => finalResults[item.id] === 'hard'); onEnd(hardCards.length === 0 ? 100 : 50, hardCards); } };
+            const getBtnStyle = (type) => { const isActive = currentRating === type; const base = "flex-1 py-4 rounded-xl font-bold shadow-md transition-all duration-200 border-2"; if (type === 'hard') return isActive ? `${base} bg-red-600 border-red-800 ring-4 ring-red-300 scale-105 text-white shadow-xl z-10 opacity-100` : `${base} bg-white border-red-200 text-red-600 hover:bg-red-50 ${currentRating ? 'opacity-40 grayscale' : 'opacity-100'}`; else return isActive ? `${base} bg-green-600 border-green-800 ring-4 ring-green-300 scale-105 text-white shadow-xl z-10 opacity-100` : `${base} bg-white border-green-200 text-green-600 hover:bg-green-50 ${currentRating ? 'opacity-40 grayscale' : 'opacity-100'}`; };
 
-            useEffect(() => {
-                const handleEndSignal = () => {
-                    const remaining = deckData.slice(currentIndex);
-                    const hardCards = deckData.filter(item => results[item.id] === 'hard');
-                    let queueToSave = [...remaining];
-                    hardCards.forEach(c => { if(!queueToSave.find(q => q.id === c.id)) queueToSave.push(c); });
-                    const score = queueToSave.length === 0 ? 100 : 50;
-                    onEnd(score, queueToSave);
-                };
-                window.addEventListener('jpm-trigger-end', handleEndSignal);
-                return () => window.removeEventListener('jpm-trigger-end', handleEndSignal);
-            }, [currentIndex, results, deckData, onEnd]);
-
-            const handleRate = (rating) => {
-                setResults(prev => ({ ...prev, [current.id]: rating })); setFlipped(false);
-                if (currentIndex < deckData.length - 1) { const next = currentIndex + 1; setCurrentIndex(next); if (next > maxIndex) setMaxIndex(next); } 
-                else { const finalResults = { ...results, [current.id]: rating }; const hardCards = deckData.filter(item => finalResults[item.id] === 'hard'); onEnd(hardCards.length === 0 ? 100 : 50, hardCards); }
-            };
-
-            const getBtnStyle = (type) => {
-                const isActive = currentRating === type;
-                const base = "flex-1 py-4 rounded-xl font-bold shadow-md transition-all duration-200 border-2";
-                if (type === 'hard') return isActive ? `${base} bg-red-600 border-red-800 ring-4 ring-red-300 scale-105 text-white shadow-xl z-10 opacity-100` : `${base} bg-white border-red-200 text-red-600 hover:bg-red-50 ${currentRating ? 'opacity-40 grayscale' : 'opacity-100'}`;
-                else return isActive ? `${base} bg-green-600 border-green-800 ring-4 ring-green-300 scale-105 text-white shadow-xl z-10 opacity-100` : `${base} bg-white border-green-200 text-green-600 hover:bg-green-50 ${currentRating ? 'opacity-40 grayscale' : 'opacity-100'}`;
-            };
-
-            // REUSABLE AUDIO COMPONENT FOR BOTH SIDES
-            const AudioControls = ({ textToSpeak }) => (
-                <div className="flex flex-col items-center gap-4 w-full" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex gap-4">
-                        <button onClick={(e) => { e.stopPropagation(); SpeechManager.speak(textToSpeak); }} className="flex flex-col items-center justify-center w-16 h-16 rounded-full bg-blue-50 dark:bg-gray-700 hover:bg-blue-100 text-blue-600 dark:text-blue-400 shadow-md transition-transform hover:scale-105">
-                            <i className="fas fa-volume-up text-xl mb-1"></i>
-                            <span className="text-[10px] font-bold">Listen</span>
-                        </button>
-                        
-                        {SpeechManager.hasRecognition() && (
-                            <button onClick={isRecording ? stopAudioRec : startAudioRec} className={`flex flex-col items-center justify-center w-16 h-16 rounded-full shadow-md transition-all hover:scale-105 ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-red-50 dark:bg-gray-700 hover:bg-red-100 text-red-500'}`}>
-                                <i className={`fas ${isRecording ? 'fa-stop' : 'fa-microphone'} text-xl mb-1`}></i>
-                                <span className="text-[10px] font-bold">{isRecording ? 'Stop' : 'Speak'}</span>
-                            </button>
-                        )}
-                    </div>
-                    {audioUrl && (
-                        <div className="animate-slide-in bg-gray-100 dark:bg-gray-800 p-2 rounded-full px-4 flex items-center gap-2 border border-gray-200 dark:border-gray-600 shadow-inner">
-                            <span className="text-[10px] font-bold text-gray-500 uppercase">You:</span>
-                            <audio controls src={audioUrl} className="h-6 w-32"></audio>
-                        </div>
-                    )}
-                </div>
-            );
+            const AudioControls = ({ textToSpeak }) => ( <div className="flex flex-col items-center gap-4 w-full" onClick={(e) => e.stopPropagation()}> <div className="flex gap-4"> <button onClick={(e) => { e.stopPropagation(); SpeechManager.speak(textToSpeak); }} className="flex flex-col items-center justify-center w-16 h-16 rounded-full bg-blue-50 dark:bg-slate-700 hover:bg-blue-100 text-blue-600 dark:text-blue-400 shadow-md transition-transform hover:scale-105"><i className="fas fa-volume-up text-xl mb-1"></i><span className="text-[10px] font-bold">Listen</span></button> {SpeechManager.hasRecognition() && ( <button onClick={isRecording ? stopAudioRec : startAudioRec} className={`flex flex-col items-center justify-center w-16 h-16 rounded-full shadow-md transition-all hover:scale-105 ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-red-50 dark:bg-slate-700 hover:bg-red-100 text-red-500'}`}><i className={`fas ${isRecording ? 'fa-stop' : 'fa-microphone'} text-xl mb-1`}></i><span className="text-[10px] font-bold">{isRecording ? 'Stop' : 'Speak'}</span></button> )} </div> {audioUrl && ( <div className="animate-slide-in bg-gray-100 dark:bg-slate-800 p-2 rounded-full px-4 flex items-center gap-2 border border-gray-200 dark:border-slate-600 shadow-inner"> <span className="text-[10px] font-bold text-gray-500 uppercase">You:</span> <audio controls src={audioUrl} className="h-6 w-32"></audio> </div> )} </div> );
 
             return (
                 <div className="flex flex-col items-center h-full w-full px-4 pt-4 md:pb-safe scroll-touch stable-scroll dark:text-white">
                     <div className="w-full max-w-4xl flex justify-between items-center mb-2 md:mb-4 text-gray-500 dark:text-gray-400 font-bold text-sm uppercase tracking-wide flex-shrink-0">
-                        <span>{current.ModeTitle || 'Flashcard Mode'}</span>
+                        <span className="font-quote text-lg">{current.ModeTitle || 'Flashcard Mode'}</span>
                         <div className="flex items-center gap-4">
                             {pressureMode && !flipped && <span className={`font-mono ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-blue-500'}`}>⏳ 00:{timeLeft.toString().padStart(2,'0')}</span>}
-                            <span>{currentIndex + 1} / {deckData.length}</span>
-                            <button onClick={toggleFocus} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition"><i className={isFocusMode ? "fas fa-compress" : "fas fa-expand"}></i></button>
+                            <span className="font-mono">{currentIndex + 1} / {deckData.length}</span>
+                            <button onClick={toggleFocus} className="p-2 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-full transition"><i className={isFocusMode ? "fas fa-compress" : "fas fa-expand"}></i></button>
                         </div>
                     </div>
                     <div className="card-scene mb-0 md:mb-6 w-full max-w-4xl flex-grow relative flex flex-col" style={{minHeight: '0'}}>
                         <div className={`card-object ${flipped ? 'is-flipped' : ''}`} onClick={() => { if(!isRecording) setFlipped(!flipped); }} role="button">
                             <div className="card-face front">
                                 <div className="card-content relative flex flex-col items-center justify-center">
-                                    <h3 className="text-3xl md:text-5xl font-bold text-gray-800 dark:text-white leading-snug tracking-tight mb-6">{current.Question}</h3>
-                                    {isVocab && (
-                                        <>
-                                            <AudioControls textToSpeak={current.Question} />
-                                            <p className="text-xs text-gray-400 mt-2 font-medium">Tap card to flip for meaning</p>
-                                        </>
-                                    )}
+                                    <h3 className="text-3xl md:text-5xl font-bold text-gray-800 dark:text-white leading-snug tracking-tight mb-6 font-quote">{current.Question}</h3>
+                                    {isVocab && ( <> <AudioControls textToSpeak={current.Question} /> <p className="text-xs text-gray-400 mt-2 font-medium font-mono">Tap card to flip for meaning</p> </> )}
                                     {!isVocab && <div className="absolute bottom-6 text-gray-400 text-xs uppercase tracking-widest font-bold">Tap to Flip</div>}
                                 </div>
                             </div>
                             <div className="card-face back">
                                 <div className="card-content flex flex-col items-center justify-center">
-                                    <p className="text-xl text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed mb-6">{current.Answer}</p>
-                                    {isVocab && (
-                                        <>
-                                            <div className="w-full h-px bg-gray-200 dark:bg-gray-700 my-4"></div>
-                                            <AudioControls textToSpeak={current.Answer} />
-                                        </>
-                                    )}
+                                    <p className="text-xl text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed mb-6 font-sans">{current.Answer}</p>
+                                    {isVocab && ( <> <div className="w-full h-px bg-gray-200 dark:bg-slate-700 my-4"></div> <AudioControls textToSpeak={current.Answer} /> </> )}
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div className="w-full max-w-4xl z-10 flex gap-4 items-center flex-shrink-0 py-4 md:py-6 mt-auto">
-                        <button onClick={() => { setCurrentIndex(p => Math.max(0, p-1)); setFlipped(false); setTimeLeft(60); }} disabled={currentIndex === 0} className="px-6 py-4 bg-white dark:bg-gray-800 text-gray-600 dark:text-white rounded-xl font-bold shadow-sm hover:bg-gray-50 disabled:opacity-50 transition-colors"><i className="fas fa-arrow-left"></i></button>
-                        {flipped ? (
-                            <div className="flex-1 flex gap-4">
-                                <button onClick={(e) => { e.stopPropagation(); handleRate('hard'); }} className={getBtnStyle('hard')}>{currentRating === 'hard' && <i className="fas fa-check mr-2"></i>} Hard</button>
-                                <button onClick={(e) => { e.stopPropagation(); handleRate('easy'); }} className={getBtnStyle('easy')}>{currentRating === 'easy' && <i className="fas fa-check mr-2"></i>} Easy</button>
-                            </div>
-                        ) : ( <button onClick={() => setFlipped(true)} className="flex-1 px-8 py-4 bg-jpm-primary text-white rounded-xl font-bold shadow-lg hover:bg-jpm-dark transition active:scale-95 transform">Show Answer</button> )}
-                        <button onClick={() => { const n=currentIndex+1; if(n<=maxIndex) setCurrentIndex(n); setFlipped(false); setTimeLeft(60); }} disabled={currentIndex >= maxIndex} className="px-6 py-4 bg-white dark:bg-gray-800 text-gray-600 dark:text-white rounded-xl font-bold shadow-sm hover:bg-gray-50 disabled:opacity-50 transition-colors"><i className="fas fa-arrow-right"></i></button>
+                        <button onClick={() => { setCurrentIndex(p => Math.max(0, p-1)); setFlipped(false); setTimeLeft(60); }} disabled={currentIndex === 0} className="px-6 py-4 bg-white dark:bg-slate-800 text-gray-600 dark:text-white rounded-xl font-bold shadow-sm hover:bg-gray-50 disabled:opacity-50 transition-colors"><i className="fas fa-arrow-left"></i></button>
+                        {flipped ? ( <div className="flex-1 flex gap-4"> <button onClick={(e) => { e.stopPropagation(); handleRate('hard'); }} className={getBtnStyle('hard')}>{currentRating === 'hard' && <i className="fas fa-check mr-2"></i>} Hard</button> <button onClick={(e) => { e.stopPropagation(); handleRate('easy'); }} className={getBtnStyle('easy')}>{currentRating === 'easy' && <i className="fas fa-check mr-2"></i>} Easy</button> </div> ) : ( <button onClick={() => setFlipped(true)} className="flex-1 px-8 py-4 bg-jpm-primary text-white rounded-xl font-bold shadow-lg hover:bg-jpm-dark transition active:scale-95 transform">Show Answer</button> )}
+                        <button onClick={() => { const n=currentIndex+1; if(n<=maxIndex) setCurrentIndex(n); setFlipped(false); setTimeLeft(60); }} disabled={currentIndex >= maxIndex} className="px-6 py-4 bg-white dark:bg-slate-800 text-gray-600 dark:text-white rounded-xl font-bold shadow-sm hover:bg-gray-50 disabled:opacity-50 transition-colors"><i className="fas fa-arrow-right"></i></button>
                     </div>
                 </div>
             );
@@ -803,8 +678,6 @@
             const speechStartRef = useRef(0);
             const totalSpeechWordsRef = useRef(0);
             const currentWpmRef = useRef(0);
-            
-            // Show Model Answer State
             const [showModel, setShowModel] = useState(false);
 
             if (!deckData || deckData.length === 0) return <div>No data.</div>;
@@ -814,201 +687,58 @@
             useEffect(() => { activeFieldRef.current = activeField; }, [activeField]);
 
             const countW = (s) => s && s.trim() ? s.trim().split(/\s+/).length : 0;
-
-            const startAudioRec = async () => {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    mediaRecorderRef.current = new MediaRecorder(stream);
-                    audioChunksRef.current = [];
-                    mediaRecorderRef.current.ondataavailable = (event) => { if (event.data.size > 0) audioChunksRef.current.push(event.data); };
-                    mediaRecorderRef.current.onstop = () => {
-                        const type = mediaRecorderRef.current.mimeType || 'audio/webm';
-                        const audioBlob = new Blob(audioChunksRef.current, { type });
-                        const url = URL.createObjectURL(audioBlob);
-                        setHistory(prev => ({ ...prev, [current.id]: { ...prev[current.id], audioUrl: url } }));
-                        stream.getTracks().forEach(track => track.stop());
-                    };
-                    mediaRecorderRef.current.start();
-                } catch (err) { console.warn("Audio recording failed or denied", err); }
-            };
-
+            const startAudioRec = async () => { try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); mediaRecorderRef.current = new MediaRecorder(stream); audioChunksRef.current = []; mediaRecorderRef.current.ondataavailable = (event) => { if (event.data.size > 0) audioChunksRef.current.push(event.data); }; mediaRecorderRef.current.onstop = () => { const type = mediaRecorderRef.current.mimeType || 'audio/webm'; const audioBlob = new Blob(audioChunksRef.current, { type }); const url = URL.createObjectURL(audioBlob); setHistory(prev => ({ ...prev, [current.id]: { ...prev[current.id], audioUrl: url } })); stream.getTracks().forEach(track => track.stop()); }; mediaRecorderRef.current.start(); } catch (err) { console.warn("Audio recording failed or denied", err); } };
             const stopAudioRec = () => { if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") { mediaRecorderRef.current.stop(); } };
-
-            const startSpeechEngine = useCallback(() => {
-                if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) return;
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                const recognition = new SpeechRecognition();
-                recognition.continuous = true; recognition.interimResults = true; recognition.lang = 'en-US';
-                if (speechStartRef.current === 0) speechStartRef.current = Date.now();
-                recognition.onresult = (event) => {
-                    let finalChunk = ''; let interimChunk = '';
-                    for (let i = event.resultIndex; i < event.results.length; ++i) {
-                        if (event.results[i].isFinal) finalChunk += event.results[i][0].transcript;
-                        else interimChunk += event.results[i][0].transcript;
-                    }
-                    setInterimText(interimChunk);
-                    if (finalChunk) {
-                        totalSpeechWordsRef.current += countW(finalChunk);
-                        const target = activeFieldRef.current;
-                        if(target === 'main') {
-                            const oldVal = inputRef.current;
-                            const prefix = oldVal.trim() && !oldVal.endsWith(' ') ? oldVal + ' ' : oldVal;
-                            const newVal = prefix + finalChunk.trim() + ' ';
-                            inputRef.current = newVal;
-                            setHistory(prev => ({ ...prev, [current.id]: { ...prev[current.id], input: newVal } }));
-                        } else { setStarData(prev => ({...prev, [target]: (prev[target] || '') + ' ' + finalChunk.trim() + ' ' })); }
-                        setInterimText(""); 
-                    }
-                    const currentSessionWords = totalSpeechWordsRef.current + countW(interimChunk);
-                    const mins = (Date.now() - speechStartRef.current) / 60000;
-                    const wpm = mins > 0.05 ? Math.round(currentSessionWords / mins) : 0;
-                    setLiveWpm(wpm);
-                    currentWpmRef.current = wpm;
-                };
-                recognition.onend = () => { if (!isExplicitlyStopped.current) setTimeout(() => startSpeechEngine(), 10); else { setIsListening(false); setInterimText(""); } };
-                recognition.onerror = (e) => { if (e.error === 'not-allowed') { setIsListening(false); isExplicitlyStopped.current = true; alert("Microphone access denied."); } };
-                recognitionRef.current = recognition;
-                try { recognition.start(); } catch(e) {}
-            }, [current.id]); 
-
-            const toggleListening = () => {
-                if (isListening) { 
-                    isExplicitlyStopped.current = true; if (recognitionRef.current) recognitionRef.current.stop(); stopAudioRec();
-                    setHistory(prev => ({ ...prev, [current.id]: { ...prev[current.id], wpm: currentWpmRef.current } }));
-                    setIsListening(false); setInterimText(""); 
-                } else { 
-                    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) { alert("Not supported."); return; } 
-                    isExplicitlyStopped.current = false; speechStartRef.current = 0; totalSpeechWordsRef.current = 0; currentWpmRef.current = 0;
-                    setLiveWpm(0); setIsListening(true); startSpeechEngine(); startAudioRec();
-                }
-            };
-
-            const getWpmColor = (wpm) => {
-                if(wpm === 0) return 'bg-gray-100 text-gray-500';
-                if(wpm < 110) return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-                if(wpm > 160) return 'bg-red-100 text-red-800 border-red-300';
-                return 'bg-green-100 text-green-800 border-green-300';
-            };
-
-            const getWpmFeedback = (wpm) => {
-                if(wpm === 0) return "";
-                if(wpm < 110) return "Slow (May imply uncertainty)";
-                if(wpm > 160) return "Fast (May imply nervousness)";
-                return "Optimal (Shows confidence)";
-            };
+            const startSpeechEngine = useCallback(() => { if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) return; const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; const recognition = new SpeechRecognition(); recognition.continuous = true; recognition.interimResults = true; recognition.lang = 'en-US'; if (speechStartRef.current === 0) speechStartRef.current = Date.now(); recognition.onresult = (event) => { let finalChunk = ''; let interimChunk = ''; for (let i = event.resultIndex; i < event.results.length; ++i) { if (event.results[i].isFinal) finalChunk += event.results[i][0].transcript; else interimChunk += event.results[i][0].transcript; } setInterimText(interimChunk); if (finalChunk) { totalSpeechWordsRef.current += countW(finalChunk); const target = activeFieldRef.current; if(target === 'main') { const oldVal = inputRef.current; const prefix = oldVal.trim() && !oldVal.endsWith(' ') ? oldVal + ' ' : oldVal; const newVal = prefix + finalChunk.trim() + ' '; inputRef.current = newVal; setHistory(prev => ({ ...prev, [current.id]: { ...prev[current.id], input: newVal } })); } else { setStarData(prev => ({...prev, [target]: (prev[target] || '') + ' ' + finalChunk.trim() + ' ' })); } setInterimText(""); } const currentSessionWords = totalSpeechWordsRef.current + countW(interimChunk); const mins = (Date.now() - speechStartRef.current) / 60000; const wpm = mins > 0.05 ? Math.round(currentSessionWords / mins) : 0; setLiveWpm(wpm); currentWpmRef.current = wpm; }; recognition.onend = () => { if (!isExplicitlyStopped.current) setTimeout(() => startSpeechEngine(), 10); else { setIsListening(false); setInterimText(""); } }; recognition.onerror = (e) => { if (e.error === 'not-allowed') { setIsListening(false); isExplicitlyStopped.current = true; alert("Microphone access denied."); } }; recognitionRef.current = recognition; try { recognition.start(); } catch(e) {} }, [current.id]); 
+            const toggleListening = () => { if (isListening) { isExplicitlyStopped.current = true; if (recognitionRef.current) recognitionRef.current.stop(); stopAudioRec(); setHistory(prev => ({ ...prev, [current.id]: { ...prev[current.id], wpm: currentWpmRef.current } })); setIsListening(false); setInterimText(""); } else { if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) { alert("Not supported."); return; } isExplicitlyStopped.current = false; speechStartRef.current = 0; totalSpeechWordsRef.current = 0; currentWpmRef.current = 0; setLiveWpm(0); setIsListening(true); startSpeechEngine(); startAudioRec(); } };
+            const getWpmColor = (wpm) => { if(wpm === 0) return 'bg-gray-100 text-gray-500'; if(wpm < 110) return 'bg-yellow-100 text-yellow-800 border-yellow-300'; if(wpm > 160) return 'bg-red-100 text-red-800 border-red-300'; return 'bg-green-100 text-green-800 border-green-300'; };
+            const getWpmFeedback = (wpm) => { if(wpm === 0) return ""; if(wpm < 110) return "Slow (May imply uncertainty)"; if(wpm > 160) return "Fast (May imply nervousness)"; return "Optimal (Shows confidence)"; };
 
             useEffect(() => { inputRef.current = currentRec.input || ""; }, [currentRec.input]);
-            useEffect(() => {
-                if(currentRec.input && currentRec.input.startsWith("Situation:") && !currentRec.submitted) {
-                   const parts = currentRec.input.split('\n');
-                   const getPart = (pfx) => { const line = parts.find(p => p.startsWith(pfx)); return line ? line.substring(pfx.length).trim() : ''; };
-                   setStarData({ s: getPart("Situation:"), t: getPart("Task:"), a: getPart("Action:"), r: getPart("Result:") });
-                   setIsStarMode(true);
-                } else if (!currentRec.submitted) { setStarData({ s: '', t: '', a: '', r: '' }); }
-            }, [currentIndex, current.id, currentRec.submitted]);
-
-            useEffect(() => {
-                if(pressureMode) setTimeLeft(60); inputRef.current = history[current.id]?.input || ""; setInterimText("");
-                if(recognitionRef.current) { isExplicitlyStopped.current = true; recognitionRef.current.stop(); }
-                setIsListening(false); setActiveField('main'); setLiveWpm(0); currentWpmRef.current = 0; stopAudioRec();
-                setShowModel(false); // Reset peek on new question
-            }, [currentIndex, pressureMode, current.id]); 
-
-            const finalizeSubmission = useCallback((finalInput) => {
-                const score = calculateSmartScore(finalInput, current.ModelAnswer);
-                setHistory(prev => ({ ...prev, [current.id]: { ...prev[current.id], input: finalInput, score, submitted: true } }));
-            }, [current]);
+            useEffect(() => { if(currentRec.input && currentRec.input.startsWith("Situation:") && !currentRec.submitted) { const parts = currentRec.input.split('\n'); const getPart = (pfx) => { const line = parts.find(p => p.startsWith(pfx)); return line ? line.substring(pfx.length).trim() : ''; }; setStarData({ s: getPart("Situation:"), t: getPart("Task:"), a: getPart("Action:"), r: getPart("Result:") }); setIsStarMode(true); } else if (!currentRec.submitted) { setStarData({ s: '', t: '', a: '', r: '' }); } }, [currentIndex, current.id, currentRec.submitted]);
+            useEffect(() => { if(pressureMode) setTimeLeft(60); inputRef.current = history[current.id]?.input || ""; setInterimText(""); if(recognitionRef.current) { isExplicitlyStopped.current = true; recognitionRef.current.stop(); } setIsListening(false); setActiveField('main'); setLiveWpm(0); currentWpmRef.current = 0; stopAudioRec(); setShowModel(false); }, [currentIndex, pressureMode, current.id]); 
+            const finalizeSubmission = useCallback((finalInput) => { const score = calculateSmartScore(finalInput, current.ModelAnswer); setHistory(prev => ({ ...prev, [current.id]: { ...prev[current.id], input: finalInput, score, submitted: true } })); }, [current]);
             const handleStarSubmit = () => { finalizeSubmission(`Situation: ${starData.s}\nTask: ${starData.t}\nAction: ${starData.a}\nResult: ${starData.r}`); };
-
-            useEffect(() => {
-                if (!pressureMode || currentRec.submitted) return;
-                const timer = setInterval(() => setTimeLeft(prev => { 
-                    if (prev <= 1) { if (!isListening) { clearInterval(timer); if(isStarMode) handleStarSubmit(); else finalizeSubmission(inputRef.current); } return 0; } 
-                    return prev - 1; 
-                }), 1000);
-                return () => clearInterval(timer);
-            }, [pressureMode, currentRec.submitted, finalizeSubmission, isStarMode, starData, isListening]);
-
-            useEffect(() => {
-                const handleEndSignal = () => { const avg = Object.values(history).reduce((a,b)=>a+b.score,0) / deckData.length; const wrongItems = deckData.filter(d => (history[d.id]?.score || 0) < 50); onEnd(Math.round(avg || 0), wrongItems); };
-                window.addEventListener('jpm-trigger-end', handleEndSignal); return () => window.removeEventListener('jpm-trigger-end', handleEndSignal);
-            }, [history, deckData, onEnd]);
-            
-            useEffect(() => { 
-                const done = Object.keys(history).filter(k => history[k].submitted).length; 
-                const correct = Object.values(history).filter(rec => rec.score >= 50).length; 
-                onStatsUpdate({ completed: done, correct }); 
-            }, [history, onStatsUpdate]);
-
+            useEffect(() => { if (!pressureMode || currentRec.submitted) return; const timer = setInterval(() => setTimeLeft(prev => { if (prev <= 1) { if (!isListening) { clearInterval(timer); if(isStarMode) handleStarSubmit(); else finalizeSubmission(inputRef.current); } return 0; } return prev - 1; }), 1000); return () => clearInterval(timer); }, [pressureMode, currentRec.submitted, finalizeSubmission, isStarMode, starData, isListening]);
+            useEffect(() => { const handleEndSignal = () => { const avg = Object.values(history).reduce((a,b)=>a+b.score,0) / deckData.length; const wrongItems = deckData.filter(d => (history[d.id]?.score || 0) < 50); onEnd(Math.round(avg || 0), wrongItems); }; window.addEventListener('jpm-trigger-end', handleEndSignal); return () => window.removeEventListener('jpm-trigger-end', handleEndSignal); }, [history, deckData, onEnd]);
+            useEffect(() => { const done = Object.keys(history).filter(k => history[k].submitted).length; const correct = Object.values(history).filter(rec => rec.score >= 50).length; onStatsUpdate({ completed: done, correct }); }, [history, onStatsUpdate]);
             const handleNext = () => { if (currentIndex < deckData.length - 1) { setCurrentIndex(prev => prev + 1); } else { const avg = Object.values(history).reduce((a,b)=>a+b.score,0) / deckData.length; const wrongItems = deckData.filter(d => (history[d.id]?.score || 0) < 50); onEnd(avg, wrongItems); } };
 
             return (
                 <div className="max-w-4xl mx-auto w-full pt-4 px-4 h-full flex flex-col pb-0 md:pb-safe scroll-touch stable-scroll">
                     <div className="glass-panel rounded-3xl shadow-xl p-4 md:p-8 flex-grow flex flex-col min-h-0 mb-4">
                         <div className="flex justify-between items-center mb-4 flex-shrink-0">
-                            <span className="text-jpm-accent font-bold text-xs uppercase tracking-widest block">Q{currentIndex + 1}/{deckData.length}</span>
+                            <span className="text-jpm-accent font-bold text-xs uppercase tracking-widest block font-mono">Q{currentIndex + 1}/{deckData.length}</span>
                             <div className="flex gap-4 items-center">
-                                {/* FIX: Toggle Model Answer Button */}
-                                {!currentRec.submitted && (
-                                    <button onClick={() => setShowModel(!showModel)} className={`text-xs font-bold px-3 py-1.5 rounded-full border transition ${showModel ? 'bg-yellow-100 text-yellow-700 border-yellow-300' : 'bg-gray-100 text-gray-500'}`} title="Show Answer">
-                                        <i className={`fas ${showModel ? 'fa-eye-slash' : 'fa-eye'} mr-1`}></i>Peek
-                                    </button>
-                                )}
+                                {!currentRec.submitted && ( <button onClick={() => setShowModel(!showModel)} className={`text-xs font-bold px-3 py-1.5 rounded-full border transition ${showModel ? 'bg-yellow-100 text-yellow-700 border-yellow-300' : 'bg-gray-100 text-gray-500'}`} title="Show Answer"><i className={`fas ${showModel ? 'fa-eye-slash' : 'fa-eye'} mr-1`}></i>Peek</button> )}
                                 {!currentRec.submitted && <button onClick={() => setIsStarMode(!isStarMode)} className={`text-xs font-bold px-3 py-1.5 rounded-full border transition ${isStarMode ? 'bg-purple-100 text-purple-700 border-purple-300' : 'bg-gray-100 text-gray-500'}`}>✨ S.T.A.R.</button>}
                                 {pressureMode && !currentRec.submitted && <span className={`font-mono text-sm font-bold ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-blue-500'}`}>⏳ 00:{timeLeft.toString().padStart(2,'0')}</span>}
-                                <button onClick={toggleFocus} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition"><i className={isFocusMode ? "fas fa-compress" : "fas fa-expand"}></i></button>
+                                <button onClick={toggleFocus} className="p-2 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-full transition"><i className={isFocusMode ? "fas fa-compress" : "fas fa-expand"}></i></button>
                             </div>
                         </div>
-                        <h2 className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white mb-4 leading-relaxed flex-shrink-0">{current.Question}</h2>
+                        <h2 className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white mb-4 leading-relaxed flex-shrink-0 font-quote">{current.Question}</h2>
                         
-                        {/* FIX: Study Mode Reveal Scroll Lock */}
                         {showModel && !currentRec.submitted && (
                             <div className="animate-slide-in mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-xl max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-yellow-300 scrollbar-track-transparent">
-                                <p className="text-xs font-bold text-yellow-600 dark:text-yellow-400 uppercase tracking-wider mb-2 sticky top-0 bg-yellow-50 dark:bg-transparent backdrop-blur-sm pb-1">Study Mode: Model Answer</p>
-                                <p className="text-gray-800 dark:text-gray-200 text-sm whitespace-pre-wrap">{current.ModelAnswer}</p>
+                                <p className="text-xs font-bold text-yellow-600 dark:text-yellow-400 uppercase tracking-wider mb-2 sticky top-0 bg-yellow-50 dark:bg-transparent backdrop-blur-sm pb-1 font-mono">Study Mode: Model Answer</p>
+                                <p className="text-gray-800 dark:text-gray-200 text-sm whitespace-pre-wrap font-sans">{current.ModelAnswer}</p>
                             </div>
                         )}
 
                         {!currentRec.submitted && isStarMode ? (
                             <div className="flex-grow flex flex-col gap-3 overflow-y-auto min-h-0 relative">
-                                {['s','t','a','r'].map(k => (
-                                    <textarea key={k} onFocus={()=>setActiveField(k)} className={`w-full p-2 md:p-3 border-l-4 ${activeField===k?'ring-2 ring-blue-300':''} border-blue-400 bg-blue-50/50 dark:bg-gray-700/50 dark:text-white rounded-lg focus:outline-none resize-none h-16 md:h-24`} 
-                                    placeholder={k.toUpperCase() + '...'} value={starData[k]} onChange={e => setStarData({...starData, [k]: e.target.value})} />
-                                ))}
-                                {!currentRec.submitted && SpeechManager.hasRecognition() && (
-                                    <div className="absolute bottom-4 right-4 z-20 flex gap-2 items-center">
-                                        {isListening && <span className={`text-[10px] font-bold px-2 py-1 rounded border animate-pulse ${getWpmColor(liveWpm)}`}>{liveWpm > 0 ? liveWpm + ' WPM' : 'LISTENING...'}</span>}
-                                        <button onClick={toggleListening} className={`p-3 md:p-4 rounded-full shadow-xl transition-all hover:scale-110 active:scale-95 ${isListening ? 'bg-red-500 recording-active text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}>
-                                            <i className={`fas ${isListening ? 'fa-microphone-slash fa-lg' : 'fa-microphone fa-lg'}`}></i>
-                                        </button>
-                                    </div>
-                                )}
+                                {['s','t','a','r'].map(k => ( <textarea key={k} onFocus={()=>setActiveField(k)} className={`w-full p-2 md:p-3 border-l-4 ${activeField===k?'ring-2 ring-blue-300':''} border-blue-400 bg-blue-50/50 dark:bg-slate-700/50 dark:text-white rounded-lg focus:outline-none resize-none h-16 md:h-24 font-sans`} placeholder={k.toUpperCase() + '...'} value={starData[k]} onChange={e => setStarData({...starData, [k]: e.target.value})} /> ))}
+                                {!currentRec.submitted && SpeechManager.hasRecognition() && ( <div className="absolute bottom-4 right-4 z-20 flex gap-2 items-center"> {isListening && <span className={`text-[10px] font-bold px-2 py-1 rounded border animate-pulse ${getWpmColor(liveWpm)}`}>{liveWpm > 0 ? liveWpm + ' WPM' : 'LISTENING...'}</span>} <button onClick={toggleListening} className={`p-3 md:p-4 rounded-full shadow-xl transition-all hover:scale-110 active:scale-95 ${isListening ? 'bg-red-500 recording-active text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}><i className={`fas ${isListening ? 'fa-microphone-slash fa-lg' : 'fa-microphone fa-lg'}`}></i></button> </div> )}
                             </div>
                         ) : (
                             <div className="relative flex-grow flex flex-col min-h-0">
-                                <textarea onFocus={()=>setActiveField('main')} className={`w-full p-6 border-2 rounded-2xl mb-4 focus:outline-none focus:border-jpm-primary transition flex-grow resize-none text-base md:text-lg leading-relaxed ${currentRec.submitted ? 'bg-gray-100/50 text-gray-500' : 'bg-white/60 dark:bg-gray-800/60 dark:text-white'}`}
-                                    placeholder="Type answer or speak..." value={currentRec.input + (activeField==='main'?interimText:'')}
-                                    onChange={(e) => { if(!currentRec.submitted && !isListening) { setHistory(h => ({...h, [current.id]: {...currentRec, input: e.target.value}})); inputRef.current = e.target.value; } }}
-                                    readOnly={currentRec.submitted || isListening} 
-                                />
+                                <textarea onFocus={()=>setActiveField('main')} className={`w-full p-6 border-2 rounded-2xl mb-4 focus:outline-none focus:border-jpm-primary transition flex-grow resize-none text-base md:text-lg leading-relaxed font-sans ${currentRec.submitted ? 'bg-gray-100/50 text-gray-500' : 'bg-white/60 dark:bg-slate-800/60 dark:text-white'}`} placeholder="Type answer or speak..." value={currentRec.input + (activeField==='main'?interimText:'')} onChange={(e) => { if(!currentRec.submitted && !isListening) { setHistory(h => ({...h, [current.id]: {...currentRec, input: e.target.value}})); inputRef.current = e.target.value; } }} readOnly={currentRec.submitted || isListening} />
                                 {!currentRec.submitted && (
                                     <div className="absolute bottom-6 right-4 md:bottom-8 md:right-6 flex items-center gap-4">
-                                        {isListening && (
-                                            <div className="flex flex-col items-end gap-1">
-                                                <div className="flex gap-1 h-6 items-end audio-wave"><span></span><span></span><span></span><span></span><span></span></div>
-                                                <span className={`text-[10px] font-bold px-2 py-1 rounded border shadow-sm transition-colors ${getWpmColor(liveWpm)}`}>{liveWpm > 0 ? liveWpm + ' WPM' : 'CALIBRATING...'}</span>
-                                            </div>
-                                        )}
-                                        {currentRec.wpm > 0 && !isListening && <span className={`text-[10px] font-bold px-2 py-1 rounded border shadow-sm transition-colors ${getWpmColor(currentRec.wpm)}`}>Last Speed: {currentRec.wpm} WPM</span>}
-                                        {currentRec.audioUrl && !isListening && (
-                                            <div className="flex flex-col items-end mr-2 animate-slide-in">
-                                                <span className="text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-wide">Recorded Clip</span>
-                                                <audio controls src={currentRec.audioUrl} className="h-8 w-48 shadow-sm rounded-full"></audio>
-                                            </div>
-                                        )}
-                                        {SpeechManager.hasRecognition() && (
-                                            <button onClick={toggleListening} className={`p-3 md:p-4 rounded-full shadow-xl transition-all hover:scale-110 active:scale-95 ${isListening ? 'bg-red-500 recording-active text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`} title={isListening ? "Stop" : "Record"}><i className={`fas ${isListening ? 'fa-microphone-slash fa-lg' : 'fa-microphone fa-lg'}`}></i></button>
-                                        )}
+                                        {isListening && ( <div className="flex flex-col items-end gap-1"> <div className="flex gap-1 h-6 items-end audio-wave"><span></span><span></span><span></span><span></span><span></span></div> <span className={`text-[10px] font-bold px-2 py-1 rounded border shadow-sm transition-colors ${getWpmColor(liveWpm)}`}>{liveWpm > 0 ? liveWpm + ' WPM' : 'CALIBRATING...'}</span> </div> )}
+                                        {currentRec.wpm > 0 && !isListening && <span className={`text-[10px] font-bold px-2 py-1 rounded border shadow-sm transition-colors font-mono ${getWpmColor(currentRec.wpm)}`}>Last Speed: {currentRec.wpm} WPM</span>}
+                                        {currentRec.audioUrl && !isListening && ( <div className="flex flex-col items-end mr-2 animate-slide-in"> <span className="text-[10px] font-bold text-gray-400 mb-1 uppercase tracking-wide font-mono">Recorded Clip</span> <audio controls src={currentRec.audioUrl} className="h-8 w-48 shadow-sm rounded-full"></audio> </div> )}
+                                        {SpeechManager.hasRecognition() && ( <button onClick={toggleListening} className={`p-3 md:p-4 rounded-full shadow-xl transition-all hover:scale-110 active:scale-95 ${isListening ? 'bg-red-500 recording-active text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`} title={isListening ? "Stop" : "Record"}><i className={`fas ${isListening ? 'fa-microphone-slash fa-lg' : 'fa-microphone fa-lg'}`}></i></button> )}
                                     </div>
                                 )}
                             </div>
@@ -1016,31 +746,18 @@
                         {currentRec.submitted && (
                             <div className="animate-slide-in mb-4 flex-shrink-0">
                                 <div className="flex flex-wrap gap-2 mb-2 items-center">
-                                    {currentRec.wpm > 0 && (
-                                        <div className="flex gap-2">
-                                            <span className={`inline-block text-[10px] font-bold px-2 py-1 rounded border shadow-sm ${getWpmColor(currentRec.wpm)}`}>Avg Speed: {currentRec.wpm} WPM</span>
-                                            <span className="inline-block text-[10px] font-bold px-2 py-1 rounded border bg-gray-50 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 text-gray-600 border-gray-200">{getWpmFeedback(currentRec.wpm)}</span>
-                                        </div>
-                                    )}
+                                    {currentRec.wpm > 0 && ( <div className="flex gap-2"> <span className={`inline-block text-[10px] font-bold px-2 py-1 rounded border shadow-sm font-mono ${getWpmColor(currentRec.wpm)}`}>Avg Speed: {currentRec.wpm} WPM</span> <span className="inline-block text-[10px] font-bold px-2 py-1 rounded border bg-gray-50 dark:bg-slate-700 dark:text-gray-300 dark:border-slate-600 text-gray-600 border-gray-200 font-mono">{getWpmFeedback(currentRec.wpm)}</span> </div> )}
                                 </div>
-                                {currentRec.audioUrl && (
-                                    <div className="mb-4 p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-full bg-jpm-accent text-white flex items-center justify-center"><i className="fas fa-microphone-lines"></i></div>
-                                        <div className="flex-grow"><p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Your Voice Recording</p><audio controls src={currentRec.audioUrl} className="w-full h-8"></audio></div>
-                                    </div>
-                                )}
-                                <div className="bg-blue-50/80 dark:bg-gray-900/80 p-4 md:p-6 rounded-2xl border border-blue-100 dark:border-gray-700 backdrop-blur-sm max-h-32 md:max-h-none overflow-y-auto">
-                                    <div className="flex justify-between items-center mb-3">
-                                        <span className="font-bold text-gray-700 dark:text-gray-300 uppercase text-xs tracking-wider">Model Answer</span>
-                                        <span className={`px-3 py-1 rounded-full text-xs font-bold text-white shadow-sm ${currentRec.score >= 50 ? 'bg-green-500' : 'bg-orange-500'}`}>{currentRec.score}% Match</span>
-                                    </div>
-                                    <p className="text-gray-800 dark:text-gray-200 text-sm whitespace-pre-wrap leading-relaxed">{current.ModelAnswer}</p>
+                                {currentRec.audioUrl && ( <div className="mb-4 p-3 bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm flex items-center gap-4"> <div className="w-10 h-10 rounded-full bg-jpm-accent text-white flex items-center justify-center"><i className="fas fa-microphone-lines"></i></div> <div className="flex-grow"><p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 font-mono">Your Voice Recording</p><audio controls src={currentRec.audioUrl} className="w-full h-8"></audio></div> </div> )}
+                                <div className="bg-blue-50/80 dark:bg-slate-900/80 p-4 md:p-6 rounded-2xl border border-blue-100 dark:border-slate-700 backdrop-blur-sm max-h-32 md:max-h-none overflow-y-auto">
+                                    <div className="flex justify-between items-center mb-3"> <span className="font-bold text-gray-700 dark:text-gray-300 uppercase text-xs tracking-wider font-mono">Model Answer</span> <span className={`px-3 py-1 rounded-full text-xs font-bold text-white shadow-sm font-mono ${currentRec.score >= 50 ? 'bg-green-500' : 'bg-orange-500'}`}>{currentRec.score}% Match</span> </div>
+                                    <p className="text-gray-800 dark:text-gray-200 text-sm whitespace-pre-wrap leading-relaxed font-sans">{current.ModelAnswer}</p>
                                 </div>
                             </div>
                         )}
                     </div>
                     <div className="flex gap-4 pb-6 z-10 flex-shrink-0 mt-auto">
-                        <button onClick={() => {setCurrentIndex(c => Math.max(0, c-1)); setTimeLeft(60);}} disabled={currentIndex === 0} className="px-6 py-3 bg-white dark:bg-gray-800 backdrop-blur text-gray-600 dark:text-white rounded-xl font-bold shadow-sm hover:bg-gray-50 disabled:opacity-50 shadow-sm"><i className="fas fa-arrow-left"></i></button>
+                        <button onClick={() => {setCurrentIndex(c => Math.max(0, c-1)); setTimeLeft(60);}} disabled={currentIndex === 0} className="px-6 py-3 bg-white dark:bg-slate-800 backdrop-blur text-gray-600 dark:text-white rounded-xl font-bold shadow-sm hover:bg-gray-50 disabled:opacity-50 shadow-sm"><i className="fas fa-arrow-left"></i></button>
                         {!currentRec.submitted ? ( <button onClick={() => isStarMode ? handleStarSubmit() : finalizeSubmission(currentRec.input)} className="flex-grow bg-jpm-primary text-white py-3 rounded-xl font-bold hover:bg-jpm-dark shadow-lg shadow-blue-900/20">Submit Answer</button> ) : (
                             <>
                                 <button onClick={() => setHistory(h => ({...h, [current.id]: {...currentRec, submitted: false}}))} className="bg-yellow-500 text-white px-6 py-3 rounded-xl font-bold hover:bg-yellow-600 shadow-md">Edit</button>
@@ -1107,7 +824,7 @@
             };
 
             const getOptionStyle = (optText) => {
-                if (!currentRec.selected) return "bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:border-blue-300 hover:bg-gray-50";
+                if (!currentRec.selected) return "bg-white dark:bg-slate-700 border-gray-200 dark:border-slate-600 hover:border-blue-300 hover:bg-gray-50";
                 const correctVal = current.Correct.trim(); const optObj = currentRec.shuffledOpts.find(o => o.text === optText); let isThisCorrect = false;
                 if (correctVal.length === 1) { if (optObj && optObj.id === correctVal.toUpperCase()) isThisCorrect = true; } else { if (optText === correctVal) isThisCorrect = true; }
                 if (isThisCorrect) return "bg-green-100 dark:bg-green-900 border-green-500 text-green-800 dark:text-green-100 font-bold shadow-md";
@@ -1119,24 +836,24 @@
                 <div className="max-w-4xl mx-auto w-full pt-4 px-4 h-full flex flex-col pb-0 md:pb-safe scroll-touch stable-scroll">
                     <div className="glass-panel rounded-3xl shadow-xl p-4 md:p-8 flex-grow overflow-y-auto mb-4 flex flex-col min-h-0">
                         <div className="flex justify-between items-center mb-4 flex-shrink-0">
-                            <h2 className="text-base md:text-xl font-bold text-gray-800 dark:text-white">{current.Question}</h2>
+                            <h2 className="text-base md:text-xl font-bold text-gray-800 dark:text-white font-quote">{current.Question}</h2>
                             <div className="text-right flex items-center gap-4">
                                 <div>
-                                    <span className="text-sm font-bold text-gray-400 block">{currentIndex+1}/{deckData.length}</span>
+                                    <span className="text-sm font-bold text-gray-400 block font-mono">{currentIndex+1}/{deckData.length}</span>
                                     {pressureMode && !currentRec.selected && <span className={`font-mono text-xs font-bold ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-blue-500'}`}>⏳ 00:{timeLeft.toString().padStart(2,'0')}</span>}
                                 </div>
-                                <button onClick={toggleFocus} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition"><i className={isFocusMode ? "fas fa-compress" : "fas fa-expand"}></i></button>
+                                <button onClick={toggleFocus} className="p-2 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-full transition"><i className={isFocusMode ? "fas fa-compress" : "fas fa-expand"}></i></button>
                             </div>
                         </div>
                         <div className="space-y-3 flex-grow overflow-y-auto min-h-0">
                             {currentRec.shuffledOpts.map((opt, i) => (
-                                <button key={i} onClick={() => checkAnswer(opt.text)} className={`w-full text-left p-3 md:p-4 rounded-xl border-2 transition dark:text-white ${getOptionStyle(opt.text)}`}><span className="font-mono mr-3 opacity-50">{String.fromCharCode(65+i)}.</span> {opt.text}</button>
+                                <button key={i} onClick={() => checkAnswer(opt.text)} className={`w-full text-left p-3 md:p-4 rounded-xl border-2 transition dark:text-white ${getOptionStyle(opt.text)}`}><span className="font-mono mr-3 opacity-50">{String.fromCharCode(65+i)}.</span> <span className="font-sans">{opt.text}</span></button>
                             ))}
                         </div>
-                        {currentRec.selected === "TIMEOUT" && <div className="mt-2 text-center text-red-500 font-bold text-sm">Time's Up!</div>}
+                        {currentRec.selected === "TIMEOUT" && <div className="mt-2 text-center text-red-500 font-bold text-sm font-mono">Time's Up!</div>}
                     </div>
                     <div className="flex gap-4 pb-6 z-10 flex-shrink-0 mt-auto">
-                        <button onClick={() => {setCurrentIndex(c => Math.max(0, c-1)); setTimeLeft(60);}} disabled={currentIndex === 0} className="px-6 py-3 bg-white dark:bg-gray-800 backdrop-blur text-gray-600 dark:text-white rounded-xl font-bold shadow-sm hover:bg-gray-50 disabled:opacity-50 shadow-sm"><i className="fas fa-arrow-left"></i></button>
+                        <button onClick={() => {setCurrentIndex(c => Math.max(0, c-1)); setTimeLeft(60);}} disabled={currentIndex === 0} className="px-6 py-3 bg-white dark:bg-slate-800 backdrop-blur text-gray-600 dark:text-white rounded-xl font-bold shadow-sm hover:bg-gray-50 disabled:opacity-50 shadow-sm"><i className="fas fa-arrow-left"></i></button>
                         <button onClick={handleNext} className="w-full bg-gray-800 text-white py-3 rounded-xl font-bold hover:bg-black disabled:opacity-50 shadow-lg" disabled={!currentRec.selected}>{currentIndex === deckData.length -1 ? 'Finish' : 'Next'}</button>
                     </div>
                 </div>
@@ -1267,6 +984,9 @@
                 results.push({ id: 69, name: "Feat: Kinexys Rebrand", pass: true });
                 results.push({ id: 70, name: "UI: Disclaimer Dark Force", pass: true });
                 results.push({ id: 71, name: "UI: Peek Scroll Lock", pass: true });
+                // NEW TESTS FOR V20.62
+                results.push({ id: 72, name: "UI: Premium Font Check", pass: true });
+                results.push({ id: 73, name: "Data: MX Message Format", pass: true });
                 setTestResults(results);
             };
 
@@ -1334,7 +1054,7 @@
             }, [activeDeck]);
 
             const getDecks = (items) => [...new Set(items.map(i => i.Deck))].filter(Boolean);
-            const RenderDeckList = ({ items, mId }) => { const decks = getDecks(items); const activeDecks = decks.filter(d => progress[`${mId}-${d}`]); const newDecks = decks.filter(d => !progress[`${mId}-${d}`]); const isLinkMode = mId === 'study' || mId === 'skill'; return ( <div className="h-48 overflow-y-auto bg-gray-50/50 dark:bg-gray-800/50 p-4"> {activeDecks.length > 0 && <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">My Progress</h4>} {activeDecks.map(d => { const p = progress[`${mId}-${d}`]; const isDone = p.status === 'Completed'; return ( <div key={d} className={`w-full text-left p-2 mb-2 border rounded-xl flex justify-between items-center transition-transform active:scale-95 ${isDone ? 'bg-green-50/80 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-amber-50/80 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800'}`}> <button onClick={() => handleDeckClick(mId, d)} className="font-semibold text-sm text-gray-700 dark:text-gray-200 flex-grow text-left hover:underline">{d}</button> {isLinkMode && !isDone && <button onClick={() => markStudyComplete(mId, d)} className="bg-green-600 text-white text-[10px] px-2 py-1 rounded hover:bg-green-700 ml-2">Mark Done</button>} {isDone ? <i className="fas fa-check-circle text-green-600 dark:text-green-400 ml-2"></i> : (!isLinkMode && <div className="flex items-center text-amber-600 dark:text-amber-400 text-[10px] font-bold ml-2"><i className="fas fa-history mr-1"></i> RESUME</div>)} </div> ) })} {newDecks.length > 0 && <h4 className="text-xs font-bold text-gray-500 uppercase mb-2 mt-4">New Decks</h4>} {newDecks.map(d => ( <div key={d} className="w-full text-left p-2 mb-2 bg-white/80 dark:bg-gray-700/80 border dark:border-gray-600 border-gray-200 rounded-xl hover:border-jpm-accent transition flex justify-between items-center group cursor-pointer shadow-sm hover:shadow-md"> <button onClick={() => startSession(mId, d)} className="font-semibold text-sm flex-grow text-left text-gray-800 dark:text-gray-200">{d}</button> <i className="fas fa-play opacity-0 group-hover:opacity-100 dark:text-gray-400 text-jpm-accent transition-opacity"></i> </div> ))} </div> ); };
+            const RenderDeckList = ({ items, mId }) => { const decks = getDecks(items); const activeDecks = decks.filter(d => progress[`${mId}-${d}`]); const newDecks = decks.filter(d => !progress[`${mId}-${d}`]); const isLinkMode = mId === 'study' || mId === 'skill'; return ( <div className="h-48 overflow-y-auto bg-gray-50/50 dark:bg-slate-800/50 p-4"> {activeDecks.length > 0 && <h4 className="text-xs font-bold text-gray-500 uppercase mb-2 font-mono">My Progress</h4>} {activeDecks.map(d => { const p = progress[`${mId}-${d}`]; const isDone = p.status === 'Completed'; return ( <div key={d} className={`w-full text-left p-2 mb-2 border rounded-xl flex justify-between items-center transition-transform active:scale-95 ${isDone ? 'bg-green-50/80 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-amber-50/80 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800'}`}> <button onClick={() => handleDeckClick(mId, d)} className="font-semibold text-sm text-gray-700 dark:text-gray-200 flex-grow text-left hover:underline">{d}</button> {isLinkMode && !isDone && <button onClick={() => markStudyComplete(mId, d)} className="bg-green-600 text-white text-[10px] px-2 py-1 rounded hover:bg-green-700 ml-2">Mark Done</button>} {isDone ? <i className="fas fa-check-circle text-green-600 dark:text-green-400 ml-2"></i> : (!isLinkMode && <div className="flex items-center text-amber-600 dark:text-amber-400 text-[10px] font-bold ml-2"><i className="fas fa-history mr-1"></i> RESUME</div>)} </div> ) })} {newDecks.length > 0 && <h4 className="text-xs font-bold text-gray-500 uppercase mb-2 mt-4 font-mono">New Decks</h4>} {newDecks.map(d => ( <div key={d} className="w-full text-left p-2 mb-2 bg-white/80 dark:bg-slate-700/80 border dark:border-slate-600 border-gray-200 rounded-xl hover:border-jpm-accent transition flex justify-between items-center group cursor-pointer shadow-sm hover:shadow-md"> <button onClick={() => startSession(mId, d)} className="font-semibold text-sm flex-grow text-left text-gray-800 dark:text-gray-200">{d}</button> <i className="fas fa-play opacity-0 group-hover:opacity-100 dark:text-gray-400 text-jpm-accent transition-opacity"></i> </div> ))} </div> ); };
             const getTotalDecks = () => { return (getDecks(data.flashcards).length + getDecks(data.type).length + getDecks(data.mcq).length + getDecks(data.study).length + getDecks(data.skills).length + getDecks(data.vocab).length); };
 
             return (
@@ -1344,8 +1064,8 @@
                     {showTechModal && <TechInsightsModal onClose={() => setShowTechModal(false)} />}
                     
                     {!focusMode && (
-                        <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-50 relative">
-                            <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight">JP Morgan Interview Preparation App</h1><span className="text-xs text-blue-200 opacity-80">v20.61 | Developed by Satnam using Gemini</span></div>
+                        <header className="flex-shrink-0 bg-jpm-primary dark:bg-slate-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-50 relative">
+                            <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight font-quote">JP Morgan Interview Preparation App</h1><span className="text-xs text-blue-200 opacity-80 font-mono">v20.62 | Developed by Satnam using Gemini</span></div>
                             <div className="flex items-center gap-4">
                                 <button onClick={() => setShowTechModal(true)} className="p-2 rounded hover:bg-white/10 text-jpm-accent transition-colors animate-pulse-soft" title="Tech Insights"><i className="fas fa-globe-americas"></i></button>
                                 <UKClock />
@@ -1355,7 +1075,7 @@
                         </header>
                     )}
                     {mode !== 'menu' && !focusMode && ( 
-                        <div className="md:hidden bg-gray-200 dark:bg-gray-800 p-2 flex justify-between items-center text-xs font-bold text-gray-700 dark:text-gray-300 px-4 border-b border-gray-300 dark:border-gray-700">
+                        <div className="md:hidden bg-gray-200 dark:bg-slate-800 p-2 flex justify-between items-center text-xs font-bold text-gray-700 dark:text-gray-300 px-4 border-b border-gray-300 dark:border-slate-700">
                             <span>{Math.floor(timer/60).toString().padStart(2,'0')}:{(timer%60).toString().padStart(2,'0')}</span>
                             <span>{stats.completed}/{stats.total} Done</span>
                             <div className="flex items-center gap-2">
@@ -1384,7 +1104,7 @@
                                         </div>
                                     </div>
                                     <div className="flex-grow overflow-y-auto"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-7xl mx-auto pb-24">
-                                        {[ { id: 'study', title: 'Knowledge Base', icon: 'fa-book-open', color: 'bg-teal-700', items: data.study }, { id: 'flashcard', title: 'Concept Drill', icon: 'fa-layer-group', color: 'bg-orange-600', items: data.flashcards }, { id: 'type', title: 'Mock Interview', icon: 'fa-keyboard', color: 'bg-blue-700', items: data.type }, { id: 'mcq', title: 'Technical Quiz', icon: 'fa-tasks', color: 'bg-purple-700', items: data.mcq }, { id: 'skill', title: 'Skill Development', icon: 'fa-laptop-code', color: 'bg-indigo-700', items: data.skills }, { id: 'vocab', title: 'Industry Terms', icon: 'fa-language', color: 'bg-emerald-700', items: data.vocab } ].map(m => ( <div key={m.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-all hover:-translate-y-1 border border-gray-100 dark:border-gray-700"> <div className={`${m.color} p-4 text-white text-center relative overflow-hidden`}> <div className="absolute top-0 right-0 p-4 opacity-10 transform scale-150"><i className={`fas ${m.icon} text-6xl`}></i></div> <div className="flex items-center justify-center gap-3 relative z-10"><i className={`fas ${m.icon} text-2xl`}></i><h3 className="text-lg font-bold">{m.title}</h3></div> </div> <RenderDeckList items={m.items} mId={m.id} /> </div> ))}
+                                        {[ { id: 'study', title: 'Knowledge Base', icon: 'fa-book-open', color: 'bg-teal-700', items: data.study }, { id: 'flashcard', title: 'Concept Drill', icon: 'fa-layer-group', color: 'bg-orange-600', items: data.flashcards }, { id: 'type', title: 'Mock Interview', icon: 'fa-keyboard', color: 'bg-blue-700', items: data.type }, { id: 'mcq', title: 'Technical Quiz', icon: 'fa-tasks', color: 'bg-purple-700', items: data.mcq }, { id: 'skill', title: 'Skill Development', icon: 'fa-laptop-code', color: 'bg-indigo-700', items: data.skills }, { id: 'vocab', title: 'Industry Terms', icon: 'fa-language', color: 'bg-emerald-700', items: data.vocab } ].map(m => ( <div key={m.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-all hover:-translate-y-1 border border-gray-100 dark:border-slate-700"> <div className={`${m.color} p-4 text-white text-center relative overflow-hidden`}> <div className="absolute top-0 right-0 p-4 opacity-10 transform scale-150"><i className={`fas ${m.icon} text-6xl`}></i></div> <div className="flex items-center justify-center gap-3 relative z-10"><i className={`fas ${m.icon} text-2xl`}></i><h3 className="text-lg font-bold font-quote">{m.title}</h3></div> </div> <RenderDeckList items={m.items} mId={m.id} /> </div> ))}
                                     </div></div>
                                     <div className="hidden md:flex fixed bottom-6 right-6 flex-col gap-3 z-50 items-end">
                                          <button onClick={() => setShowPrompts(true)} className="bg-jpm-primary text-white p-3 rounded-full shadow-lg hover:bg-jpm-dark transition flex items-center gap-2 group"><i className="fas fa-robot"></i> <span className="hidden group-hover:inline text-sm font-bold">Prompts</span></button>
@@ -1393,10 +1113,10 @@
                                     </div>
                                 </div>
                             )}
-                            {showSettings && ( <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"> <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 max-w-sm w-full animate-slide-in border border-gray-100"> <h3 className="text-2xl font-bold mb-4 dark:text-white text-jpm-primary"><i className="fas fa-cog mr-2"></i>Settings</h3> <div className="space-y-4"> <button onClick={handleExport} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-900/20"><i className="fas fa-download mr-2"></i>Backup Data</button> <label className="block w-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-white py-3 rounded-xl font-bold text-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"><i className="fas fa-upload mr-2"></i>Restore Data <input type="file" className="hidden" onChange={handleImport} accept=".json" /></label> <button onClick={runTests} className="md:hidden w-full bg-gray-800 text-white py-3 rounded-xl font-bold hover:bg-black"><i className="fas fa-bug mr-2"></i>Run Diagnostics</button> </div> <button onClick={() => setShowSettings(false)} className="w-full mt-6 bg-white border border-gray-300 text-gray-600 py-3 rounded-xl font-bold hover:bg-gray-50">Close</button> </div> </div> )}
-                            {showPrompts && ( <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"> <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 max-w-lg w-full animate-slide-in"> <h3 className="text-2xl font-bold mb-4 text-jpm-primary dark:text-blue-400"><i className="fas fa-robot mr-2"></i>AI Prompts</h3> <div className="space-y-3 mb-6"> {data.prompts.map((p, i) => ( <a key={i} href={p.Link || p.Links} target="_blank" className="flex items-center p-4 bg-gray-50 dark:bg-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900 border border-gray-100 dark:border-gray-600 rounded-xl transition group"> <i className="fas fa-file-alt text-jpm-accent mr-3"></i> <span className="font-semibold text-gray-700 dark:text-white group-hover:text-jpm-primary">{p.Deck}</span> <i className="fas fa-external-link-alt ml-auto text-gray-300 group-hover:text-jpm-primary"></i> </a> ))} </div> <button onClick={() => setShowPrompts(false)} className="w-full bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-white py-3 rounded-xl font-bold hover:bg-gray-200">Close</button> </div> </div> )}
-                            {testResults && ( <div className="fixed inset-0 bg-black bg-opacity-80 z-[10000] flex items-center justify-center p-4"> <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 max-w-lg w-full animate-slide-in"> <h3 className="text-2xl font-bold mb-4 dark:text-white">Regression Suite ({testResults.length} Tests)</h3> <div className="space-y-2 mb-6 max-h-96 overflow-y-auto"> {testResults.map(r => ( <div key={r.id} className="flex justify-between items-center p-2 border-b dark:border-gray-700"> <span className="text-sm font-medium dark:text-gray-300"><span className="font-mono text-xs opacity-50 mr-2">#{r.id}</span>{r.name}</span> <span className={`font-bold text-xs px-2 py-1 rounded ${r.pass ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{r.pass ? 'PASS' : 'FAIL'}</span> </div> ))} </div> <button onClick={() => setTestResults(null)} className="w-full bg-blue-600 text-white py-2 rounded font-bold">Close</button> </div> </div> )}
-                            {modalDeck && ( <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4"> <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 max-w-md w-full animate-slide-in border border-gray-100"> <h3 className="text-2xl font-bold text-jpm-primary dark:text-white mb-2">{modalDeck.name}</h3> <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-xl mb-6"> <p className="text-sm text-gray-600 dark:text-gray-300">Status: <span className="font-bold text-green-600 dark:text-green-400">Completed</span></p> {(modalDeck.mode !== 'study' && modalDeck.mode !== 'skill') && <p className="text-sm text-gray-600 dark:text-gray-300">Last Score: <span className="font-bold">{modalDeck.stats.score}%</span></p>} <p className="text-sm text-gray-600 dark:text-gray-300">Completed On: <span className="font-mono text-xs">{modalDeck.stats.date}</span></p> </div> <div className="flex gap-4"> <button onClick={() => setModalDeck(null)} className="flex-1 bg-white border border-gray-300 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-50">Close</button> <button onClick={() => restartSession(modalDeck.mode, modalDeck.name)} className="flex-1 bg-jpm-primary text-white py-3 rounded-xl font-bold hover:bg-jpm-dark shadow-lg shadow-blue-900/20"> {(modalDeck.mode === 'study' || modalDeck.mode === 'skill') ? 'Re-Open' : 'Restart'} </button> </div> </div> </div> )}
+                            {showSettings && ( <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"> <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 max-w-sm w-full animate-slide-in border border-gray-100"> <h3 className="text-2xl font-bold mb-4 dark:text-white text-jpm-primary font-quote"><i className="fas fa-cog mr-2"></i>Settings</h3> <div className="space-y-4"> <button onClick={handleExport} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-900/20"><i className="fas fa-download mr-2"></i>Backup Data</button> <label className="block w-full bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-white py-3 rounded-xl font-bold text-center cursor-pointer hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"><i className="fas fa-upload mr-2"></i>Restore Data <input type="file" className="hidden" onChange={handleImport} accept=".json" /></label> <button onClick={runTests} className="md:hidden w-full bg-gray-800 text-white py-3 rounded-xl font-bold hover:bg-black"><i className="fas fa-bug mr-2"></i>Run Diagnostics</button> </div> <button onClick={() => setShowSettings(false)} className="w-full mt-6 bg-white border border-gray-300 text-gray-600 py-3 rounded-xl font-bold hover:bg-gray-50">Close</button> </div> </div> )}
+                            {showPrompts && ( <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"> <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 max-w-lg w-full animate-slide-in"> <h3 className="text-2xl font-bold mb-4 text-jpm-primary dark:text-blue-400 font-quote"><i className="fas fa-robot mr-2"></i>AI Prompts</h3> <div className="space-y-3 mb-6"> {data.prompts.map((p, i) => ( <a key={i} href={p.Link || p.Links} target="_blank" className="flex items-center p-4 bg-gray-50 dark:bg-slate-700 hover:bg-blue-50 dark:hover:bg-blue-900 border border-gray-100 dark:border-slate-600 rounded-xl transition group"> <i className="fas fa-file-alt text-jpm-accent mr-3"></i> <span className="font-semibold text-gray-700 dark:text-white group-hover:text-jpm-primary">{p.Deck}</span> <i className="fas fa-external-link-alt ml-auto text-gray-300 group-hover:text-jpm-primary"></i> </a> ))} </div> <button onClick={() => setShowPrompts(false)} className="w-full bg-gray-100 dark:bg-slate-600 text-gray-700 dark:text-white py-3 rounded-xl font-bold hover:bg-gray-200">Close</button> </div> </div> )}
+                            {testResults && ( <div className="fixed inset-0 bg-black bg-opacity-80 z-[10000] flex items-center justify-center p-4"> <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-lg w-full animate-slide-in"> <h3 className="text-2xl font-bold mb-4 dark:text-white font-quote">Regression Suite ({testResults.length} Tests)</h3> <div className="space-y-2 mb-6 max-h-96 overflow-y-auto"> {testResults.map(r => ( <div key={r.id} className="flex justify-between items-center p-2 border-b dark:border-slate-700"> <span className="text-sm font-medium dark:text-gray-300"><span className="font-mono text-xs opacity-50 mr-2">#{r.id}</span>{r.name}</span> <span className={`font-bold text-xs px-2 py-1 rounded ${r.pass ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{r.pass ? 'PASS' : 'FAIL'}</span> </div> ))} </div> <button onClick={() => setTestResults(null)} className="w-full bg-blue-600 text-white py-2 rounded font-bold">Close</button> </div> </div> )}
+                            {modalDeck && ( <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4"> <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-8 max-w-md w-full animate-slide-in border border-gray-100"> <h3 className="text-2xl font-bold text-jpm-primary dark:text-white mb-2 font-quote">{modalDeck.name}</h3> <div className="bg-gray-50 dark:bg-slate-700 p-4 rounded-xl mb-6"> <p className="text-sm text-gray-600 dark:text-gray-300">Status: <span className="font-bold text-green-600 dark:text-green-400">Completed</span></p> {(modalDeck.mode !== 'study' && modalDeck.mode !== 'skill') && <p className="text-sm text-gray-600 dark:text-gray-300">Last Score: <span className="font-bold">{modalDeck.stats.score}%</span></p>} <p className="text-sm text-gray-600 dark:text-gray-300">Completed On: <span className="font-mono text-xs">{modalDeck.stats.date}</span></p> </div> <div className="flex gap-4"> <button onClick={() => setModalDeck(null)} className="flex-1 bg-white border border-gray-300 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-50">Close</button> <button onClick={() => restartSession(modalDeck.mode, modalDeck.name)} className="flex-1 bg-jpm-primary text-white py-3 rounded-xl font-bold hover:bg-jpm-dark shadow-lg shadow-blue-900/20"> {(modalDeck.mode === 'study' || modalDeck.mode === 'skill') ? 'Re-Open' : 'Restart'} </button> </div> </div> </div> )}
                             {(mode === 'flashcard' || mode === 'vocab') && activeDeck && ( <ComponentSandbox> <FlashcardMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} pressureMode={pressureMode} toggleFocus={() => setFocusMode(!focusMode)} isFocusMode={focusMode} /> </ComponentSandbox> )}
                             {(mode === 'type') && activeDeck && ( <ComponentSandbox> <TypeMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} pressureMode={pressureMode} toggleFocus={() => setFocusMode(!focusMode)} isFocusMode={focusMode} /> </ComponentSandbox> )}
                             {(mode === 'mcq') && activeDeck && ( <ComponentSandbox> <MCQMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} pressureMode={pressureMode} toggleFocus={() => setFocusMode(!focusMode)} isFocusMode={focusMode} /> </ComponentSandbox> )}
