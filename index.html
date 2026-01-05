@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Prep v20.48 (Hotfix)</title>
+    <title>JPM Prep v20.49 (Fixed & Stable)</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -58,7 +58,7 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
-        // --- MODULE 1: UTILS & LOGIC ---
+        // --- MODULE 1: UTILS ---
         const parseCSV = (text) => {
             if (!text || typeof text !== 'string') return [];
             if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1); 
@@ -292,6 +292,7 @@
             const [currentIndex, setCurrentIndex] = useState(0);
             const [history, setHistory] = useState({}); 
             const [timeLeft, setTimeLeft] = useState(60);
+            const inputRef = useRef(""); 
             const [isStarMode, setIsStarMode] = useState(false); 
             const [starData, setStarData] = useState({ s: '', t: '', a: '', r: '' }); 
             const [input, setInput] = useState("");
@@ -565,9 +566,10 @@
                 <GlobalErrorBoundary>
                     <div className="flex flex-col h-dvh bg-jpm-surface dark:bg-gray-900 transition-colors duration-300">
                         <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-50 relative">
-                            <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight">JPM Prep App</h1><span className="text-xs text-blue-200 opacity-80">v20.48 (Stable)</span></div>
+                            <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight">JPM Prep App</h1><span className="text-xs text-blue-200 opacity-80">v20.49 (Fixed & Stable)</span></div>
                             <div className="flex items-center gap-4"><UKClock /><button onClick={()=>setDarkMode(!darkMode)} className="p-2"><i className={`fas ${darkMode?'fa-moon':'fa-sun'}`}></i></button>{mode!=='menu'&&<div className="flex gap-2"><button onClick={()=>startSession(mode,activeDeck.name)} className="bg-blue-600 px-3 py-2 rounded font-bold"><i className="fas fa-sync"></i></button><button onClick={()=>window.dispatchEvent(new CustomEvent('jpm-trigger-end'))} className="bg-red-500 px-4 py-2 rounded font-bold">End</button></div>}</div>
                         </header>
+                        
                         <div className="flex flex-grow overflow-hidden relative">
                             <Dashboard active={mode !== 'menu'} stats={stats} timer={timer} progressData={progress} streak={streak} totalDecks={0} />
                             <main className={`flex-grow overflow-y-auto transition-all duration-300 relative ${mode!=='menu'?'md:ml-64':''} scroll-touch stable-scroll pb-16 md:pb-safe`}>
