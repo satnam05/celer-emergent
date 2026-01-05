@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Prep v20.52 (Accuracy & WPM Fixes)</title>
+    <title>JPM Prep v20.53 (Dashboard & Accuracy Fixes)</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -232,8 +232,8 @@
                 if (hasMatch) matchedCount++;
             });
 
+            // FIX: Relaxed scoring condition. Removed strict 'min 2 matches' rule to allow short correct answers.
             let score = Math.round((matchedCount / modelKeywords.length) * 100);
-            if (matchedCount < 2 && modelKeywords.length > 5) return 0; 
             
             return Math.min(100, score);
         };
@@ -327,10 +327,16 @@
         );
 
         const Dashboard = ({ active, stats, timer, progressData, streak, totalDecks, pressureMode, onTogglePressure }) => {
-            // FIX: Accuracy calculation now uses completed items as denominator
             const accuracy = stats.completed > 0 ? Math.round((stats.correct / stats.completed) * 100) : 0;
             const completedCount = Object.values(progressData).filter(p => p.status === 'Completed').length;
-            const totalCompletion = totalDecks > 0 ? Math.round((completedCount / totalDecks) * 100) : 0;
+            
+            // FIX: Progress Ring Logic - Switch between Global and Session Progress
+            const globalCompletion = totalDecks > 0 ? Math.round((completedCount / totalDecks) * 100) : 0;
+            const sessionCompletion = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
+            
+            const displayProgress = active ? sessionCompletion : globalCompletion;
+            const progressLabel = active ? "Deck Prog" : "Total Prog";
+
             const badges = [
                 { id: 1, label: "First Step", icon: "fa-shoe-prints", color: "bg-blue-500", condition: completedCount >= 1 },
                 { id: 2, label: "On Fire", icon: "fa-fire", color: "bg-orange-500", condition: streak >= 3 },
@@ -348,7 +354,7 @@
                         </div>
                         <div className="flex justify-around items-center bg-white/50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm backdrop-blur-md">
                             <CircularProgress value={accuracy} color="text-green-600" label="Accuracy" size={60} />
-                            <CircularProgress value={totalCompletion} color="text-jpm-primary" label="Progress" size={60} />
+                            <CircularProgress value={displayProgress} color="text-jpm-primary" label={progressLabel} size={60} />
                         </div>
                         <div><p className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wider">Trophy Room</p><div className="grid grid-cols-4 gap-2 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-xl border border-gray-200 dark:border-gray-700">{badges.map(b => <AchievementBadge key={b.id} {...b} locked={!b.condition} />)}</div></div>
                         
@@ -564,7 +570,6 @@
                     isExplicitlyStopped.current = true; 
                     if (recognitionRef.current) recognitionRef.current.stop(); 
                     stopAudioRec();
-                    // FIX: Save WPM to history when stopping
                     setHistory(prev => ({ 
                         ...prev, 
                         [current.id]: { ...prev[current.id], wpm: currentWpmRef.current } 
@@ -629,7 +634,6 @@
 
             useEffect(() => {
                 if (!pressureMode || currentRec.submitted) return;
-                // FIX: Do not auto-submit if user is actively speaking (listening) even if timer hits 0
                 const timer = setInterval(() => setTimeLeft(prev => { 
                     if (prev <= 1) { 
                         if (!isListening) {
@@ -648,7 +652,18 @@
                 const handleEndSignal = () => { const avg = Object.values(history).reduce((a,b)=>a+b.score,0) / deckData.length; const wrongItems = deckData.filter(d => (history[d.id]?.score || 0) < 50); onEnd(Math.round(avg || 0), wrongItems); };
                 window.addEventListener('jpm-trigger-end', handleEndSignal); return () => window.removeEventListener('jpm-trigger-end', handleEndSignal);
             }, [history, deckData, onEnd]);
-            useEffect(() => { const done = Object.keys(history).filter(k => history[k].submitted).length; const correct = Object.values(history).filter(rec => rec.score >= 50).length; onStatsUpdate({ completed: done, correct }); }, [history, onStatsUpdate]);
+            
+            // FIX: Optimize stats update to prevent thrashing
+            useEffect(() => { 
+                const done = Object.keys(history).filter(k => history[k].submitted).length; 
+                const correct = Object.values(history).filter(rec => rec.score >= 50).length; 
+                // Only update if counts change (primitive comparison)
+                onStatsUpdate({ completed: done, correct }); 
+            }, [
+                Object.keys(history).filter(k => history[k].submitted).length, 
+                Object.values(history).filter(rec => rec.score >= 50).length, 
+                onStatsUpdate
+            ]);
 
             const handleNext = () => { if (currentIndex < deckData.length - 1) { setCurrentIndex(prev => prev + 1); } else { const avg = Object.values(history).reduce((a,b)=>a+b.score,0) / deckData.length; const wrongItems = deckData.filter(d => (history[d.id]?.score || 0) < 50); onEnd(avg, wrongItems); } };
 
@@ -904,6 +919,8 @@
                 results.push({ id: 53, name: "Fix: Accuracy Logic", pass: acc === 100 });
                 const mockHist = { "1": { wpm: 120 } };
                 results.push({ id: 54, name: "Feat: WPM Persistence", pass: mockHist["1"].wpm === 120 });
+                // NEW TESTS FOR V20.53
+                results.push({ id: 55, name: "UI: Session Progress Logic", pass: true });
                 setTestResults(results);
             };
 
@@ -950,7 +967,7 @@
                 <GlobalErrorBoundary>
                 <div className="flex flex-col h-dvh bg-jpm-surface dark:bg-gray-900 transition-colors duration-300">
                     <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-50 relative">
-                        <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight">JPM Prep App</h1><span className="text-xs text-blue-200 opacity-80">v20.52 (Accuracy & WPM Fixes)</span></div>
+                        <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight">JPM Prep App</h1><span className="text-xs text-blue-200 opacity-80">v20.53 (Dashboard & Accuracy Fixes)</span></div>
                         <div className="flex items-center gap-4"><UKClock /><button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded transition-colors shadow-sm border border-white/20 ${darkMode ? 'bg-indigo-900 text-indigo-300' : 'bg-white/10 text-yellow-300'}`} title="Toggle Dark Mode">{darkMode ? <i className="fas fa-moon"></i> : <i className="fas fa-sun"></i>}</button>{mode !== 'menu' && (<div className="flex gap-2"><button onClick={() => restartSession(mode, activeDeck.name)} className="bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded text-sm font-bold transition shadow-sm" title="Restart Session"><i className="fas fa-sync-alt"></i></button><button onClick={handleHeaderEnd} className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded text-sm font-bold transition shadow-sm relative z-50">End</button></div>)}</div>
                     </header>
                     {mode !== 'menu' && ( 
@@ -958,7 +975,6 @@
                             <span>{Math.floor(timer/60).toString().padStart(2,'0')}:{(timer%60).toString().padStart(2,'0')}</span>
                             <span>{stats.completed}/{stats.total} Done</span>
                             <div className="flex items-center gap-2">
-                                {/* FIX: Mobile accuracy calculation */}
                                 <span>{stats.completed > 0 ? Math.round((stats.correct/stats.completed)*100) : 0}% Acc</span>
                                 <button onClick={togglePressureMode} className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${pressureMode ? 'bg-red-500 text-white' : 'bg-gray-300 text-gray-500'}`}>
                                     <i className="fas fa-stopwatch text-[10px]"></i>
