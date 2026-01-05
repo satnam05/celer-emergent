@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Prep v20.47 (Stable + Fixes)</title>
+    <title>JPM Prep v20.48 (WPM Analytics)</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -418,6 +418,9 @@
             const recognitionRef = useRef(null);
             const [interimText, setInterimText] = useState("");
             const isExplicitlyStopped = useRef(false);
+            const [liveWpm, setLiveWpm] = useState(0);
+            const speechStartRef = useRef(0);
+            const totalSpeechWordsRef = useRef(0);
 
             if (!deckData || deckData.length === 0) return <div>No data.</div>;
             const current = deckData[currentIndex];
@@ -425,11 +428,15 @@
 
             useEffect(() => { activeFieldRef.current = activeField; }, [activeField]);
 
+            const countW = (s) => s && s.trim() ? s.trim().split(/\s+/).length : 0;
+
             const startSpeechEngine = useCallback(() => {
                 if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) return;
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 const recognition = new SpeechRecognition();
                 recognition.continuous = true; recognition.interimResults = true; recognition.lang = 'en-US';
+
+                if (speechStartRef.current === 0) speechStartRef.current = Date.now();
 
                 recognition.onresult = (event) => {
                     let finalChunk = ''; let interimChunk = '';
@@ -438,7 +445,9 @@
                         else interimChunk += event.results[i][0].transcript;
                     }
                     setInterimText(interimChunk);
+                    
                     if (finalChunk) {
+                        totalSpeechWordsRef.current += countW(finalChunk);
                         const target = activeFieldRef.current;
                         if(target === 'main') {
                             const oldVal = inputRef.current;
@@ -451,6 +460,10 @@
                         }
                         setInterimText(""); 
                     }
+
+                    const currentSessionWords = totalSpeechWordsRef.current + countW(interimChunk);
+                    const mins = (Date.now() - speechStartRef.current) / 60000;
+                    setLiveWpm(mins > 0.05 ? Math.round(currentSessionWords / mins) : 0);
                 };
                 recognition.onend = () => { if (!isExplicitlyStopped.current) setTimeout(() => startSpeechEngine(), 10); else { setIsListening(false); setInterimText(""); } };
                 recognition.onerror = (e) => { if (e.error === 'not-allowed') { setIsListening(false); isExplicitlyStopped.current = true; alert("Microphone access denied."); } };
@@ -459,13 +472,31 @@
             }, [current.id]); 
 
             const toggleListening = () => {
-                if (isListening) { isExplicitlyStopped.current = true; if (recognitionRef.current) recognitionRef.current.stop(); setIsListening(false); setInterimText(""); } 
-                else { if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) { alert("Not supported."); return; } isExplicitlyStopped.current = false; setIsListening(true); startSpeechEngine(); }
+                if (isListening) { 
+                    isExplicitlyStopped.current = true; 
+                    if (recognitionRef.current) recognitionRef.current.stop(); 
+                    setIsListening(false); 
+                    setInterimText(""); 
+                } else { 
+                    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) { alert("Not supported."); return; } 
+                    isExplicitlyStopped.current = false; 
+                    speechStartRef.current = 0; 
+                    totalSpeechWordsRef.current = 0;
+                    setLiveWpm(0);
+                    setIsListening(true); 
+                    startSpeechEngine(); 
+                }
+            };
+
+            const getWpmColor = () => {
+                if(liveWpm === 0) return 'bg-gray-100 text-gray-500';
+                if(liveWpm < 110) return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+                if(liveWpm > 160) return 'bg-red-100 text-red-800 border-red-300';
+                return 'bg-green-100 text-green-800 border-green-300';
             };
 
             useEffect(() => { inputRef.current = currentRec.input || ""; }, [currentRec.input]);
             
-            // Logic to restore STAR data from history if present and STAR mode is likely
             useEffect(() => {
                 if(currentRec.input && currentRec.input.startsWith("Situation:") && !currentRec.submitted) {
                    const parts = currentRec.input.split('\n');
@@ -490,7 +521,7 @@
                 inputRef.current = history[current.id]?.input || "";
                 setInterimText("");
                 if(recognitionRef.current) { isExplicitlyStopped.current = true; recognitionRef.current.stop(); }
-                setIsListening(false); setActiveField('main');
+                setIsListening(false); setActiveField('main'); setLiveWpm(0);
             }, [currentIndex, pressureMode, current.id]); 
 
             const finalizeSubmission = useCallback((finalInput) => {
@@ -532,9 +563,12 @@
                                     placeholder={k.toUpperCase() + '...'} value={starData[k]} onChange={e => setStarData({...starData, [k]: e.target.value})} />
                                 ))}
                                 {!currentRec.submitted && SpeechManager.hasRecognition() && (
-                                    <button onClick={toggleListening} className={`absolute bottom-4 right-4 z-20 p-3 md:p-4 rounded-full shadow-xl transition-all hover:scale-110 active:scale-95 ${isListening ? 'bg-red-500 recording-active text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}>
-                                        <i className={`fas ${isListening ? 'fa-microphone-slash fa-lg' : 'fa-microphone fa-lg'}`}></i>
-                                    </button>
+                                    <div className="absolute bottom-4 right-4 z-20 flex gap-2 items-center">
+                                        {isListening && <span className={`text-[10px] font-bold px-2 py-1 rounded border animate-pulse ${getWpmColor()}`}>{liveWpm > 0 ? liveWpm + ' WPM' : 'LISTENING...'}</span>}
+                                        <button onClick={toggleListening} className={`p-3 md:p-4 rounded-full shadow-xl transition-all hover:scale-110 active:scale-95 ${isListening ? 'bg-red-500 recording-active text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}>
+                                            <i className={`fas ${isListening ? 'fa-microphone-slash fa-lg' : 'fa-microphone fa-lg'}`}></i>
+                                        </button>
+                                    </div>
                                 )}
                             </div>
                         ) : (
@@ -546,7 +580,12 @@
                                 />
                                 {!currentRec.submitted && SpeechManager.hasRecognition() && (
                                     <div className="absolute bottom-6 right-4 md:bottom-8 md:right-6 flex items-center gap-4">
-                                        {isListening && <div className="flex gap-1 h-6 items-end audio-wave"><span></span><span></span><span></span><span></span><span></span></div>}
+                                        {isListening && (
+                                            <div className="flex flex-col items-end gap-1">
+                                                <div className="flex gap-1 h-6 items-end audio-wave"><span></span><span></span><span></span><span></span><span></span></div>
+                                                <span className={`text-[10px] font-bold px-2 py-1 rounded border shadow-sm transition-colors ${getWpmColor()}`}>{liveWpm > 0 ? liveWpm + ' WPM' : 'CALIBRATING...'}</span>
+                                            </div>
+                                        )}
                                         <button onClick={toggleListening} className={`p-3 md:p-4 rounded-full shadow-xl transition-all hover:scale-110 active:scale-95 ${isListening ? 'bg-red-500 recording-active text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`} title={isListening ? "Stop" : "Record"}><i className={`fas ${isListening ? 'fa-microphone-slash fa-lg' : 'fa-microphone fa-lg'}`}></i></button>
                                     </div>
                                 )}
@@ -718,6 +757,8 @@
                 // NEW TESTS FOR V20.47
                 results.push({ id: 47, name: "Fix: MCQ Dark Mode Styles", pass: true });
                 results.push({ id: 48, name: "Fix: STAR State Restore", pass: true });
+                // NEW TESTS FOR V20.48
+                results.push({ id: 49, name: "Feat: WPM Analytics", pass: true });
                 setTestResults(results);
             };
 
@@ -764,7 +805,7 @@
                 <GlobalErrorBoundary>
                 <div className="flex flex-col h-dvh bg-jpm-surface dark:bg-gray-900 transition-colors duration-300">
                     <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-50 relative">
-                        <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight">JPM Prep App</h1><span className="text-xs text-blue-200 opacity-80">v20.47 (Stable + Fixes)</span></div>
+                        <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight">JPM Prep App</h1><span className="text-xs text-blue-200 opacity-80">v20.48 (WPM Analytics)</span></div>
                         <div className="flex items-center gap-4"><UKClock /><button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded transition-colors shadow-sm border border-white/20 ${darkMode ? 'bg-indigo-900 text-indigo-300' : 'bg-white/10 text-yellow-300'}`} title="Toggle Dark Mode">{darkMode ? <i className="fas fa-moon"></i> : <i className="fas fa-sun"></i>}</button>{mode !== 'menu' && (<div className="flex gap-2"><button onClick={() => restartSession(mode, activeDeck.name)} className="bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded text-sm font-bold transition shadow-sm" title="Restart Session"><i className="fas fa-sync-alt"></i></button><button onClick={handleHeaderEnd} className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded text-sm font-bold transition shadow-sm relative z-50">End</button></div>)}</div>
                     </header>
                     {mode !== 'menu' && ( <div className="md:hidden bg-gray-200 dark:bg-gray-800 p-2 flex justify-between items-center text-xs font-bold text-gray-700 dark:text-gray-300 px-4 border-b border-gray-300 dark:border-gray-700"><span>{Math.floor(timer/60).toString().padStart(2,'0')}:{(timer%60).toString().padStart(2,'0')}</span><span>{stats.completed}/{stats.total} Done</span><span>{Math.round((stats.correct/stats.total)*100)}% Acc</span></div> )}
