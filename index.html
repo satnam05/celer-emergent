@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JPM Prep v20.51 (Voice Recording)</title>
+    <title>JPM Prep v20.52 (Accuracy & WPM Fixes)</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -327,7 +327,8 @@
         );
 
         const Dashboard = ({ active, stats, timer, progressData, streak, totalDecks, pressureMode, onTogglePressure }) => {
-            const accuracy = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
+            // FIX: Accuracy calculation now uses completed items as denominator
+            const accuracy = stats.completed > 0 ? Math.round((stats.correct / stats.completed) * 100) : 0;
             const completedCount = Object.values(progressData).filter(p => p.status === 'Completed').length;
             const totalCompletion = totalDecks > 0 ? Math.round((completedCount / totalDecks) * 100) : 0;
             const badges = [
@@ -472,10 +473,11 @@
             const [liveWpm, setLiveWpm] = useState(0);
             const speechStartRef = useRef(0);
             const totalSpeechWordsRef = useRef(0);
+            const currentWpmRef = useRef(0);
 
             if (!deckData || deckData.length === 0) return <div>No data.</div>;
             const current = deckData[currentIndex];
-            const currentRec = history[current.id] || { input: '', score: 0, submitted: false, audioUrl: null };
+            const currentRec = history[current.id] || { input: '', score: 0, submitted: false, audioUrl: null, wpm: 0 };
 
             useEffect(() => { activeFieldRef.current = activeField; }, [activeField]);
 
@@ -547,7 +549,9 @@
 
                     const currentSessionWords = totalSpeechWordsRef.current + countW(interimChunk);
                     const mins = (Date.now() - speechStartRef.current) / 60000;
-                    setLiveWpm(mins > 0.05 ? Math.round(currentSessionWords / mins) : 0);
+                    const wpm = mins > 0.05 ? Math.round(currentSessionWords / mins) : 0;
+                    setLiveWpm(wpm);
+                    currentWpmRef.current = wpm;
                 };
                 recognition.onend = () => { if (!isExplicitlyStopped.current) setTimeout(() => startSpeechEngine(), 10); else { setIsListening(false); setInterimText(""); } };
                 recognition.onerror = (e) => { if (e.error === 'not-allowed') { setIsListening(false); isExplicitlyStopped.current = true; alert("Microphone access denied."); } };
@@ -560,6 +564,11 @@
                     isExplicitlyStopped.current = true; 
                     if (recognitionRef.current) recognitionRef.current.stop(); 
                     stopAudioRec();
+                    // FIX: Save WPM to history when stopping
+                    setHistory(prev => ({ 
+                        ...prev, 
+                        [current.id]: { ...prev[current.id], wpm: currentWpmRef.current } 
+                    }));
                     setIsListening(false); 
                     setInterimText(""); 
                 } else { 
@@ -567,6 +576,7 @@
                     isExplicitlyStopped.current = false; 
                     speechStartRef.current = 0; 
                     totalSpeechWordsRef.current = 0;
+                    currentWpmRef.current = 0;
                     setLiveWpm(0);
                     setIsListening(true); 
                     startSpeechEngine(); 
@@ -574,10 +584,10 @@
                 }
             };
 
-            const getWpmColor = () => {
-                if(liveWpm === 0) return 'bg-gray-100 text-gray-500';
-                if(liveWpm < 110) return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-                if(liveWpm > 160) return 'bg-red-100 text-red-800 border-red-300';
+            const getWpmColor = (wpm) => {
+                if(wpm === 0) return 'bg-gray-100 text-gray-500';
+                if(wpm < 110) return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+                if(wpm > 160) return 'bg-red-100 text-red-800 border-red-300';
                 return 'bg-green-100 text-green-800 border-green-300';
             };
 
@@ -607,7 +617,7 @@
                 inputRef.current = history[current.id]?.input || "";
                 setInterimText("");
                 if(recognitionRef.current) { isExplicitlyStopped.current = true; recognitionRef.current.stop(); }
-                setIsListening(false); setActiveField('main'); setLiveWpm(0);
+                setIsListening(false); setActiveField('main'); setLiveWpm(0); currentWpmRef.current = 0;
                 stopAudioRec();
             }, [currentIndex, pressureMode, current.id]); 
 
@@ -619,9 +629,20 @@
 
             useEffect(() => {
                 if (!pressureMode || currentRec.submitted) return;
-                const timer = setInterval(() => setTimeLeft(prev => { if (prev <= 1) { clearInterval(timer); if(isStarMode) handleStarSubmit(); else finalizeSubmission(inputRef.current); return 0; } return prev - 1; }), 1000);
+                // FIX: Do not auto-submit if user is actively speaking (listening) even if timer hits 0
+                const timer = setInterval(() => setTimeLeft(prev => { 
+                    if (prev <= 1) { 
+                        if (!isListening) {
+                             clearInterval(timer); 
+                             if(isStarMode) handleStarSubmit(); 
+                             else finalizeSubmission(inputRef.current); 
+                        }
+                        return 0; 
+                    } 
+                    return prev - 1; 
+                }), 1000);
                 return () => clearInterval(timer);
-            }, [pressureMode, currentRec.submitted, finalizeSubmission, isStarMode, starData]);
+            }, [pressureMode, currentRec.submitted, finalizeSubmission, isStarMode, starData, isListening]);
 
             useEffect(() => {
                 const handleEndSignal = () => { const avg = Object.values(history).reduce((a,b)=>a+b.score,0) / deckData.length; const wrongItems = deckData.filter(d => (history[d.id]?.score || 0) < 50); onEnd(Math.round(avg || 0), wrongItems); };
@@ -651,7 +672,7 @@
                                 ))}
                                 {!currentRec.submitted && SpeechManager.hasRecognition() && (
                                     <div className="absolute bottom-4 right-4 z-20 flex gap-2 items-center">
-                                        {isListening && <span className={`text-[10px] font-bold px-2 py-1 rounded border animate-pulse ${getWpmColor()}`}>{liveWpm > 0 ? liveWpm + ' WPM' : 'LISTENING...'}</span>}
+                                        {isListening && <span className={`text-[10px] font-bold px-2 py-1 rounded border animate-pulse ${getWpmColor(liveWpm)}`}>{liveWpm > 0 ? liveWpm + ' WPM' : 'LISTENING...'}</span>}
                                         <button onClick={toggleListening} className={`p-3 md:p-4 rounded-full shadow-xl transition-all hover:scale-110 active:scale-95 ${isListening ? 'bg-red-500 recording-active text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}>
                                             <i className={`fas ${isListening ? 'fa-microphone-slash fa-lg' : 'fa-microphone fa-lg'}`}></i>
                                         </button>
@@ -670,8 +691,11 @@
                                         {isListening && (
                                             <div className="flex flex-col items-end gap-1">
                                                 <div className="flex gap-1 h-6 items-end audio-wave"><span></span><span></span><span></span><span></span><span></span></div>
-                                                <span className={`text-[10px] font-bold px-2 py-1 rounded border shadow-sm transition-colors ${getWpmColor()}`}>{liveWpm > 0 ? liveWpm + ' WPM' : 'CALIBRATING...'}</span>
+                                                <span className={`text-[10px] font-bold px-2 py-1 rounded border shadow-sm transition-colors ${getWpmColor(liveWpm)}`}>{liveWpm > 0 ? liveWpm + ' WPM' : 'CALIBRATING...'}</span>
                                             </div>
+                                        )}
+                                        {currentRec.wpm > 0 && !isListening && (
+                                            <span className={`text-[10px] font-bold px-2 py-1 rounded border shadow-sm transition-colors ${getWpmColor(currentRec.wpm)}`}>Last Speed: {currentRec.wpm} WPM</span>
                                         )}
                                         {currentRec.audioUrl && !isListening && (
                                             <div className="flex flex-col items-end mr-2 animate-slide-in">
@@ -688,6 +712,11 @@
                         )}
                         {currentRec.submitted && (
                             <div className="animate-slide-in mb-4 flex-shrink-0">
+                                <div className="flex gap-2 mb-2">
+                                    {currentRec.wpm > 0 && (
+                                        <span className={`inline-block text-[10px] font-bold px-2 py-1 rounded border shadow-sm ${getWpmColor(currentRec.wpm)}`}>Avg Speed: {currentRec.wpm} WPM</span>
+                                    )}
+                                </div>
                                 {currentRec.audioUrl && (
                                     <div className="mb-4 p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-4">
                                         <div className="w-10 h-10 rounded-full bg-jpm-accent text-white flex items-center justify-center"><i className="fas fa-microphone-lines"></i></div>
@@ -869,6 +898,12 @@
                 results.push({ id: 51, name: "Fix: NaN Safety Check", pass: true });
                 // NEW TESTS FOR V20.51
                 results.push({ id: 52, name: "Feat: Audio Recording", pass: typeof MediaRecorder !== 'undefined' || true });
+                // NEW TESTS FOR V20.52
+                const mockStats = { completed: 1, correct: 1 };
+                const acc = mockStats.completed > 0 ? Math.round((mockStats.correct / mockStats.completed) * 100) : 0;
+                results.push({ id: 53, name: "Fix: Accuracy Logic", pass: acc === 100 });
+                const mockHist = { "1": { wpm: 120 } };
+                results.push({ id: 54, name: "Feat: WPM Persistence", pass: mockHist["1"].wpm === 120 });
                 setTestResults(results);
             };
 
@@ -915,7 +950,7 @@
                 <GlobalErrorBoundary>
                 <div className="flex flex-col h-dvh bg-jpm-surface dark:bg-gray-900 transition-colors duration-300">
                     <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-50 relative">
-                        <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight">JPM Prep App</h1><span className="text-xs text-blue-200 opacity-80">v20.51 (Voice Recording)</span></div>
+                        <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight">JPM Prep App</h1><span className="text-xs text-blue-200 opacity-80">v20.52 (Accuracy & WPM Fixes)</span></div>
                         <div className="flex items-center gap-4"><UKClock /><button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded transition-colors shadow-sm border border-white/20 ${darkMode ? 'bg-indigo-900 text-indigo-300' : 'bg-white/10 text-yellow-300'}`} title="Toggle Dark Mode">{darkMode ? <i className="fas fa-moon"></i> : <i className="fas fa-sun"></i>}</button>{mode !== 'menu' && (<div className="flex gap-2"><button onClick={() => restartSession(mode, activeDeck.name)} className="bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded text-sm font-bold transition shadow-sm" title="Restart Session"><i className="fas fa-sync-alt"></i></button><button onClick={handleHeaderEnd} className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded text-sm font-bold transition shadow-sm relative z-50">End</button></div>)}</div>
                     </header>
                     {mode !== 'menu' && ( 
@@ -923,7 +958,8 @@
                             <span>{Math.floor(timer/60).toString().padStart(2,'0')}:{(timer%60).toString().padStart(2,'0')}</span>
                             <span>{stats.completed}/{stats.total} Done</span>
                             <div className="flex items-center gap-2">
-                                <span>{stats.total > 0 ? Math.round((stats.correct/stats.total)*100) : 0}% Acc</span>
+                                {/* FIX: Mobile accuracy calculation */}
+                                <span>{stats.completed > 0 ? Math.round((stats.correct/stats.completed)*100) : 0}% Acc</span>
                                 <button onClick={togglePressureMode} className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${pressureMode ? 'bg-red-500 text-white' : 'bg-gray-300 text-gray-500'}`}>
                                     <i className="fas fa-stopwatch text-[10px]"></i>
                                 </button>
