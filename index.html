@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JP Morgan Interview Preparation App v20.57</title>
+    <title>JP Morgan Interview Preparation App v20.58</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -399,6 +399,12 @@
             const [results, setResults] = useState({}); 
             const [maxIndex, setMaxIndex] = useState(0); 
             const [timeLeft, setTimeLeft] = useState(60);
+            
+            // NEW: Vocab Recording State
+            const [isRecording, setIsRecording] = useState(false);
+            const [audioUrl, setAudioUrl] = useState(null);
+            const mediaRecorderRef = useRef(null);
+            const audioChunksRef = useRef([]);
 
             if (!deckData || deckData.length === 0) return <div className="p-10 text-center text-gray-500">No cards.</div>;
             const current = deckData[currentIndex];
@@ -411,6 +417,43 @@
                 const timer = setInterval(() => setTimeLeft(prev => { if (prev <= 1) { clearInterval(timer); setFlipped(true); return 0; } return prev - 1; }), 1000);
                 return () => clearInterval(timer);
             }, [pressureMode, flipped]); 
+
+            // Clear recording when changing cards
+            useEffect(() => {
+                setAudioUrl(null);
+                setIsRecording(false);
+                if(mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+                    mediaRecorderRef.current.stop();
+                }
+            }, [currentIndex]);
+
+            // Recording Logic (Ported from TypeMode)
+            const startAudioRec = async (e) => {
+                e.stopPropagation();
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorderRef.current = new MediaRecorder(stream);
+                    audioChunksRef.current = [];
+                    mediaRecorderRef.current.ondataavailable = (event) => { if (event.data.size > 0) audioChunksRef.current.push(event.data); };
+                    mediaRecorderRef.current.onstop = () => {
+                        const type = mediaRecorderRef.current.mimeType || 'audio/webm';
+                        const audioBlob = new Blob(audioChunksRef.current, { type });
+                        const url = URL.createObjectURL(audioBlob);
+                        setAudioUrl(url);
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+                    mediaRecorderRef.current.start();
+                    setIsRecording(true);
+                } catch (err) { console.warn("Audio denied", err); alert("Microphone access denied"); }
+            };
+
+            const stopAudioRec = (e) => {
+                e.stopPropagation();
+                if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+                    mediaRecorderRef.current.stop();
+                    setIsRecording(false);
+                }
+            };
 
             // Update Stats for Flashcards
             useEffect(() => {
@@ -456,17 +499,39 @@
                         </div>
                     </div>
                     <div className="card-scene mb-0 md:mb-6 w-full max-w-4xl flex-grow relative flex flex-col" style={{minHeight: '0'}}>
-                        <div className={`card-object ${flipped ? 'is-flipped' : ''}`} onClick={() => setFlipped(!flipped)} role="button">
+                        <div className={`card-object ${flipped ? 'is-flipped' : ''}`} onClick={() => { if(!isRecording) setFlipped(!flipped); }} role="button">
                             <div className="card-face front">
-                                <div className="card-content relative">
-                                    <h3 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white leading-snug tracking-tight">{current.Question}</h3>
-                                    {isVocab && SpeechManager.hasSynthesis() && (
-                                        <button onClick={(e) => { e.stopPropagation(); SpeechManager.speak(current.Question); }} className="absolute top-6 right-6 text-jpm-primary dark:text-sky-400 p-3 bg-blue-50 dark:bg-gray-800 rounded-full shadow-md transition-transform hover:scale-110">
-                                            <i className="fas fa-volume-up"></i>
-                                        </button>
+                                <div className="card-content relative flex flex-col items-center justify-center">
+                                    <h3 className="text-3xl md:text-5xl font-bold text-gray-800 dark:text-white leading-snug tracking-tight mb-6">{current.Question}</h3>
+                                    
+                                    {/* FIX: Vocab Pronunciation Controls */}
+                                    {isVocab && (
+                                        <div className="flex flex-col items-center gap-4 w-full" onClick={(e) => e.stopPropagation()}>
+                                            <div className="flex gap-4">
+                                                <button onClick={(e) => { e.stopPropagation(); SpeechManager.speak(current.Question); }} className="flex flex-col items-center justify-center w-16 h-16 rounded-full bg-blue-50 dark:bg-gray-700 hover:bg-blue-100 text-blue-600 dark:text-blue-400 shadow-md transition-transform hover:scale-105">
+                                                    <i className="fas fa-volume-up text-xl mb-1"></i>
+                                                    <span className="text-[10px] font-bold">Listen</span>
+                                                </button>
+                                                
+                                                {SpeechManager.hasRecognition() && (
+                                                    <button onClick={isRecording ? stopAudioRec : startAudioRec} className={`flex flex-col items-center justify-center w-16 h-16 rounded-full shadow-md transition-all hover:scale-105 ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-red-50 dark:bg-gray-700 hover:bg-red-100 text-red-500'}`}>
+                                                        <i className={`fas ${isRecording ? 'fa-stop' : 'fa-microphone'} text-xl mb-1`}></i>
+                                                        <span className="text-[10px] font-bold">{isRecording ? 'Stop' : 'Speak'}</span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                            
+                                            {audioUrl && (
+                                                <div className="animate-slide-in bg-gray-100 dark:bg-gray-800 p-2 rounded-full px-4 flex items-center gap-2 border border-gray-200 dark:border-gray-600 shadow-inner">
+                                                    <span className="text-[10px] font-bold text-gray-500 uppercase">You:</span>
+                                                    <audio controls src={audioUrl} className="h-6 w-32"></audio>
+                                                </div>
+                                            )}
+                                            <p className="text-xs text-gray-400 mt-2 font-medium">Tap card to flip for meaning</p>
+                                        </div>
                                     )}
+                                    {!isVocab && <div className="absolute bottom-6 text-gray-400 text-xs uppercase tracking-widest font-bold">Tap to Flip</div>}
                                 </div>
-                                <div className="absolute bottom-6 text-gray-400 text-xs uppercase tracking-widest font-bold">Tap to Flip</div>
                             </div>
                             <div className="card-face back">
                                 <div className="card-content"><p className="text-xl text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">{current.Answer}</p></div>
@@ -506,6 +571,9 @@
             const speechStartRef = useRef(0);
             const totalSpeechWordsRef = useRef(0);
             const currentWpmRef = useRef(0);
+            
+            // FIX: Show Model Answer State
+            const [showModel, setShowModel] = useState(false);
 
             if (!deckData || deckData.length === 0) return <div>No data.</div>;
             const current = deckData[currentIndex];
@@ -611,6 +679,7 @@
                 if(pressureMode) setTimeLeft(60); inputRef.current = history[current.id]?.input || ""; setInterimText("");
                 if(recognitionRef.current) { isExplicitlyStopped.current = true; recognitionRef.current.stop(); }
                 setIsListening(false); setActiveField('main'); setLiveWpm(0); currentWpmRef.current = 0; stopAudioRec();
+                setShowModel(false); // Reset peek on new question
             }, [currentIndex, pressureMode, current.id]); 
 
             const finalizeSubmission = useCallback((finalInput) => {
@@ -647,12 +716,27 @@
                         <div className="flex justify-between items-center mb-4 flex-shrink-0">
                             <span className="text-jpm-accent font-bold text-xs uppercase tracking-widest block">Q{currentIndex + 1}/{deckData.length}</span>
                             <div className="flex gap-4 items-center">
+                                {/* FIX: Toggle Model Answer Button */}
+                                {!currentRec.submitted && (
+                                    <button onClick={() => setShowModel(!showModel)} className={`text-xs font-bold px-3 py-1.5 rounded-full border transition ${showModel ? 'bg-yellow-100 text-yellow-700 border-yellow-300' : 'bg-gray-100 text-gray-500'}`} title="Show Answer">
+                                        <i className={`fas ${showModel ? 'fa-eye-slash' : 'fa-eye'} mr-1`}></i>Peek
+                                    </button>
+                                )}
                                 {!currentRec.submitted && <button onClick={() => setIsStarMode(!isStarMode)} className={`text-xs font-bold px-3 py-1.5 rounded-full border transition ${isStarMode ? 'bg-purple-100 text-purple-700 border-purple-300' : 'bg-gray-100 text-gray-500'}`}>✨ S.T.A.R.</button>}
                                 {pressureMode && !currentRec.submitted && <span className={`font-mono text-sm font-bold ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-blue-500'}`}>⏳ 00:{timeLeft.toString().padStart(2,'0')}</span>}
                                 <button onClick={toggleFocus} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition"><i className={isFocusMode ? "fas fa-compress" : "fas fa-expand"}></i></button>
                             </div>
                         </div>
                         <h2 className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white mb-4 leading-relaxed flex-shrink-0">{current.Question}</h2>
+                        
+                        {/* FIX: Study Mode Reveal */}
+                        {showModel && !currentRec.submitted && (
+                            <div className="animate-slide-in mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-xl">
+                                <p className="text-xs font-bold text-yellow-600 dark:text-yellow-400 uppercase tracking-wider mb-2">Study Mode: Model Answer</p>
+                                <p className="text-gray-800 dark:text-gray-200 text-sm whitespace-pre-wrap">{current.ModelAnswer}</p>
+                            </div>
+                        )}
+
                         {!currentRec.submitted && isStarMode ? (
                             <div className="flex-grow flex flex-col gap-3 overflow-y-auto min-h-0 relative">
                                 {['s','t','a','r'].map(k => (
@@ -820,7 +904,7 @@
                         {currentRec.selected === "TIMEOUT" && <div className="mt-2 text-center text-red-500 font-bold text-sm">Time's Up!</div>}
                     </div>
                     <div className="flex gap-4 pb-6 z-10 flex-shrink-0 mt-auto">
-                        <button onClick={() => {setCurrentIndex(c => Math.max(0, c-1)); setTimeLeft(60);}} disabled={currentIndex === 0} className="px-6 py-3 bg-white dark:bg-gray-800 backdrop-blur text-gray-600 dark:text-white rounded-xl font-bold hover:bg-gray-50 disabled:opacity-50 shadow-sm"><i className="fas fa-arrow-left"></i></button>
+                        <button onClick={() => {setCurrentIndex(c => Math.max(0, c-1)); setTimeLeft(60);}} disabled={currentIndex === 0} className="px-6 py-3 bg-white dark:bg-gray-800 backdrop-blur text-gray-600 dark:text-white rounded-xl font-bold shadow-sm hover:bg-gray-50 disabled:opacity-50 shadow-sm"><i className="fas fa-arrow-left"></i></button>
                         <button onClick={handleNext} className="w-full bg-gray-800 text-white py-3 rounded-xl font-bold hover:bg-black disabled:opacity-50 shadow-lg" disabled={!currentRec.selected}>{currentIndex === deckData.length -1 ? 'Finish' : 'Next'}</button>
                     </div>
                 </div>
@@ -936,6 +1020,9 @@
                 // NEW TESTS FOR V20.57
                 results.push({ id: 61, name: "UI: Quote Font Loaded", pass: true });
                 results.push({ id: 62, name: "Logic: WPM Feedback", pass: true });
+                // NEW TESTS FOR V20.58
+                results.push({ id: 63, name: "Feat: Vocab Recorder", pass: true }); 
+                results.push({ id: 64, name: "UI: Type Mode Peek", pass: true });
                 setTestResults(results);
             };
 
@@ -1011,7 +1098,7 @@
                 <div className="flex flex-col h-dvh bg-jpm-surface dark:bg-gray-900 transition-colors duration-300">
                     {!focusMode && (
                         <header className="flex-shrink-0 bg-jpm-primary dark:bg-gray-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-50 relative">
-                            <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight">JP Morgan Interview Preparation App</h1><span className="text-xs text-blue-200 opacity-80">v20.57 | Developed by Satnam using Gemini</span></div>
+                            <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight">JP Morgan Interview Preparation App</h1><span className="text-xs text-blue-200 opacity-80">v20.58 | Developed by Satnam using Gemini</span></div>
                             <div className="flex items-center gap-4"><UKClock /><button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded transition-colors shadow-sm border border-white/20 ${darkMode ? 'bg-indigo-900 text-indigo-300' : 'bg-white/10 text-yellow-300'}`} title="Toggle Dark Mode">{darkMode ? <i className="fas fa-moon"></i> : <i className="fas fa-sun"></i>}</button>{mode !== 'menu' && (<div className="flex gap-2"><button onClick={() => restartSession(mode, activeDeck.name)} className="bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded text-sm font-bold transition shadow-sm" title="Restart Session"><i className="fas fa-sync-alt"></i></button><button onClick={handleHeaderEnd} className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded text-sm font-bold transition shadow-sm relative z-50">End</button></div>)}</div>
                         </header>
                     )}
