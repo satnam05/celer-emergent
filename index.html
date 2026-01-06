@@ -212,15 +212,26 @@
             const clean = (text) => text.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter(w => w.length > 1);
             const userRaw = clean(user); const modelRaw = clean(model);
             const userKeywords = userRaw.filter(w => !stopWords.has(w)); const modelKeywords = modelRaw.filter(w => !stopWords.has(w));
-            const uniqueWords = new Set(userKeywords);
-            if (uniqueWords.size < 3) return 0;
-            if (modelKeywords.length === 0) return 0; if (userKeywords.length === 0) return 0; 
+            
+            if (modelKeywords.length === 0) return 0; 
+            if (userKeywords.length === 0) return 0; 
+
             let matchedCount = 0;
             userKeywords.forEach(uWord => { const hasMatch = modelKeywords.some(mWord => { if (uWord === mWord) return true; if (uWord.length > 3 && mWord.length > 3) { if (Math.abs(uWord.length - mWord.length) > 2) return false; return levenshteinDistance(uWord, mWord) <= 2; } return false; }); if (hasMatch) matchedCount++; });
+            
             let score = Math.round((matchedCount / modelKeywords.length) * 100);
             if (matchedCount >= 2 && score < 50) { score = 50 + matchedCount * 5; }
             if (matchedCount === 1 && score < 30 && userKeywords.length < 3) { score = 40; }
-            return Math.min(100, score);
+            score = Math.min(100, score);
+
+            // --- V20.67 HOTFIX: Confidence-Based Filtering ---
+            // Allows short answers if they match well (e.g. "Singleton") but blocks gibberish (e.g. "hello hello")
+            const uniqueWords = new Set(userKeywords);
+            if (uniqueWords.size < 3 && score < 80) {
+                return 0; 
+            }
+
+            return score;
         };
 
         const shuffleArray = (array) => { let arr = [...array]; for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
@@ -228,7 +239,6 @@
         class GlobalErrorBoundary extends React.Component { constructor(props) { super(props); this.state = { hasError: false, error: null }; } static getDerivedStateFromError(error) { return { hasError: true, error }; } render() { if (this.state.hasError) return <div className="flex flex-col items-center justify-center h-screen bg-red-900 p-6 text-center text-white"><button onClick={() => window.location.reload()}>Reload</button></div>; return this.props.children; } }
         class ComponentSandbox extends React.Component { constructor(props) { super(props); this.state = { hasError: false }; } static getDerivedStateFromError(error) { return { hasError: true }; } render() { if (this.state.hasError) return <button onClick={() => window.location.reload()}>Reload</button>; return this.props.children; } }
 
-        // --- Disclaimer Modal (Premium Dark) ---
         const DisclaimerModal = ({ onEnter }) => (
             <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-95 backdrop-blur-md p-4">
                 <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8 max-w-lg w-full text-center shadow-2xl animate-slide-in relative overflow-hidden">
@@ -337,7 +347,6 @@
             const sessionCompletion = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
             const badges = [ { id: 1, label: "First Step", icon: "fa-shoe-prints", condition: completedCount >= 1 }, { id: 2, label: "On Fire", icon: "fa-fire", condition: streak >= 3 }, { id: 3, label: "Scholar", icon: "fa-graduation-cap", condition: completedCount >= 5 }, { id: 4, label: "Sniper", icon: "fa-crosshairs", condition: accuracy >= 80 && stats.total > 5 } ];
             
-            // Daily Briefing Logic
             const now = Date.now();
             const staleDecks = Object.values(progressData).filter(p => p.status === 'Completed' && p.nextReview && p.nextReview < now).length;
             const resumeDecks = Object.values(progressData).filter(p => p.status === 'In Progress').length;
@@ -346,20 +355,11 @@
                 <div className={`hidden md:flex fixed inset-y-0 left-0 w-64 glass-panel shadow-2xl z-20 flex-col transition-transform duration-300 ${active ? 'translate-x-0' : '-translate-x-full'}`}>
                     <div className="p-6 bg-slate-900 border-b border-slate-800"><h2 className="text-xl font-bold tracking-tight font-quote text-white"><i className="fas fa-chart-line mr-2 text-jpm-accent"></i> Analytics</h2></div>
                     <div className="p-6 space-y-6 flex-grow overflow-y-auto">
-                        
-                        {/* Daily Briefing */}
                         <div className="bg-slate-800/80 p-3 rounded-xl border-l-4 border-jpm-accent shadow-md">
                             <h4 className="text-[10px] font-bold text-gray-400 uppercase mb-2 font-mono tracking-wider">Daily Briefing</h4>
-                            <div className="flex justify-between items-center mb-1">
-                                <span className="text-xs text-white">Review Due</span>
-                                <span className={`text-xs font-bold ${staleDecks > 0 ? 'text-red-400 animate-pulse' : 'text-green-400'}`}>{staleDecks}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-xs text-white">Pending Resume</span>
-                                <span className="text-xs font-bold text-amber-400">{resumeDecks}</span>
-                            </div>
+                            <div className="flex justify-between items-center mb-1"><span className="text-xs text-white">Review Due</span><span className={`text-xs font-bold ${staleDecks > 0 ? 'text-red-400 animate-pulse' : 'text-green-400'}`}>{staleDecks}</span></div>
+                            <div className="flex justify-between items-center"><span className="text-xs text-white">Pending Resume</span><span className="text-xs font-bold text-amber-400">{resumeDecks}</span></div>
                         </div>
-
                         <div className="bg-slate-800 p-4 rounded-xl border-l-4 border-jpm-accent shadow-sm flex items-center justify-between">
                             <div><p className="text-xs text-gray-400 font-bold uppercase tracking-wider font-mono">Current Streak</p><p className="text-3xl font-bold text-white font-mono">{streak} <span className="text-sm font-medium text-gray-500">Days</span></p></div>
                             <i className="fas fa-fire text-3xl text-jpm-accent opacity-90"></i>
@@ -410,7 +410,12 @@
             useEffect(() => { const handleEndSignal = () => { const remaining = deckData.slice(currentIndex); const hardCards = deckData.filter(item => results[item.id] === 'hard'); let queueToSave = [...remaining]; hardCards.forEach(c => { if(!queueToSave.find(q => q.id === c.id)) queueToSave.push(c); }); const score = queueToSave.length === 0 ? 100 : 50; onEnd(score, queueToSave); }; window.addEventListener('jpm-trigger-end', handleEndSignal); return () => window.removeEventListener('jpm-trigger-end', handleEndSignal); }, [currentIndex, results, deckData, onEnd]);
 
             const handleRate = (rating) => { setResults(prev => ({ ...prev, [current.id]: rating })); setFlipped(false); if (currentIndex < deckData.length - 1) { const next = currentIndex + 1; setCurrentIndex(next); if (next > maxIndex) setMaxIndex(next); } else { const finalResults = { ...results, [current.id]: rating }; const hardCards = deckData.filter(item => finalResults[item.id] === 'hard'); onEnd(hardCards.length === 0 ? 100 : 50, hardCards); } };
-            const getBtnStyle = (type) => { const isActive = currentRating === type; const base = "flex-1 py-4 rounded-xl font-bold shadow-md transition-all duration-200 border border-[#C59D5F]/30 bg-[#C59D5F]/10 text-white"; if (type === 'hard') return isActive ? `flex-1 py-4 rounded-xl font-bold shadow-lg shadow-red-500/50 bg-red-900 border-red-500 text-white scale-105` : `${base} hover:bg-red-900/50 hover:border-red-500 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)]`; else return isActive ? `flex-1 py-4 rounded-xl font-bold shadow-lg shadow-green-500/50 bg-green-900 border-green-500 text-white scale-105` : `${base} hover:bg-green-900/50 hover:border-green-500 hover:shadow-[0_0_15px_rgba(34,197,94,0.5)]`; };
+            const getBtnStyle = (type) => { 
+                const isActive = currentRating === type; 
+                const base = "flex-1 py-4 rounded-xl font-bold shadow-md transition-all duration-200 border border-[#C59D5F]/30 bg-[#C59D5F]/10 text-white"; 
+                if (type === 'hard') return isActive ? `flex-1 py-4 rounded-xl font-bold shadow-lg shadow-red-500/50 bg-red-900 border-red-500 text-white scale-105` : `${base} hover:bg-red-900/50 hover:border-red-500 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)]`; 
+                else return isActive ? `flex-1 py-4 rounded-xl font-bold shadow-lg shadow-green-500/50 bg-green-900 border-green-500 text-white scale-105` : `${base} hover:bg-green-900/50 hover:border-green-500 hover:shadow-[0_0_15px_rgba(34,197,94,0.5)]`; 
+            };
 
             const AudioControls = ({ textToSpeak }) => ( <div className="flex flex-col items-center gap-4 w-full" onClick={(e) => e.stopPropagation()}> <div className="flex gap-4"> <button onClick={(e) => { e.stopPropagation(); SpeechManager.speak(textToSpeak); }} className="flex flex-col items-center justify-center w-16 h-16 rounded-full bg-slate-700 hover:bg-blue-900/50 text-jpm-accent shadow-md transition-transform hover:scale-105 border border-slate-600"><i className="fas fa-volume-up text-xl mb-1"></i><span className="text-[10px] font-bold">Listen</span></button> {SpeechManager.hasRecognition() && ( <button onClick={isRecording ? stopAudioRec : startAudioRec} className={`flex flex-col items-center justify-center w-16 h-16 rounded-full shadow-md transition-all hover:scale-105 border ${isRecording ? 'bg-red-900 text-white animate-pulse border-red-500' : 'bg-slate-700 hover:bg-red-900/30 text-jpm-accent border-slate-600'}`}><i className={`fas ${isRecording ? 'fa-stop' : 'fa-microphone'} text-xl mb-1`}></i><span className="text-[10px] font-bold">{isRecording ? 'Stop' : 'Speak'}</span></button> )} </div> {audioUrl && ( <div className="animate-slide-in bg-slate-800 p-2 rounded-full px-4 flex items-center gap-2 border border-slate-600 shadow-inner"> <span className="text-[10px] font-bold text-gray-400 uppercase">You:</span> <audio controls src={audioUrl} className="h-6 w-32"></audio> </div> )} </div> );
 
@@ -770,6 +775,7 @@
                 results.push({ id: 79, name: "UI: Golden Glow Applied", pass: true });
                 results.push({ id: 80, name: "UI: Volumetric Gradient", pass: true });
                 results.push({ id: 81, name: "Logic: Leitner State", pass: true });
+                results.push({ id: 82, name: "Hotfix: Short Answer Confidence", pass: calculateSmartScore("Singleton Pattern", "The Singleton Pattern ensures a class has only one instance") >= 80 });
                 setTestResults(results); 
             };
 
@@ -906,7 +912,7 @@
                         <header className="flex-shrink-0 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-50 relative">
                             <div className="flex items-center gap-3">
                                 <i className="fas fa-university text-jpm-accent text-2xl"></i>
-                                <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight font-quote text-gray-100">JP Morgan Interview Prep</h1><span className="text-xs text-slate-400 font-mono">v20.66 | Premium Edition</span></div>
+                                <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight font-quote text-gray-100">JP Morgan Interview Prep</h1><span className="text-xs text-slate-400 font-mono">v20.67 | Premium Edition</span></div>
                             </div>
                             <div className="flex items-center gap-4">
                                 <button onClick={() => setShowTechModal(true)} className="p-2 rounded hover:bg-white/10 text-jpm-accent transition-colors animate-pulse-soft hover:shadow-[0_0_15px_rgba(197,157,95,0.4)]" title="Tech Insights"><i className="fas fa-globe-americas"></i></button>
@@ -984,4 +990,3 @@
     </script>
 </body>
 </html>
-
