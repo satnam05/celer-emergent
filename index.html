@@ -1182,7 +1182,35 @@
                 if (!progress[`${m}-${deckName}`]) saveProgress(m, deckName, 'In Progress', 0); 
             };
 
-            const restartSession = (m, deckName) => { const map = { 'flashcard': 'flashcards', 'type': 'type', 'mcq': 'mcq', 'study': 'study', 'skill': 'skills', 'vocab': 'vocab' }; let fullDeck = data[map[m]].filter(d => d.Deck === deckName); if(fullDeck.length === 0) return; if (m === 'vocab') fullDeck = fullDeck.map(item => ({...item, Question: item.Word, Answer: item.Meaning, ModeTitle: 'Vocabulary'})); saveProgress(m, deckName, 'In Progress', 0, null); setActiveDeck({ name: deckName, items: fullDeck }); setMode(m); setStats({ correct: 0, completed: 0, total: fullDeck.length }); setModalDeck(null); setSessionKey(prev => prev + 1); setFocusMode(false); };
+			const restartSession = (m, deckName) => { 
+                // --- FIX FOR AI MODE ---
+                if (m === 'ai_interview') {
+                    // Just clear the key to re-mount the component (Resets chat)
+                    setSessionKey(prev => prev + 1); 
+                    return;
+                }
+                // -----------------------
+
+                const map = { 'flashcard': 'flashcards', 'type': 'type', 'mcq': 'mcq', 'study': 'study', 'skill': 'skills', 'vocab': 'vocab' }; 
+                
+                // Safety check: Does this mode exist in the map?
+                if (!map[m] || !data[map[m]]) return;
+
+                let fullDeck = data[map[m]].filter(d => d.Deck === deckName); 
+                
+                if(fullDeck.length === 0) return; 
+                
+                if (m === 'vocab') fullDeck = fullDeck.map(item => ({...item, Question: item.Word, Answer: item.Meaning, ModeTitle: 'Vocabulary'})); 
+                
+                saveProgress(m, deckName, 'In Progress', 0, null); 
+                setActiveDeck({ name: deckName, items: fullDeck }); 
+                setMode(m); 
+                setStats({ correct: 0, completed: 0, total: fullDeck.length }); 
+                setModalDeck(null); 
+                setSessionKey(prev => prev + 1); 
+                setFocusMode(false); 
+            };
+			
             const handleHeaderEnd = () => { window.dispatchEvent(new CustomEvent('jpm-trigger-end')); };
             const endSession = useCallback((finalScore = 0, remainingItems = []) => { let status = 'In Progress'; let queueToSave = null; if (mode === 'flashcard' || mode === 'vocab') { if (finalScore === 100 && remainingItems.length === 0) status = 'Completed'; else { status = 'In Progress'; queueToSave = remainingItems; } } else { status = finalScore >= 50 && remainingItems.length === 0 ? 'Completed' : 'In Progress'; if (status === 'In Progress') queueToSave = remainingItems; } saveProgress(mode, activeDeck.name, status, finalScore, queueToSave); setMode('menu'); setActiveDeck(null); setFocusMode(false); }, [mode, activeDeck, progress]);
             const saveProgress = (m, d, status, score, queue = null) => { 
@@ -1344,6 +1372,7 @@
     </script>
 </body>
 </html>
+
 
 
 
