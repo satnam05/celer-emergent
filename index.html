@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JP Morgan Interview Preparation App v20.82</title>
+    <title>JP Morgan Interview Preparation App v20.83</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -1006,6 +1006,34 @@
 			                    <i className="fas fa-cog mr-2"></i>Configure Neural Link
 			                </button>
 			            </div>
+
+												/* --- ADDING VOICE SELECTOR UI --- */
+						{/* CONTEXT: UI toggles for user to dynamically change the AI Interviewer's voice accent and gender */}
+						<div className="w-full px-4 mt-6 space-y-3 bg-slate-800/40 p-4 rounded-2xl border border-slate-700 shadow-inner">
+						    <span className="text-[10px] font-bold text-gray-500 uppercase font-mono tracking-widest block mb-2 text-left">Panel Persona</span>
+						    
+						    <div className="flex gap-2">
+						        <button 
+						            onClick={() => { SpeechManager.voiceConfig.lang = 'en-GB'; setMessages([...messages]); }}
+						            className={`flex-1 text-[10px] py-2 rounded-lg font-mono border transition-all ${SpeechManager.voiceConfig.lang === 'en-GB' ? 'bg-jpm-accent text-black border-jpm-accent shadow-lg' : 'bg-slate-700 text-gray-400 border-slate-600 opacity-60'}`}
+						        >UK ACCENT</button>
+						        <button 
+						            onClick={() => { SpeechManager.voiceConfig.lang = 'en-US'; setMessages([...messages]); }}
+						            className={`flex-1 text-[10px] py-2 rounded-lg font-mono border transition-all ${SpeechManager.voiceConfig.lang === 'en-US' ? 'bg-jpm-accent text-black border-jpm-accent shadow-lg' : 'bg-slate-700 text-gray-400 border-slate-600 opacity-60'}`}
+						        >US ACCENT</button>
+						    </div>
+						
+						    <div className="flex gap-2">
+						        <button 
+						            onClick={() => { SpeechManager.voiceConfig.gender = 'male'; setMessages([...messages]); }}
+						            className={`flex-1 text-[10px] py-2 rounded-lg font-mono border transition-all ${SpeechManager.voiceConfig.gender === 'male' ? 'bg-blue-600 text-white border-blue-500 shadow-lg' : 'bg-slate-700 text-gray-400 border-slate-600 opacity-60'}`}
+						        ><i className="fas fa-mars mr-1"></i> MALE</button>
+						        <button 
+						            onClick={() => { SpeechManager.voiceConfig.gender = 'female'; setMessages([...messages]); }}
+						            className={`flex-1 text-[10px] py-2 rounded-lg font-mono border transition-all ${SpeechManager.voiceConfig.gender === 'female' ? 'bg-pink-600 text-white border-pink-500 shadow-lg' : 'bg-slate-700 text-gray-400 border-slate-600 opacity-60'}`}
+						        ><i className="fas fa-venus mr-1"></i> FEMALE</button>
+						    </div>
+						</div>
 			
 			            {showConfig && (
 			                <div className="absolute bottom-10 left-6 right-6 z-50 bg-slate-900 border border-slate-700 p-4 rounded-xl shadow-2xl animate-slide-in">
@@ -1394,7 +1422,7 @@
                         <header className="flex-shrink-0 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-50 relative">
                             <div className="flex items-center gap-3">
                                 <i className="fas fa-university text-jpm-accent text-2xl"></i>
-                                <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight font-quote text-gray-100">JP Morgan Interview Prep</h1><span className="text-xs text-slate-400 font-mono">v20.82 | Premium Edition</span></div>
+                                <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight font-quote text-gray-100">JP Morgan Interview Prep</h1><span className="text-xs text-slate-400 font-mono">v20.83 | Premium Edition</span></div>
                             </div>
                             <div className="flex items-center gap-4">
                                 <button onClick={() => setShowTechModal(true)} className="p-2 rounded hover:bg-white/10 text-jpm-accent transition-colors animate-pulse-soft hover:shadow-[0_0_15px_rgba(197,157,95,0.4)]" title="Tech Insights"><i className="fas fa-globe-americas"></i></button>
@@ -1473,6 +1501,7 @@
     </script>
 </body>
 </html>
+
 
 
 
