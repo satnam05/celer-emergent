@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JP Morgan Interview Preparation App v20.76</title>
+    <title>JP Morgan Interview Preparation App v20.77</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -1145,7 +1145,19 @@
             const handleImport = (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const p = JSON.parse(e.target.result); setProgress(p); if(p._settings) setPressureMode(p._settings.pressureMode || false); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(p)); alert("Import Successful!"); } catch(err) { alert("Invalid File"); } }; reader.readAsText(file); };
             const togglePressureMode = () => { const newVal = !pressureMode; setPressureMode(newVal); const newP = { ...progress, _settings: { ...(progress._settings || {}), pressureMode: newVal } }; setProgress(newP); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(newP)); };
             
-            const startSession = (m, deckName, specificQueue = null) => { 
+            const startSession = (m, deckName, specificQueue = null) => {
+
+				// ---AI CLICK NOT WORKING FIX STARTS HERE 8th Jan 2025 12:30 AM---
+                // If it is AI Mode, we skip the CSV data lookup entirely
+                if (m === 'ai_interview') {
+                    setActiveDeck({ name: deckName, items: [] }); // No data needed
+                    setMode(m);
+                    setSessionKey(prev => prev + 1);
+                    setFocusMode(false);
+                    return; // Stop here, don't run the rest
+                }
+                // --- FIX ENDS HERE ---
+				
                 const map = { 'flashcard': 'flashcards', 'type': 'type', 'mcq': 'mcq', 'study': 'study', 'skill': 'skills', 'vocab': 'vocab', 'ai_interview': 'prompts' }; 
 				// Note: We map to 'prompts' just to ensure a valid data array is returned, though AIMode doesn't use it.
                 let deck = specificQueue || data[map[m]].filter(d => d.Deck === deckName); 
@@ -1249,7 +1261,7 @@
                         <header className="flex-shrink-0 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-50 relative">
                             <div className="flex items-center gap-3">
                                 <i className="fas fa-university text-jpm-accent text-2xl"></i>
-                                <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight font-quote text-gray-100">JP Morgan Interview Prep</h1><span className="text-xs text-slate-400 font-mono">v20.76 | Premium Edition</span></div>
+                                <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight font-quote text-gray-100">JP Morgan Interview Prep</h1><span className="text-xs text-slate-400 font-mono">v20.77 | Premium Edition</span></div>
                             </div>
                             <div className="flex items-center gap-4">
                                 <button onClick={() => setShowTechModal(true)} className="p-2 rounded hover:bg-white/10 text-jpm-accent transition-colors animate-pulse-soft hover:shadow-[0_0_15px_rgba(197,157,95,0.4)]" title="Tech Insights"><i className="fas fa-globe-americas"></i></button>
@@ -1329,5 +1341,6 @@
     </script>
 </body>
 </html>
+
 
 
