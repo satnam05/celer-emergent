@@ -975,9 +975,21 @@
 			    <div className="flex h-full w-full bg-slate-950 text-white overflow-hidden">
 			        {/* LEFT PANEL: The Animated AI Orb (The "Brain") */}
 			        <div className="w-1/3 border-r border-slate-800 flex flex-col items-center justify-center p-6 bg-slate-900/50 relative">
-			            <div className="absolute top-10 text-jpm-accent font-mono text-[10px] tracking-[0.3em] uppercase">
-			                System Status: {status}
-			            </div>
+
+						{/* CONTEXT: Re-positioning Status Text from Absolute to Relative to prevent Orb overlap */}
+						<div className="flex flex-col items-center mb-8">
+						    <span className="text-jpm-accent font-mono text-[10px] tracking-[0.3em] uppercase opacity-70 mb-2">
+						        System Interface
+						    </span>
+						    <div className={`px-3 py-1 rounded-full border text-[11px] font-bold font-mono transition-all duration-300 ${
+						        status === 'LISTENING' ? 'bg-blue-900/30 border-blue-500 text-blue-400' :
+						        status === 'THINKING' ? 'bg-purple-900/30 border-purple-500 text-purple-400' :
+						        status === 'SPEAKING' ? 'bg-jpm-accent/20 border-jpm-accent text-jpm-accent' :
+						        'bg-slate-800 border-slate-700 text-slate-500'
+						    }`}>
+						        {status}
+						    </div>
+						</div>
 			            
 			            {/* THE DYNAMIC ORB */}
 			            <div className={`relative w-48 h-48 md:w-56 md:h-56 rounded-full flex items-center justify-center transition-all duration-700
@@ -1536,6 +1548,7 @@
     </script>
 </body>
 </html>
+
 
 
 
