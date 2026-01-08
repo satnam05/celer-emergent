@@ -208,7 +208,7 @@
             hasRecognition: () => 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window,
             hasSynthesis: () => 'speechSynthesis' in window,
             voices: [],
-            phoneticMap: { "TUPE": "Too P", "SQL": "Sequel", "JPM": "J P M", "API": "A P I", "OOPS": "Oops", "JDBC": "J D B C" },
+            phoneticMap: { "TUPE": "Too P", "SQL": "Sequel", "JPM": "J P M", "API": "A P I", "OOPS": "Oops", "JDBC": "J D B C", "PACS.002": "pacs two", "PACS.008": "pacs eight", "PACS.009": "pacs nine", "PAIN.001": "pain one", "PAIN.002": "pain two" },
             init: function() {
                 if (this.hasSynthesis()) {
                     const load = () => { this.voices = window.speechSynthesis.getVoices(); };
@@ -219,21 +219,39 @@
             getPhoneticText: function(text) {
                 if (!text) return "";
                 return text.split(' ').map(word => {
-                    const cleanWord = word.replace(/[^a-zA-Z0-9]/g, ''); 
+                    const cleanWord = word.replace(/[^a-zA-Z0-9]/g, '');
                     const mapping = this.phoneticMap[cleanWord.toUpperCase()];
                     return mapping || word;
                 }).join(' ');
             },
-            speak: function(text) {
-                if (!this.hasSynthesis()) return;
-                window.speechSynthesis.cancel(); 
-                const phoneticText = this.getPhoneticText(text);
-                const utterance = new SpeechSynthesisUtterance(phoneticText);
-                let voice = this.voices.find(v => v.lang === 'en-GB' && (v.name.includes('Male') || v.name.includes('Daniel')));
-                if (!voice) voice = this.voices.find(v => v.lang === 'en-GB'); 
-                if (voice) { utterance.voice = voice; utterance.lang = 'en-GB'; utterance.rate = 0.9; utterance.pitch = 1.0; }
-                window.speechSynthesis.speak(utterance);
-            }
+
+			voiceConfig: { lang: 'en-GB', gender: 'male' }, // Default settings for voice
+			//Male Female US UK voice implementation
+			speak: function(text) {
+			    if (!this.hasSynthesis()) return;
+			    window.speechSynthesis.cancel(); 
+			    const phoneticText = this.getPhoneticText(text);
+			    const utterance = new SpeechSynthesisUtterance(phoneticText);
+			    
+			    // Logic to find the specific voice requested
+			    let voice = this.voices.find(v => 
+			        v.lang.startsWith(this.voiceConfig.lang) && 
+			        (this.voiceConfig.gender === 'male' ? 
+			            (v.name.includes('Male') || v.name.includes('Daniel') || v.name.includes('David')) : 
+			            (v.name.includes('Female') || v.name.includes('Google UK English Female') || v.name.includes('Hazel')))
+			    );
+			
+			    if (!voice) voice = this.voices.find(v => v.lang.startsWith(this.voiceConfig.lang)); 
+			    
+			    if (voice) { 
+			        utterance.voice = voice; 
+			        utterance.lang = this.voiceConfig.lang; 
+			        utterance.rate = 1.0; 
+			        utterance.pitch = 1.0; 
+			    }
+			    window.speechSynthesis.speak(utterance);
+			}
+
         };
         SpeechManager.init();
 
@@ -944,7 +962,6 @@
 			    }
 			};
 
-            /* --- REPLACE EVERYTHING FROM LINE 513 TO 572 WITH THIS --- */
 			return (
 			    <div className="flex h-full w-full bg-slate-950 text-white overflow-hidden">
 			        {/* LEFT PANEL: The Animated AI Orb (The "Brain") */}
@@ -961,7 +978,7 @@
 			                ${status === 'IDLE' ? 'border-2 border-slate-700 opacity-60' : ''}
 			            `}>
 			                <div className="w-full h-full rounded-full bg-gradient-to-br from-slate-900 to-black flex items-center justify-center">
-							/* --- AI ORB EMOJIS --- */
+								{/* --- AI ORB EMOJIS --- */}
 								{status === 'IDLE' && (
 								    <div className="text-6xl animate-[matrix-glitch_4s_infinite] select-none">📟</div>
 								)}
@@ -1456,6 +1473,7 @@
     </script>
 </body>
 </html>
+
 
 
 
