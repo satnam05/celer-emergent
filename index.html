@@ -1183,17 +1183,16 @@
             };
 
 			const restartSession = (m, deckName) => { 
-                // --- FIX FOR AI MODE ---
+                // --- FIX: Prevent crash in AI Mode ---
                 if (m === 'ai_interview') {
-                    // Just clear the key to re-mount the component (Resets chat)
-                    setSessionKey(prev => prev + 1); 
+                    setSessionKey(prev => prev + 1); // Just reset the component
                     return;
                 }
-                // -----------------------
+                // -------------------------------------
 
                 const map = { 'flashcard': 'flashcards', 'type': 'type', 'mcq': 'mcq', 'study': 'study', 'skill': 'skills', 'vocab': 'vocab' }; 
                 
-                // Safety check: Does this mode exist in the map?
+                // Safety check to prevent "undefined" crash
                 if (!map[m] || !data[map[m]]) return;
 
                 let fullDeck = data[map[m]].filter(d => d.Deck === deckName); 
@@ -1372,6 +1371,7 @@
     </script>
 </body>
 </html>
+
 
 
 
