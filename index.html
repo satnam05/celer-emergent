@@ -1123,8 +1123,27 @@
             // Forced Dark Mode
             useEffect(() => { document.documentElement.classList.add('dark'); document.documentElement.classList.remove('light'); }, []);
 
-            const handleDeckClick = (m, deckName) => { const p = progress[`${m}-${deckName}`]; if (p && p.status === 'Completed') { setModalDeck({ mode: m, name: deckName, stats: p }); } else if (p && p.status === 'In Progress' && p.queue && p.queue.length > 0) { startSession(m, deckName, p.queue); } else { startSession(m, deckName); } };
-            const handleExport = () => { const blob = new Blob([JSON.stringify(progress)], {type: "application/json"}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = "jpm_backup.json"; a.click(); };
+           //Changed for AI by Satnam - const handleDeckClick = (m, deckName) => { const p = progress[`${m}-${deckName}`]; if (p && p.status === 'Completed') { setModalDeck({ mode: m, name: deckName, stats: p }); } else if (p && p.status === 'In Progress' && p.queue && p.queue.length > 0) { startSession(m, deckName, p.queue); } else { startSession(m, deckName); } };
+
+            const handleDeckClick = (m, deckName) => { 
+                // NEW: Catch the AI mode click immediately
+                if (m === 'ai_interview') {
+                    startSession(m, deckName);
+                    return;
+                }
+
+                // ... existing logic ...
+                const p = progress[`${m}-${deckName}`]; 
+                if (p && p.status === 'Completed') { 
+                    setModalDeck({ mode: m, name: deckName, stats: p }); 
+                } else if (p && p.status === 'In Progress' && p.queue && p.queue.length > 0) { 
+                    startSession(m, deckName, p.queue); 
+                } else { 
+                    startSession(m, deckName); 
+                } 
+            };
+			
+			const handleExport = () => { const blob = new Blob([JSON.stringify(progress)], {type: "application/json"}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = "jpm_backup.json"; a.click(); };
             const handleImport = (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const p = JSON.parse(e.target.result); setProgress(p); if(p._settings) setPressureMode(p._settings.pressureMode || false); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(p)); alert("Import Successful!"); } catch(err) { alert("Invalid File"); } }; reader.readAsText(file); };
             const togglePressureMode = () => { const newVal = !pressureMode; setPressureMode(newVal); const newP = { ...progress, _settings: { ...(progress._settings || {}), pressureMode: newVal } }; setProgress(newP); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(newP)); };
             
@@ -1312,3 +1331,4 @@
     </script>
 </body>
 </html>
+
