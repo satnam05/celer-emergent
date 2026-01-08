@@ -125,10 +125,12 @@
 		}
 
 		/* AI ORB EMOJIS ANIMATION */
-		@keyframes matrix-glitch {
-		    0% { filter: hue-rotate(0deg); }
-		    50% { filter: hue-rotate(180deg) contrast(1.5); }
-		    100% { filter: hue-rotate(360deg); }
+
+		/* CONTEXT: High-fidelity glowing pulse for AI Orb at Idle */
+		@keyframes ai-glow-idle {
+		    0% { filter: drop-shadow(0 0 5px #C59D5F) brightness(1); transform: scale(1); }
+		    50% { filter: drop-shadow(0 0 25px #C59D5F) brightness(1.4); transform: scale(1.05); }
+		    100% { filter: drop-shadow(0 0 5px #C59D5F) brightness(1); transform: scale(1); }
 		}
 		
 		@keyframes brain-glow {
@@ -998,21 +1000,29 @@
 			                ${status === 'SPEAKING' ? 'animate-[orb-speak_1s_infinite] border-4 border-jpm-accent shadow-[0_0_40px_rgba(197,157,95,0.3)]' : ''}
 			                ${status === 'IDLE' ? 'border-2 border-slate-700 opacity-60' : ''}
 			            `}>
-			                <div className="w-full h-full rounded-full bg-gradient-to-br from-slate-900 to-black flex items-center justify-center">
-								{/* --- AI ORB EMOJIS --- */}
-								{status === 'IDLE' && (
-								    <div className="text-6xl animate-[matrix-glitch_4s_infinite] select-none">📟</div>
-								)}
-								{status === 'LISTENING' && (
-								    <div className="text-6xl animate-pulse select-none">🎙️</div>
-								)}
-								{status === 'THINKING' && (
-								    <div className="text-6xl animate-[brain-glow_1.5s_infinite] select-none">🧠</div>
-								)}
-								{status === 'SPEAKING' && (
-								    <div className="text-6xl animate-bounce select-none">🤖</div>
-								)}
-			                </div>
+
+							<div className="w-full h-full rounded-full bg-gradient-to-br from-slate-900 to-black flex items-center justify-center">
+							    {/* IDLE: Technical AI Atom Emoji with Gold Glow */}
+							    {status === 'IDLE' && (
+							        <div className="text-7xl animate-[ai-glow-idle_3s_infinite] select-none">⚛️</div>
+							    )}
+							    
+							    {/* LISTENING: Pulse Ear */}
+							    {status === 'LISTENING' && (
+							        <div className="text-6xl animate-pulse select-none">🎙️</div>
+							    )}
+							    
+							    {/* THINKING: Processing Brain */}
+							    {status === 'THINKING' && (
+							        <div className="text-7xl animate-[brain-glow_1.5s_infinite] select-none">🧠</div>
+							    )}
+							    
+							    {/* SPEAKING: Animated Robot */}
+							    {status === 'SPEAKING' && (
+							        <div className="text-6xl animate-bounce select-none">🤖</div>
+							    )}
+							</div>
+							
 			            </div>
 			
 			            <div className="mt-12 flex flex-col gap-4 w-full px-4">
@@ -1548,6 +1558,7 @@
     </script>
 </body>
 </html>
+
 
 
 
