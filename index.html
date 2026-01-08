@@ -225,29 +225,38 @@
                 }).join(' ');
             },
 
-			voiceConfig: { lang: 'en-GB', gender: 'male' }, // Default settings for voice
-			//Male Female US UK voice implementation
+			/* CONTEXT: Adding global controls for Pitch and Rate to fix "fast/unnatural" voice issues */
+			voiceConfig: { lang: 'en-GB', gender: 'male', pitch: 1.0, rate: 0.9 }, 
+			
+			init: function() {
+			    if (this.hasSynthesis()) {
+			        const load = () => { this.voices = window.speechSynthesis.getVoices(); };
+			        load();
+			        if (window.speechSynthesis.onvoiceschanged !== undefined) { window.speechSynthesis.onvoiceschanged = load; }
+			    }
+			},
+			
 			speak: function(text) {
 			    if (!this.hasSynthesis()) return;
 			    window.speechSynthesis.cancel(); 
 			    const phoneticText = this.getPhoneticText(text);
 			    const utterance = new SpeechSynthesisUtterance(phoneticText);
 			    
-			    // Logic to find the specific voice requested
 			    let voice = this.voices.find(v => 
 			        v.lang.startsWith(this.voiceConfig.lang) && 
 			        (this.voiceConfig.gender === 'male' ? 
-			            (v.name.includes('Male') || v.name.includes('Daniel') || v.name.includes('David')) : 
-			            (v.name.includes('Female') || v.name.includes('Google UK English Female') || v.name.includes('Hazel')))
+			            (v.name.includes('Male') || v.name.includes('Daniel') || v.name.includes('David') || v.name.includes('Microsoft George')) : 
+			            (v.name.includes('Female') || v.name.includes('Google UK English Female') || v.name.includes('Hazel') || v.name.includes('Susan')))
 			    );
 			
 			    if (!voice) voice = this.voices.find(v => v.lang.startsWith(this.voiceConfig.lang)); 
 			    
 			    if (voice) { 
 			        utterance.voice = voice; 
-			        utterance.lang = this.voiceConfig.lang; 
-			        utterance.rate = 1.0; 
-			        utterance.pitch = 1.0; 
+			        utterance.lang = this.voiceConfig.lang;
+			        /* APPLY SLIDER VALUES HERE */
+			        utterance.pitch = this.voiceConfig.pitch; 
+			        utterance.rate = this.voiceConfig.rate; 
 			    }
 			    window.speechSynthesis.speak(utterance);
 			}
@@ -1007,7 +1016,6 @@
 			                </button>
 			            </div>
 
-												/* --- ADDING VOICE SELECTOR UI --- */
 						{/* CONTEXT: UI toggles for user to dynamically change the AI Interviewer's voice accent and gender */}
 						<div className="w-full px-4 mt-6 space-y-3 bg-slate-800/40 p-4 rounded-2xl border border-slate-700 shadow-inner">
 						    <span className="text-[10px] font-bold text-gray-500 uppercase font-mono tracking-widest block mb-2 text-left">Panel Persona</span>
@@ -1032,6 +1040,33 @@
 						            onClick={() => { SpeechManager.voiceConfig.gender = 'female'; setMessages([...messages]); }}
 						            className={`flex-1 text-[10px] py-2 rounded-lg font-mono border transition-all ${SpeechManager.voiceConfig.gender === 'female' ? 'bg-pink-600 text-white border-pink-500 shadow-lg' : 'bg-slate-700 text-gray-400 border-slate-600 opacity-60'}`}
 						        ><i className="fas fa-venus mr-1"></i> FEMALE</button>
+						    </div>
+						</div>
+
+						{/* CONTEXT: Precision sliders for Pitch and Speed to customize the AI's vocal delivery */}
+						<div className="w-full px-4 mt-4 space-y-4 bg-slate-800/40 p-4 rounded-2xl border border-slate-700 shadow-inner">
+						    <div className="flex flex-col gap-1">
+						        <div className="flex justify-between items-center">
+						            <span className="text-[10px] font-bold text-gray-500 uppercase font-mono tracking-widest">Voice Speed</span>
+						            <span className="text-[10px] font-mono text-jpm-accent">{SpeechManager.voiceConfig.rate}x</span>
+						        </div>
+						        <input type="range" min="0.5" max="1.5" step="0.1" 
+						            value={SpeechManager.voiceConfig.rate} 
+						            onChange={(e) => { SpeechManager.voiceConfig.rate = parseFloat(e.target.value); setMessages([...messages]); }}
+						            className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-jpm-accent" 
+						        />
+						    </div>
+						
+						    <div className="flex flex-col gap-1">
+						        <div className="flex justify-between items-center">
+						            <span className="text-[10px] font-bold text-gray-500 uppercase font-mono tracking-widest">Voice Pitch</span>
+						            <span className="text-[10px] font-mono text-jpm-accent">{SpeechManager.voiceConfig.pitch}</span>
+						        </div>
+						        <input type="range" min="0.5" max="1.5" step="0.1" 
+						            value={SpeechManager.voiceConfig.pitch} 
+						            onChange={(e) => { SpeechManager.voiceConfig.pitch = parseFloat(e.target.value); setMessages([...messages]); }}
+						            className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-jpm-accent" 
+						        />
 						    </div>
 						</div>
 			
@@ -1501,6 +1536,7 @@
     </script>
 </body>
 </html>
+
 
 
 
