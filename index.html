@@ -1298,22 +1298,49 @@
             };
 
             useEffect(() => {
+                /*Cloud Boot Protocol. On startup, the app checks the cloud 
+                    for a newer master copy of your data before falling back to local storage. */
                 const load = async () => {
                     try {
                         const ts = Date.now(); 
                         const [f, t, m, s, p, sk, v] = await Promise.all([
-                            fetch(`flashcards.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""), fetch(`type_answer.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""),
-                            fetch(`mcq.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""), fetch(`context.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""),
-                            fetch(`prompt.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""), fetch(`skill.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""), fetch(`vocab.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : "")
+                            fetch(`flashcards.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""), 
+                            fetch(`type_answer.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""),
+                            fetch(`mcq.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""), 
+                            fetch(`context.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""),
+                            fetch(`prompt.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""), 
+                            fetch(`skill.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : ""), 
+                            fetch(`vocab.csv?t=${ts}`, {cache: 'no-store'}).then(r => r.ok ? r.text() : "")
                         ]);
                         setData({ flashcards: f ? parseCSV(f) : [], type: t ? parseCSV(t) : [], mcq: m ? parseCSV(m) : [], study: s ? parseCSV(s) : [], prompts: p ? parseCSV(p) : [], skills: sk ? parseCSV(sk) : [], vocab: v ? parseCSV(v) : [] });
                     } catch(e) { console.error(e); }
+
+                    const aiUrl = localStorage.getItem('jpm_ai_url');
+                    if (aiUrl) {
+                        try {
+                            const cloudRes = await fetch(aiUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ data: { action: "fetch", userID: "satnam_default" } })
+                            });
+                            const cloudData = await cloudRes.json();
+                            if (cloudData.data?.payload) {
+                                const { progress: cloudP, customProjects: cloudCP } = cloudData.data.payload;
+                                if (cloudP) setProgress(cloudP);
+                                if (cloudCP) setCustomProjects(cloudCP);
+                                // After cloud merge, check settings
+                                if (cloudP?._settings) setPressureMode(cloudP._settings.pressureMode || false);
+                                return; 
+                            }
+                        } catch (e) { console.warn("Cloud fetch failed, using local."); }
+                    }
+
                     const saved = localStorage.getItem('jpm_prep_progress_v20');
-                    if(saved) { const parsed = JSON.parse(saved); setProgress(parsed); if(parsed._settings) setPressureMode(parsed._settings.pressureMode || false); }
-                    const today = new Date().toLocaleDateString(); const lastLogin = localStorage.getItem('jpm_last_login');
-                    let currentStreak = parseInt(localStorage.getItem('jpm_streak') || '0');
-                    if (lastLogin !== today) { const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1); if (lastLogin === yesterday.toLocaleDateString()) currentStreak++; else currentStreak = 1; localStorage.setItem('jpm_last_login', today); localStorage.setItem('jpm_streak', currentStreak); }
-                    setStreak(currentStreak);
+                    if(saved) { 
+                        const parsed = JSON.parse(saved); 
+                        setProgress(parsed); 
+                        if(parsed._settings) setPressureMode(parsed._settings.pressureMode || false); 
+                    }
                 };
                 load();
             }, []);
@@ -1345,6 +1372,41 @@
             const handleImport = (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const p = JSON.parse(e.target.result); setProgress(p); if(p._settings) setPressureMode(p._settings.pressureMode || false); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(p)); alert("Import Successful!"); } catch(err) { alert("Invalid File"); } }; reader.readAsText(file); };
             const togglePressureMode = () => { const newVal = !pressureMode; setPressureMode(newVal); const newP = { ...progress, _settings: { ...(progress._settings || {}), pressureMode: newVal } }; setProgress(newP); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(newP)); };
             
+            /*Enterprise Auto-Sync. This monitors all application activity 
+            and automatically pushes a master backup to Firebase every 3 seconds 
+            after the last change to ensure iPad/Laptop parity. */
+            useEffect(() => {
+                localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(progress));
+                localStorage.setItem('jpm_custom_projects', JSON.stringify(customProjects));
+
+                const syncToCloud = async () => {
+                    const aiUrl = localStorage.getItem('jpm_ai_url');
+                    if (!aiUrl) return;
+
+                    setSyncStatus('saving');
+                    try {
+                        await fetch(aiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                data: { 
+                                    action: "sync", 
+                                    userID: "satnam_default", 
+                                    payload: { progress, customProjects } 
+                                } 
+                            })
+                        });
+                        setSyncStatus('synced');
+                    } catch (e) {
+                        setSyncStatus('error');
+                        console.error("Cloud Sync Failed:", e);
+                    }
+                };
+
+                const timer = setTimeout(syncToCloud, 3000); 
+                return () => clearTimeout(timer);
+            }, [progress, customProjects]);
+
             const startSession = (m, deckName, specificQueue = null) => {
 
 				// ---AI CLICK NOT WORKING FIX STARTS HERE 8th Jan 2025 12:30 AM---
