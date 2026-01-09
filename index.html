@@ -1174,6 +1174,15 @@
             const [pressureMode, setPressureMode] = useState(false);
             const [focusMode, setFocusMode] = useState(false);
 
+            /* Initializing the Global Sync Engine states. 
+                'customProjects' will store your future Innovation Lab projects. */
+            const [customProjects, setCustomProjects] = useState(() => {
+                const saved = localStorage.getItem('jpm_custom_projects');
+                return saved ? JSON.parse(saved) : [];
+            });
+            const [showProjectCreator, setShowProjectCreator] = useState(false);
+            const [syncStatus, setSyncStatus] = useState('synced');
+
             const quote = useMemo(() => {
                 const quotes = [
                     "\"The Secret Of Getting Ahead Is Getting Started.\" — Mark Twain",
