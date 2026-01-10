@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JP Morgan Interview Preparation App V20.97</title>
+    <title>JP Morgan Interview Preparation App V20.99</title>
 
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -349,14 +349,14 @@
             hasRecognition: () => 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window,
             hasSynthesis: () => 'speechSynthesis' in window,
             voices: [],
-            phoneticMap: { "TUPE": "Too P", "SQL": "Sequel", "JPM": "J P M", "API": "A P I", "OOPS": "Oops", "JDBC": "J D B C", "PACS.002": "pacs two", "PACS.008": "pacs eight", "PACS.009": "pacs nine", "PAIN.001": "pain one", "PAIN.002": "pain two" },
-            init: function () {
-                if (this.hasSynthesis()) {
-                    const load = () => { this.voices = window.speechSynthesis.getVoices(); };
-                    load();
-                    if (window.speechSynthesis.onvoiceschanged !== undefined) { window.speechSynthesis.onvoiceschanged = load; }
-                }
-            },
+            phoneticMap: { "TUPE": "Too P", "SQL": "Sequel", "JPM": "J P M", "API": "A P I", "OOPS": "Oops", 
+            "JDBC": "J D B C", "PACS.002": "pacs two", "PACS.008": "pacs eight", "PACS.009": "pacs nine", 
+            "PAIN.001": "pain one", "PAIN.002": "pain two", "SWIFT": "Swift", "KYC": "K Y C", "AML": "A M L", 
+            "OFAC": "O F A C", "GDP": "G D P", "IP": "I P", "UI": "U I", "UX": "U X", "JSON": "Jason", "XML": 
+            "X M L", "HTML": "H T M L", "CSS": "C S S", "HTTP": "H T T P", "HTTPS": "H T T P S", "TCP": "T C P", 
+            "IPFS": "I P F S", "NFT": "N F T", "GUI": "G U I", "Pacs.002": "pacs two", "Pacs.008": "pacs eight", 
+            "Pacs.009": "pacs nine", "Pain.001": "pain one", "Pain.002": "pain two" },
+            
             getPhoneticText: function (text) {
                 if (!text) return "";
                 return text.split(' ').map(word => {
@@ -366,9 +366,6 @@
                 }).join(' ');
             },
 
-            /* CONTEXT: Adding global controls for Pitch and Rate to fix "fast/unnatural" voice issues */
-            voiceConfig: { lang: 'en-GB', gender: 'male', pitch: 1.0, rate: 0.9 },
-
             init: function () {
                 if (this.hasSynthesis()) {
                     const load = () => { this.voices = window.speechSynthesis.getVoices(); };
@@ -376,6 +373,9 @@
                     if (window.speechSynthesis.onvoiceschanged !== undefined) { window.speechSynthesis.onvoiceschanged = load; }
                 }
             },
+
+            /* CONTEXT: Adding global controls for Pitch and Rate to fix "fast/unnatural" voice issues */
+            voiceConfig: { lang: 'en-GB', gender: 'male', pitch: 1.0, rate: 0.9 },            
 
             speak: function (text) {
                 if (!this.hasSynthesis()) return;
@@ -1084,7 +1084,7 @@
                             });
                             setMessages(historicalMessages);
                         }
-                        
+
                     } catch (e) { console.error("History fetch failed:", e); }
                 };
                 fetchCloudHistory();
@@ -1118,20 +1118,20 @@
             };
 
             /* Strategic Turn-Taking Logic. 
-               Uses a 1.5s 'silenceTimeout' to prevent the AI from interrupting 
+               Uses a 2s 'silenceTimeout' to prevent the AI from interrupting 
                Satnam mid-sentence during complex technical answers. */
                
             const startListening = () => {
-                if (!('webkitSpeechRecognition' in window)) return alert("Browser not supported");
-                const SpeechRecognition = window.webkitSpeechRecognition;
-                const recognition = new SpeechRecognition();
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) return alert("Browser not supported");
 
+                const recognition = new SpeechRecognition();
                 recognition.continuous = true;
-                recognition.interimResults = true; // CRITICAL: Allows real-time viewing
+                recognition.interimResults = true;
                 recognition.lang = 'en-GB';
 
                 let silencerTimeout = null;
-                let fullTranscript = ""; // Accumulator for the whole speech
+                let fullTranscript = "";
 
                 recognition.onstart = () => {
                     setStatus("LISTENING");
@@ -1140,7 +1140,6 @@
 
                 recognition.onresult = (e) => {
                     if (silencerTimeout) clearTimeout(silencerTimeout);
-
                     let interim = "";
                     for (let i = e.resultIndex; i < e.results.length; ++i) {
                         if (e.results[i].isFinal) {
@@ -1149,21 +1148,21 @@
                             interim += e.results[i][0].transcript;
                         }
                     }
-
-                    // Show Satnam his live words so he knows the mic is working
                     setInterimText(fullTranscript + interim);
 
                     if (fullTranscript.trim() || interim.trim()) {
                         silencerTimeout = setTimeout(() => {
-                            const finalSpeech = (fullTranscript + interim).trim();
-                            sendMessage(finalSpeech); // Send the WHOLE technical answer
+                            sendMessage((fullTranscript + interim).trim());
                             recognition.stop();
-                            setInterimText(""); // Clear for next round
-                        }, 2000); // Increased to 2s to allow for deeper ISO 20022 thought pauses
+                        }, 2000);
                     }
                 };
 
-                recognition.onend = () => { if (status === "LISTENING") setStatus("IDLE"); };
+                recognition.onend = () => {
+                    // Use a functional update to check status safely
+                    setStatus(prev => prev === "LISTENING" ? "IDLE" : prev);
+                };
+
                 recognitionRef.current = recognition;
                 recognition.start();
             };
@@ -1321,27 +1320,45 @@
 
                         {/* END - THE DYNAMIC PREMIUM AI ORB */}
                         
-                        {/*Session Control Buttons*/}
-                        <div className="mt-12 flex flex-col gap-4 w-full px-4">
+                        {/* Session Control Buttons - Refined for Sleek Production Look */}
+                        <div className="mt-12 flex flex-col gap-3 w-full px-4">
                             {status === 'IDLE' ? (
-                                <button onClick={startListening} className="w-full bg-jpm-accent text-black font-bold py-4 rounded-xl hover:scale-105 transition shadow-lg shadow-jpm-accent/20">START SESSION</button>
+                                <button
+                                    onClick={startListening}
+                                    className="w-full bg-jpm-accent text-black font-bold py-4 rounded-xl hover:scale-105 transition shadow-lg shadow-jpm-accent/20"
+                                >
+                                    START SESSION
+                                </button>
                             ) : (
-                                <div className="space-y-3">
-                                    {(status === 'SPEAKING' || status === 'PAUSED') && (
+                                <>
+                                    {/* SLEEK PAUSE BUTTON: Matching 'End Session' style but in Amber */}
+                                    {(status === 'SPEAKING' || status === 'PAUSED' || status === 'LISTENING' || status === 'THINKING') && (
                                         <button
                                             onClick={togglePause}
-                                            className={`w-full font-bold py-4 rounded-xl transition shadow-lg ${isPaused ? 'bg-amber-600 animate-pulse text-white' : 'bg-slate-700 text-amber-500 border border-amber-900/50'
+                                            className={`w-full border py-3 rounded-xl font-mono text-[10px] uppercase tracking-widest transition-all ${isPaused
+                                                    ? 'bg-amber-600/20 border-amber-500 text-white animate-pulse'
+                                                    : 'border-amber-900/50 text-amber-500 hover:bg-amber-900/10'
                                                 }`}
                                         >
                                             <i className={`fas ${isPaused ? 'fa-play' : 'fa-pause'} mr-2`}></i>
-                                            {isPaused ? 'RESUME SPEECH' : 'PAUSE SPEECH'}
+                                            {isPaused ? 'Resume Speech' : 'Pause Speech'}
                                         </button>
                                     )}
-                                    <button onClick={stopEverything} className="w-full border border-red-900 text-red-500 font-mono text-xs py-3 rounded-xl hover:bg-red-900/10 transition uppercase tracking-widest">End Session</button>
-                                </div>
+
+                                    {/* END SESSION BUTTON: Always visible once session starts */}
+                                    <button
+                                        onClick={stopEverything}
+                                        className="w-full border border-red-900 text-red-500 font-mono text-[10px] py-3 rounded-xl hover:bg-red-900/10 transition uppercase tracking-widest"
+                                    >
+                                        End Session
+                                    </button>
+                                </>
                             )}
-                                {/* Neural Link Toggle remains available */}
-                            <button onClick={() => setShowConfig(!showConfig)} className="text-[10px] text-slate-500 hover:text-jpm-accent transition-colors font-mono">
+
+                            <button
+                                onClick={() => setShowConfig(!showConfig)}
+                                className="text-[10px] text-slate-500 hover:text-jpm-accent transition-colors font-mono mt-2 self-center"
+                            >
                                 <i className="fas fa-cog mr-2"></i>Configure Neural Link
                             </button>
                         </div>
@@ -1860,7 +1877,7 @@
                             <header className="flex-shrink-0 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-50 relative">
                                 <div className="flex items-center gap-3">
                                     <i className="fas fa-university text-jpm-accent text-2xl"></i>
-                                    <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight font-quote text-gray-100">JP Morgan Interview Prep</h1><span className="text-xs text-slate-400 font-mono">V20.97 | Premium Edition</span></div>
+                                    <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight font-quote text-gray-100">JP Morgan Interview Prep</h1><span className="text-xs text-slate-400 font-mono">V20.99 | Premium Edition</span></div>
                                 </div>
                                 <div className="flex items-center gap-4">
                                     <button onClick={() => setShowTechModal(true)} className="p-2 rounded hover:bg-white/10 text-jpm-accent transition-colors animate-pulse-soft hover:shadow-[0_0_15px_rgba(197,157,95,0.4)]" title="Tech Insights"><i className="fas fa-globe-americas"></i></button>
