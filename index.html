@@ -1018,6 +1018,24 @@
             const [showConfig, setShowConfig] = useState(!localStorage.getItem('jpm_ai_url'));
 
             const recognitionRef = useRef(null);
+            const lastSpokenTextRef = useRef(""); // New: Stores text for live-restarts
+            const currentAudioRef = useRef(null); // New: Tracks active audio object
+
+            /*Real-time Voice Adoption. 
+            When Satnam changes Speed, Gender, or Region, the current audio stops 
+            and restarts immediately with the new settings using the same text. */
+            useEffect(() => {
+                if (status === "SPEAKING" && currentAudioRef.current) {
+                    // Stop current audio
+                    currentAudioRef.current.pause();
+                    currentAudioRef.current.src = "";
+
+                    // Restart with same text but new settings
+                    if (lastSpokenTextRef.current) {
+                        speakResponse(lastSpokenTextRef.current);
+                    }
+                }
+            }, [gender, speed, region]); // Watch for any setting change
 
             //Ends the session cleanly in AI mode when END button is hit 
             useEffect(() => {
@@ -1062,6 +1080,7 @@
             and added error handling to prevent the 'Stuck in Speaking' bug. */
 
             const speakResponse = async (text) => {
+                lastSpokenTextRef.current = text; // Store for potential restart
                 const aiUrl = localStorage.getItem('jpm_ai_url');
                 console.log("DEBUG: Sending text to speech:", text.substring(0, 20) + "...");
                 try {
@@ -1092,6 +1111,7 @@
 
                     const audioUrl = URL.createObjectURL(blob);
                     const audio = new Audio(audioUrl);
+                    currentAudioRef.current = audio; // Track this audio
                     audio.onplay = () => setStatus("SPEAKING");
                     /* Continuous AI Flow Fix. 
                         Removes the flicker to IDLE after speaking, keeping the UI in a 
@@ -1101,7 +1121,7 @@
                         // Directly transition from SPEAKING to LISTENING without hitting IDLE
                         startListening();
                     };
-                    
+
                     audio.onerror = (e) => { console.error("DEBUG: Audio Playback Error:", e); setStatus("IDLE"); };
                     await audio.play();
                 } catch (e) {
