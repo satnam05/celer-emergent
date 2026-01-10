@@ -759,6 +759,32 @@
             useEffect(() => { const done = Object.keys(results).length; const correct = Object.values(results).filter(r => r === 'easy').length; onStatsUpdate({ completed: done, correct }); }, [results, onStatsUpdate]);
             useEffect(() => { const handleEndSignal = () => { const remaining = deckData.slice(currentIndex); const hardCards = deckData.filter(item => results[item.id] === 'hard'); let queueToSave = [...remaining]; hardCards.forEach(c => { if (!queueToSave.find(q => q.id === c.id)) queueToSave.push(c); }); const score = queueToSave.length === 0 ? 100 : 50; onEnd(score, queueToSave); }; window.addEventListener('jpm-trigger-end', handleEndSignal); return () => window.removeEventListener('jpm-trigger-end', handleEndSignal); }, [currentIndex, results, deckData, onEnd]);
 
+            /* CONTEXT: Strategic History Fetch.
+            When Satnam starts the AI mode, this effect reaches out to the 
+            bridge to pull the last 10-20 messages for the current session. */
+            useEffect(() => {
+                const fetchCloudHistory = async () => {
+                    const aiUrl = localStorage.getItem('jpm_ai_url');
+                    if (!aiUrl) return;
+                    try {
+                        const res = await fetch(aiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ data: { action: "fetchHistory", userID: "satnam_default" } })
+                        });
+                        const result = await res.json();
+                        // result.data.history should contain your Firestore history
+                        if (result.data?.history) {
+                            setMessages(result.data.history.map(h => ({
+                                role: h.role || (h.aiSaid ? 'model' : 'user'),
+                                text: h.aiSaid || h.userSaid
+                            })));
+                        }
+                    } catch (e) { console.error("History fetch failed:", e); }
+                };
+                fetchCloudHistory();
+            }, []);
+
             const handleRate = (rating) => { setResults(prev => ({ ...prev, [current.id]: rating })); setFlipped(false); if (currentIndex < deckData.length - 1) { const next = currentIndex + 1; setCurrentIndex(next); if (next > maxIndex) setMaxIndex(next); } else { const finalResults = { ...results, [current.id]: rating }; const hardCards = deckData.filter(item => finalResults[item.id] === 'hard'); onEnd(hardCards.length === 0 ? 100 : 50, hardCards); } };
             const getBtnStyle = (type) => {
                 const isActive = currentRating === type;
@@ -1020,6 +1046,7 @@
             const recognitionRef = useRef(null);
             const lastSpokenTextRef = useRef(""); // New: Stores text for live-restarts
             const currentAudioRef = useRef(null); // New: Tracks active audio object
+            const [isPaused, setIsPaused] = useState(false); // New: Paused state
 
             /*Real-time Voice Adoption. 
             When Satnam changes Speed, Gender, or Region, the current audio stops 
@@ -1048,6 +1075,19 @@
                 if (recognitionRef.current) recognitionRef.current.stop();
                 window.speechSynthesis.cancel();
                 setStatus("IDLE");
+            };
+            //  New: Toggle Pause/Resume for current audio
+            const togglePause = () => {
+                if (!currentAudioRef.current) return;
+                if (isPaused) {
+                    currentAudioRef.current.play();
+                    setIsPaused(false);
+                    setStatus("SPEAKING");
+                } else {
+                    currentAudioRef.current.pause();
+                    setIsPaused(true);
+                    setStatus("PAUSED");
+                }
             };
 
             const handleConnect = () => {
@@ -1112,6 +1152,20 @@
                     const audioUrl = URL.createObjectURL(blob);
                     const audio = new Audio(audioUrl);
                     currentAudioRef.current = audio; // Track this audio
+                    const togglePause = () => {
+                        if (!currentAudioRef.current) return;
+
+                        if (isPaused) {
+                            currentAudioRef.current.play();
+                            setIsPaused(false);
+                            setStatus("SPEAKING");
+                        } else {
+                            currentAudioRef.current.pause();
+                            setIsPaused(true);
+                            setStatus("PAUSED"); // Add this state to your status list
+                        }
+                    };
+
                     audio.onplay = () => setStatus("SPEAKING");
                     /* Continuous AI Flow Fix. 
                         Removes the flicker to IDLE after speaking, keeping the UI in a 
@@ -1215,15 +1269,27 @@
                         </div>
 
                         {/* END - THE DYNAMIC PREMIUM AI ORB */}
-
+                        
+                        {/*Session Control Buttons*/1}
                         <div className="mt-12 flex flex-col gap-4 w-full px-4">
                             {status === 'IDLE' ? (
                                 <button onClick={startListening} className="w-full bg-jpm-accent text-black font-bold py-4 rounded-xl hover:scale-105 transition shadow-lg shadow-jpm-accent/20">START SESSION</button>
                             ) : (
-                                <button onClick={stopEverything} className="w-full border border-red-900 text-red-500 font-mono text-xs py-3 rounded-xl hover:bg-red-900/10 transition uppercase tracking-widest">Stop Session</button>
+                                <div className="space-y-3">
+                                    {(status === 'SPEAKING' || status === 'PAUSED') && (
+                                        <button
+                                            onClick={togglePause}
+                                            className={`w-full font-bold py-4 rounded-xl transition shadow-lg ${isPaused ? 'bg-amber-600 animate-pulse text-white' : 'bg-slate-700 text-amber-500 border border-amber-900/50'
+                                                }`}
+                                        >
+                                            <i className={`fas ${isPaused ? 'fa-play' : 'fa-pause'} mr-2`}></i>
+                                            {isPaused ? 'RESUME SPEECH' : 'PAUSE SPEECH'}
+                                        </button>
+                                    )}
+                                    <button onClick={stopEverything} className="w-full border border-red-900 text-red-500 font-mono text-xs py-3 rounded-xl hover:bg-red-900/10 transition uppercase tracking-widest">End Session</button>
+                                </div>
                             )}
-
-                            {/* Neural Link Toggle remains available */}
+                                {/* Neural Link Toggle remains available */}
                             <button onClick={() => setShowConfig(!showConfig)} className="text-[10px] text-slate-500 hover:text-jpm-accent transition-colors font-mono">
                                 <i className="fas fa-cog mr-2"></i>Configure Neural Link
                             </button>
