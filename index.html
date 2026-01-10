@@ -770,7 +770,7 @@
                         const res = await fetch(aiUrl, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ data: { action: "fetchHistory", userID: "satnam_default" } })
+                            body: JSON.stringify({ data: { action: "fetchHistory", userID: "satnam_default", sessionID: "voice-session-satnam" } }) // MATCHING STABLE ID
                         });
                         const result = await res.json();
                         // result.data.history should contain your Firestore history
@@ -1098,19 +1098,41 @@
                 setShowConfig(false);
             };
 
+            /* Strategic Turn-Taking Logic. 
+               Uses a 1.5s 'silenceTimeout' to prevent the AI from interrupting 
+               Satnam mid-sentence during complex technical answers. */
+               
             const startListening = () => {
                 if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) return alert("Browser not supported");
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 const recognition = new SpeechRecognition();
-                recognition.continuous = false;
-                recognition.interimResults = false;
+
+                recognition.continuous = true; // Key: Don't stop on short breaths
+                recognition.interimResults = true;
                 recognition.lang = 'en-GB';
 
+                let silencerTimeout = null;
+
                 recognition.onstart = () => setStatus("LISTENING");
+
                 recognition.onresult = (e) => {
-                    const transcript = e.results[0][0].transcript;
-                    if (transcript.trim()) sendMessage(transcript);
+                    // Reset the timer every time Satnam speaks a new word
+                    if (silencerTimeout) clearTimeout(silencerTimeout);
+
+                    let finalTranscript = '';
+                    for (let i = e.resultIndex; i < e.results.length; ++i) {
+                        if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript;
+                    }
+
+                    if (finalTranscript.trim()) {
+                        // Wait for exactly 1.5 seconds of silence before AI takes over
+                        silencerTimeout = setTimeout(() => {
+                            sendMessage(finalTranscript);
+                            recognition.stop();
+                        }, 1500);
+                    }
                 };
+
                 recognition.onend = () => { if (status === "LISTENING") setStatus("IDLE"); };
                 recognitionRef.current = recognition;
                 recognition.start();
@@ -1196,17 +1218,16 @@
 
                 try {
 
-                    /* --- START THINKING TOGGLE IMPLEMENTATION --- */
+                    // CHANGE THIS: Replace the dynamic timestamp with a stable session ID
                     const payload = {
                         data: {
                             message: text,
-                            sessionID: "voice-session-" + new Date().getTime(),
+                            sessionID: "voice-session-satnam", // STABLE ID
                             history: updatedHistory.map(m => ({
                                 role: m.role === 'model' ? 'ai' : 'user',
                                 text: m.text
                             })),
-
-                            thinking_level: thinkingMode //Taking input from screen for thinking mode 
+                            thinking_level: thinkingMode
                         }
                     };
 
