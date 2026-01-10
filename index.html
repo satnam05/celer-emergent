@@ -1010,97 +1010,112 @@
 
         // ---START AI MODE ---
         
-        const AIMode = ({ onEnd, toggleFocus, isFocusMode, gender, speed, region, setGender, setSpeed, setRegion }) => {
-    const [status, setStatus] = React.useState("IDLE");
-    const [thinkingMode, setThinkingMode] = React.useState("low");
-    const [messages, setMessages] = React.useState([]);
-    const [url, setUrl] = React.useState(localStorage.getItem('jpm_ai_url') || "");
-    const [showConfig, setShowConfig] = React.useState(!localStorage.getItem('jpm_ai_url'));
-    const [interimText, setInterimText] = React.useState("");
-    const [isPaused, setIsPaused] = React.useState(false);
+       const AIMode = ({ onEnd, gender, speed, region }) => {
+    const [status, setStatus] = useState("IDLE");
+    const [messages, setMessages] = useState([]);
+    const [interimText, setInterimText] = useState("");
+    const [isPaused, setIsPaused] = useState(false);
+    const [thinkingMode, setThinkingMode] = useState("low");
 
-    const recognitionRef = React.useRef(null);
-    const currentAudioRef = React.useRef(null);
-    const isBotSpeakingRef = React.useRef(false);
-    const lastSpokenTextRef = React.useRef("");
-    const fullTranscriptRef = React.useRef("");
+    const recognitionRef = useRef(null);
+    const currentAudioRef = useRef(null);
+    const isBotSpeakingRef = useRef(false);
+    const fullTranscriptRef = useRef("");
+    const silencerTimeoutRef = useRef(null);
 
-    // --- FIX 2 & 4: Aggressive Stop & Cleanup ---
-    const stopEverything = React.useCallback(() => {
+    // FIX 5 & 7: Hard Stop and Reset Disabled
+    const stopEverything = useCallback(() => {
         isBotSpeakingRef.current = false;
-        
-        // Kill Recognition
         if (recognitionRef.current) {
-            recognitionRef.current.onend = null; // Prevent auto-restart loop
-            recognitionRef.current.abort(); // Stronger than stop()
+            recognitionRef.current.onend = null;
+            recognitionRef.current.abort(); // Force kill
         }
-
-        // Kill Audio Buffer (Fix for "speaking when stopped")
         if (currentAudioRef.current) {
             currentAudioRef.current.pause();
-            currentAudioRef.current.src = ""; // Clear stream
-            currentAudioRef.current.load(); // Reset element
+            currentAudioRef.current.src = ""; // Flush buffer
+            currentAudioRef.current.load();
         }
-
         window.speechSynthesis.cancel();
         setStatus("IDLE");
-        setIsPaused(false);
     }, []);
 
-    // --- FIX 3: High-Accuracy UK Transcription ---
-    const startListening = React.useCallback(() => {
+    // FIX 6: Persistent History Load
+    useEffect(() => {
+        const fetchHistory = async () => {
+            const aiUrl = localStorage.getItem('jpm_ai_url');
+            if (!aiUrl) return;
+            try {
+                const res = await fetch(aiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data: { action: "fetchHistory", userID: "satnam_default", sessionID: "voice-session-satnam" } })
+                });
+                const result = await res.json();
+                if (result.data?.history) {
+                    const formatted = [];
+                    result.data.history.forEach(h => {
+                        if (h.userSaid) formatted.push({ role: 'user', text: h.userSaid });
+                        if (h.aiSaid) formatted.push({ role: 'model', text: h.aiSaid });
+                    });
+                    setMessages(formatted);
+                }
+            } catch (e) { console.error("History fail", e); }
+        };
+        fetchHistory();
+    }, []);
+
+    // FIX 3: Real-Time Transcription
+    const startListening = useCallback(() => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) return alert("Speech API not supported");
+        if (!SpeechRecognition) return;
 
         const recognition = new SpeechRecognition();
         recognition.continuous = true;
         recognition.interimResults = true;
-        recognition.lang = region || 'en-GB';
-
-        let silencerTimeout = null;
-        fullTranscriptRef.current = "";
+        recognition.lang = 'en-GB'; // UK Precision
 
         recognition.onstart = () => {
             setStatus("LISTENING");
-            setInterimText("");
             isBotSpeakingRef.current = false;
+            fullTranscriptRef.current = "";
         };
 
         recognition.onresult = (e) => {
-            if (isBotSpeakingRef.current) return; // FIX 1: Bot won't hear itself
-            if (silencerTimeout) clearTimeout(silencerTimeout);
+            // FIX 4: Hard Lock - Discard if bot is speaking
+            if (isBotSpeakingRef.current) return;
+
+            if (silencerTimeoutRef.current) clearTimeout(silencerTimeoutRef.current);
 
             let interim = "";
-            let finalized = "";
-
+            let final = "";
             for (let i = e.resultIndex; i < e.results.length; ++i) {
-                if (e.results[i].isFinal) finalized += e.results[i][0].transcript + " ";
+                if (e.results[i].isFinal) final += e.results[i][0].transcript + " ";
                 else interim += e.results[i][0].transcript;
             }
 
-            fullTranscriptRef.current += finalized;
-            const liveView = (fullTranscriptRef.current + interim).trim();
-            setInterimText(liveView);
+            fullTranscriptRef.current += final;
+            const liveText = (fullTranscriptRef.current + interim).trim();
+            setInterimText(liveText);
 
-            if (liveView.length > 0) {
-                silencerTimeout = setTimeout(() => {
+            if (liveText.length > 5) {
+                silencerTimeoutRef.current = setTimeout(() => {
                     if (!isBotSpeakingRef.current) {
-                        sendMessage(liveView);
+                        sendMessage(liveText);
                         recognition.stop();
                     }
-                }, 1800); // 1.8s silence detection
+                }, 1800);
             }
         };
 
         recognition.onend = () => {
             if (!isBotSpeakingRef.current && status === "LISTENING") {
-                try { recognition.start(); } catch(e) {}
+                try { recognition.start(); } catch (err) {}
             }
         };
 
         recognitionRef.current = recognition;
         recognition.start();
-    }, [region, status]);
+    }, [status]);
 
     const speakResponse = async (text) => {
         isBotSpeakingRef.current = true;
@@ -1113,43 +1128,30 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ data: { action: "getSpeech", text, gender, speed, region } })
             });
-
             const blob = await response.blob();
-            const audioUrl = URL.createObjectURL(blob);
-            const audio = new Audio(audioUrl);
+            const audio = new Audio(URL.createObjectURL(blob));
             currentAudioRef.current = audio;
 
             audio.onplay = () => setStatus("SPEAKING");
             audio.onended = () => {
                 isBotSpeakingRef.current = false;
                 setInterimText("");
-                startListening(); // Transition back to Listening
+                startListening();
             };
-
-            await audio.play();
-        } catch (e) {
-            console.error("Polly Error:", e);
-            stopEverything();
-        }
+            audio.play();
+        } catch (e) { stopEverything(); }
     };
 
     const sendMessage = async (text) => {
         setStatus("THINKING");
-        const updatedHistory = [...messages, { role: 'user', text }];
-        setMessages(updatedHistory);
+        const history = [...messages, { role: 'user', text }];
+        setMessages(history);
 
         try {
-            const response = await fetch(url, {
+            const response = await fetch(localStorage.getItem('jpm_ai_url'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    data: {
-                        message: text,
-                        sessionID: "voice-session-satnam",
-                        history: updatedHistory.map(m => ({ role: m.role === 'model' ? 'ai' : 'user', text: m.text })),
-                        thinking_level: thinkingMode
-                    }
-                })
+                body: JSON.stringify({ data: { message: text, sessionID: "voice-session-satnam", history: history.map(m => ({ role: m.role === 'model' ? 'ai' : 'user', text: m.text })), thinking_level: thinkingMode } })
             });
             const data = await response.json();
             const aiText = data.data?.text || "Connectivity error.";
@@ -1160,82 +1162,65 @@
 
     const togglePause = () => {
         if (!currentAudioRef.current) return;
-        if (isPaused) {
-            currentAudioRef.current.play();
-            setIsPaused(false);
-            setStatus("SPEAKING");
-        } else {
-            currentAudioRef.current.pause();
-            setIsPaused(true);
-            setStatus("PAUSED");
-        }
+        if (isPaused) { currentAudioRef.current.play(); setIsPaused(false); setStatus("SPEAKING"); }
+        else { currentAudioRef.current.pause(); setIsPaused(true); setStatus("PAUSED"); }
     };
 
-    // --- RENDER STATEMENT (UNALTERED UI) ---
+    // FIX 5: Bind the header END button signal
+    useEffect(() => {
+        const handleEnd = () => { stopEverything(); onEnd(0, []); };
+        window.addEventListener('jpm-trigger-end', handleEnd);
+        return () => window.removeEventListener('jpm-trigger-end', handleEnd);
+    }, [onEnd, stopEverything]);
+
+    // FIX 1, 2, 8: Compact UI for iPad/iPhone
     return (
-        <div className="flex h-full w-full bg-slate-950 text-white overflow-hidden">
-            <div className="w-1/3 border-r border-slate-800 flex flex-col items-center justify-center p-6 bg-slate-900/50 relative">
-                <div className="flex flex-col items-center mb-8">
-                    <div className={`px-3 py-1 rounded-full border text-[11px] font-bold font-mono transition-all duration-300 ${status === 'LISTENING' ? 'bg-blue-900/30 border-blue-500 text-blue-400' : status === 'THINKING' ? 'bg-purple-900/30 border-purple-500 text-purple-400' : status === 'SPEAKING' ? 'bg-jpm-accent/20 border-jpm-accent text-jpm-accent' : 'bg-slate-800 border-slate-700 text-slate-500'}`}>
-                        {status}
+        <div className="flex h-full w-full bg-slate-950 text-white overflow-hidden flex-col md:flex-row">
+            {/* LEFT: Compact Control Panel */}
+            <div className="w-full md:w-1/3 border-b md:border-r border-slate-800 flex flex-col items-center justify-center p-4 bg-slate-900/50">
+                <div className={`px-2 py-0.5 rounded-full border text-[10px] font-mono mb-4 ${status === 'LISTENING' ? 'border-blue-500 text-blue-400' : 'border-slate-700 text-slate-500'}`}>{status}</div>
+                
+                {/* ORB */}
+                <div className={`relative w-32 h-32 md:w-44 md:h-44 rounded-full flex items-center justify-center transition-all duration-700 ${status === 'LISTENING' ? 'bg-blue-500/20 shadow-[0_0_40px_rgba(59,130,246,0.5)]' : 'bg-slate-800/40'}`}>
+                    <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border border-white/10 flex items-center justify-center bg-slate-950">
+                        <span className="text-4xl md:text-5xl">{status === 'SPEAKING' ? '🤖' : status === 'LISTENING' ? '🎙️' : '✨'}</span>
                     </div>
                 </div>
 
-                {/* AI ORB */}
-                <div className={`relative w-48 h-48 rounded-full flex items-center justify-center transition-all duration-700 shadow-2xl ${status === 'LISTENING' ? 'bg-blue-500/20 shadow-[0_0_60px_rgba(59,130,246,0.6)] animate-[orb-wobble_3s_infinite]' : status === 'SPEAKING' ? 'bg-jpm-accent/30 shadow-[0_0_60px_rgba(197,157,95,0.6)] animate-[orb-wobble_1.5s_infinite]' : status === 'THINKING' ? 'bg-purple-500/20 shadow-[0_0_60px_rgba(168,85,247,0.6)]' : 'bg-slate-800/40 shadow-inner'}`}>
-                    <div className="w-36 h-36 rounded-full border-2 border-white/10 flex items-center justify-center overflow-hidden bg-slate-950">
-                        <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center relative bg-black/20">
-                            <div className={`text-6xl flex items-center justify-center w-full h-full transition-all duration-500 ${status === 'IDLE' ? 'animate-[ai-glow-idle_12s_linear_infinite]' : status === 'THINKING' ? 'animate-[brain-think_2.5s_infinite]' : 'filter drop-shadow-lg'}`}>
-                                {status === 'SPEAKING' ? '🤖' : status === 'LISTENING' ? '🎙️' : status === 'THINKING' ? '🧠' : '✨'}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* CONTROLS (FIX 2: Pointer Events) */}
-                <div className="mt-6 flex flex-col gap-2 w-full px-4">
+                <div className="mt-6 flex flex-col gap-2 w-full max-w-[200px]">
                     {status === 'IDLE' ? (
-                        <button onClick={startListening} className="w-full bg-jpm-accent text-black font-bold py-4 rounded-xl hover:scale-105 transition cursor-pointer">START SESSION</button>
+                        <button onClick={startListening} className="w-full bg-jpm-accent text-black font-bold py-3 rounded-xl text-xs hover:scale-105 transition cursor-pointer">START SESSION</button>
                     ) : (
                         <>
-                            <button onClick={togglePause} className={`w-full border py-3 rounded-xl font-mono text-[10px] uppercase tracking-widest transition-all cursor-pointer ${isPaused ? 'bg-amber-600/20 border-amber-500 text-white animate-pulse' : 'border-amber-900/50 text-amber-500 hover:bg-amber-900/10'}`}>
+                            <button onClick={togglePause} className="w-full border border-amber-900/50 text-amber-500 py-2 rounded-xl text-[10px] uppercase font-bold cursor-pointer">
                                 <i className={`fas ${isPaused ? 'fa-play' : 'fa-pause'} mr-2 pointer-events-none`}></i>
-                                <span className="pointer-events-none">{isPaused ? 'Resume Session' : 'Pause Session'}</span>
+                                <span className="pointer-events-none">{isPaused ? 'Resume' : 'Pause'}</span>
                             </button>
-                            <button onClick={stopEverything} className="w-full border border-red-900 text-red-500 font-mono text-[10px] py-3 rounded-xl hover:bg-red-900/10 transition uppercase tracking-widest cursor-pointer">
+                            <button onClick={stopEverything} className="w-full border border-red-900 text-red-500 py-2 rounded-xl text-[10px] uppercase font-bold cursor-pointer">
                                 <i className="fas fa-stop mr-2 pointer-events-none"></i>
-                                <span className="pointer-events-none">End Session</span>
+                                <span className="pointer-events-none">End</span>
                             </button>
                         </>
                     )}
                 </div>
             </div>
 
-            {/* TRANSCRIPT PANEL */}
-            <div className="w-2/3 flex flex-col p-8 overflow-y-auto relative bg-black/20">
-                <div className="space-y-6 pb-20">
+            {/* RIGHT: Responsive History */}
+            <div className="flex-1 flex flex-col p-4 md:p-8 overflow-y-auto bg-black/20 relative">
+                <div className="space-y-4 pb-10">
                     {status === 'LISTENING' && interimText && (
                         <div className="flex justify-end animate-pulse">
-                            <div className="max-w-[85%] p-5 rounded-2xl border border-blue-500 bg-blue-900/20 text-blue-100 shadow-lg font-sans">
-                                <div className="flex items-center gap-2 mb-2 opacity-50 font-mono text-[10px] font-bold uppercase tracking-widest">
-                                    <i className="fas fa-microphone-alt"></i> Live Transcript
-                                </div>
-                                {interimText}...
-                            </div>
+                            <div className="max-w-[90%] p-4 rounded-xl border border-blue-500 bg-blue-900/20 text-blue-100 text-sm italic">{interimText}...</div>
                         </div>
                     )}
                     {messages.map((msg, i) => (
-                        <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-slide-in`}>
-                            <div className={`max-w-[85%] p-5 rounded-2xl border shadow-xl ${msg.role === 'user' ? 'bg-slate-800 border-slate-700 text-gray-200' : 'bg-slate-900 border-jpm-accent/20 text-white'}`}>
-                                <div className="flex justify-between items-center mb-2 gap-4">
-                                    <span className="text-[10px] font-bold uppercase tracking-widest opacity-50 font-mono">{msg.role === 'user' ? 'Satnam Singh' : 'J.P. Morgan Panel'}</span>
-                                    <span className="text-[9px] font-mono opacity-30">{new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
-                                </div>
-                                <div className="text-base leading-relaxed font-sans">{msg.text}</div>
+                        <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`max-w-[85%] p-4 rounded-xl border text-sm ${msg.role === 'user' ? 'bg-slate-800 border-slate-700' : 'bg-slate-900 border-jpm-accent/20'}`}>
+                                <div className="text-[9px] uppercase font-bold opacity-40 mb-1">{msg.role === 'user' ? 'Satnam' : 'JPM Panel'}</div>
+                                {msg.text}
                             </div>
                         </div>
                     ))}
-                    {status === 'THINKING' && <div className="bg-slate-900 p-4 rounded-xl text-jpm-accent font-mono text-xs border border-jpm-accent/10 animate-pulse">Analyzing response...</div>}
                 </div>
             </div>
         </div>
