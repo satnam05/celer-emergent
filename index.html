@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>JP Morgan Interview Preparation App v20.84</title>
+    <title>JP Morgan Interview Preparation App v20.85</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -918,34 +918,16 @@
                 recognition.start();
             };
 
-				/* AWS Polly AI voice*/
-            const speakResponse = async (text) => {
-                const aiUrl = localStorage.getItem('jpm_ai_url');
-                if (!aiUrl) return;
-
-                try {
-                    const response = await fetch(aiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            data: { action: "getSpeech", text, gender, speed, userID: "satnam_default" } 
-                        })
-                    });
-
-                    const blob = await response.blob();
-                    const audioUrl = URL.createObjectURL(blob);
-                    const audio = new Audio(audioUrl);
-                    
-                    audio.onplay = () => setStatus("SPEAKING");
-                    audio.onended = () => { 
-                        setStatus("IDLE"); 
-                        setTimeout(() => startListening(), 400); 
-                    };
-                    audio.play();
-                } catch (e) {
-                    console.error("Speech Error:", e);
-                    setStatus("IDLE");
-                }
+            const speakResponse = (text) => {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                const voices = window.speechSynthesis.getVoices();
+                const gbVoice = voices.find(v => v.lang.includes('GB') || v.name.includes('UK'));
+                if (gbVoice) utterance.voice = gbVoice;
+                utterance.rate = 1.1; 
+                utterance.onstart = () => setStatus("SPEAKING");
+                utterance.onend = () => { setTimeout(() => { startListening(); }, 500); };
+                window.speechSynthesis.speak(utterance);
             };
 
 			            /* --- AI CONVERSATION HISTORY UPDATE SATNAM --- */
@@ -1056,36 +1038,59 @@
 			                </button>
 			            </div>
 
-                        {/* AI Orb */}
-                        <div className="flex flex-col items-center justify-center py-8">
-                            <div className={`relative w-40 h-40 rounded-full flex items-center justify-center transition-all duration-700 ${
-                                status === 'LISTENING' ? 'bg-blue-500/20 shadow-[0_0_50px_rgba(59,130,246,0.4)]' : 
-                                status === 'SPEAKING' ? 'bg-jpm-accent/20 shadow-[0_0_50px_rgba(197,157,95,0.4)]' : 'bg-slate-800/40'}`}>
-                                <div className={`w-32 h-32 rounded-full border-2 border-white/10 flex items-center justify-center overflow-hidden bg-slate-950 ${status === 'LISTENING' ? 'animate-pulse' : ''}`}>
-                                    <span className="text-5xl filter drop-shadow-lg rounded-full">
-                                        {status === 'SPEAKING' ? '🎙️' : status === 'LISTENING' ? '🧠' : '✨'}
-                                    </span>
-                                </div>
-                                {status === 'SPEAKING' && <div className="absolute inset-0 rounded-full border border-jpm-accent/50 animate-ping"></div>}
-                            </div>
-                        </div>
+						{/* CONTEXT: UI toggles for user to dynamically change the AI Interviewer's voice accent and gender */}
+						<div className="w-full px-4 mt-6 space-y-3 bg-slate-800/40 p-4 rounded-2xl border border-slate-700 shadow-inner">
+						    <span className="text-[10px] font-bold text-gray-500 uppercase font-mono tracking-widest block mb-2 text-left">Panel Persona</span>
+						    
+						    <div className="flex gap-2">
+						        <button 
+						            onClick={() => { SpeechManager.voiceConfig.lang = 'en-GB'; setMessages([...messages]); }}
+						            className={`flex-1 text-[10px] py-2 rounded-lg font-mono border transition-all ${SpeechManager.voiceConfig.lang === 'en-GB' ? 'bg-jpm-accent text-black border-jpm-accent shadow-lg' : 'bg-slate-700 text-gray-400 border-slate-600 opacity-60'}`}
+						        >UK ACCENT</button>
+						        <button 
+						            onClick={() => { SpeechManager.voiceConfig.lang = 'en-US'; setMessages([...messages]); }}
+						            className={`flex-1 text-[10px] py-2 rounded-lg font-mono border transition-all ${SpeechManager.voiceConfig.lang === 'en-US' ? 'bg-jpm-accent text-black border-jpm-accent shadow-lg' : 'bg-slate-700 text-gray-400 border-slate-600 opacity-60'}`}
+						        >US ACCENT</button>
+						    </div>
+						
+						    <div className="flex gap-2">
+						        <button 
+						            onClick={() => { SpeechManager.voiceConfig.gender = 'male'; setMessages([...messages]); }}
+						            className={`flex-1 text-[10px] py-2 rounded-lg font-mono border transition-all ${SpeechManager.voiceConfig.gender === 'male' ? 'bg-blue-600 text-white border-blue-500 shadow-lg' : 'bg-slate-700 text-gray-400 border-slate-600 opacity-60'}`}
+						        ><i className="fas fa-mars mr-1"></i> MALE</button>
+						        <button 
+						            onClick={() => { SpeechManager.voiceConfig.gender = 'female'; setMessages([...messages]); }}
+						            className={`flex-1 text-[10px] py-2 rounded-lg font-mono border transition-all ${SpeechManager.voiceConfig.gender === 'female' ? 'bg-pink-600 text-white border-pink-500 shadow-lg' : 'bg-slate-700 text-gray-400 border-slate-600 opacity-60'}`}
+						        ><i className="fas fa-venus mr-1"></i> FEMALE</button>
+						    </div>
+						</div>
 
-                        <div className="space-y-4 bg-slate-800/40 p-5 rounded-3xl border border-slate-700 shadow-inner w-full">
-                            <div className="flex justify-between items-center">
-                                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest font-mono">Panel Voice</label>
-                                <div className="flex bg-black/40 p-1 rounded-xl border border-white/5">
-                                    <button onClick={() => setGender('male')} className={`px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all ${gender === 'male' ? 'bg-jpm-accent text-black shadow-lg' : 'text-gray-500'}`}>MALE</button>
-                                    <button onClick={() => setGender('female')} className={`px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all ${gender === 'female' ? 'bg-purple-600 text-white shadow-lg' : 'text-gray-500'}`}>FEMALE</button>
-                                </div>
-                            </div>
-                            <div className="space-y-1">
-                                <div className="flex justify-between items-center text-[10px] font-mono text-gray-500">
-                                    <span>READING SPEED</span>
-                                    <span className="text-jpm-accent font-bold">{speed}x</span>
-                                </div>
-                                <input type="range" min="0.5" max="1.5" step="0.1" value={speed} onChange={(e) => setSpeed(parseFloat(e.target.value))} className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-jpm-accent" />
-                            </div>
-                        </div>
+						{/* CONTEXT: Precision sliders for Pitch and Speed to customize the AI's vocal delivery */}
+						<div className="w-full px-4 mt-4 space-y-4 bg-slate-800/40 p-4 rounded-2xl border border-slate-700 shadow-inner">
+						    <div className="flex flex-col gap-1">
+						        <div className="flex justify-between items-center">
+						            <span className="text-[10px] font-bold text-gray-500 uppercase font-mono tracking-widest">Voice Speed</span>
+						            <span className="text-[10px] font-mono text-jpm-accent">{SpeechManager.voiceConfig.rate}x</span>
+						        </div>
+						        <input type="range" min="0.5" max="1.5" step="0.1" 
+						            value={SpeechManager.voiceConfig.rate} 
+						            onChange={(e) => { SpeechManager.voiceConfig.rate = parseFloat(e.target.value); setMessages([...messages]); }}
+						            className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-jpm-accent" 
+						        />
+						    </div>
+						
+						    <div className="flex flex-col gap-1">
+						        <div className="flex justify-between items-center">
+						            <span className="text-[10px] font-bold text-gray-500 uppercase font-mono tracking-widest">Voice Pitch</span>
+						            <span className="text-[10px] font-mono text-jpm-accent">{SpeechManager.voiceConfig.pitch}</span>
+						        </div>
+						        <input type="range" min="0.5" max="1.5" step="0.1" 
+						            value={SpeechManager.voiceConfig.pitch} 
+						            onChange={(e) => { SpeechManager.voiceConfig.pitch = parseFloat(e.target.value); setMessages([...messages]); }}
+						            className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-jpm-accent" 
+						        />
+						    </div>
+						</div>
 			
 			            {showConfig && (
 			                <div className="absolute bottom-10 left-6 right-6 z-50 bg-slate-900 border border-slate-700 p-4 rounded-xl shadow-2xl animate-slide-in">
@@ -1177,9 +1182,6 @@
             });
             const [showProjectCreator, setShowProjectCreator] = useState(false);
             const [syncStatus, setSyncStatus] = useState('synced');
-
-            const [gender, setGender] = useState('male');
-            const [speed, setSpeed] = useState(1.0);
 
             const quote = useMemo(() => {
                 const quotes = [
@@ -1548,7 +1550,7 @@
                         <header className="flex-shrink-0 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 text-white h-16 flex items-center justify-between px-6 shadow-lg z-50 relative">
                             <div className="flex items-center gap-3">
                                 <i className="fas fa-university text-jpm-accent text-2xl"></i>
-                                <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight font-quote text-gray-100">JP Morgan Interview Prep</h1><span className="text-xs text-slate-400 font-mono">v20.84 | Premium Edition</span></div>
+                                <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight font-quote text-gray-100">JP Morgan Interview Prep</h1><span className="text-xs text-slate-400 font-mono">v20.85 | Premium Edition</span></div>
                             </div>
                             <div className="flex items-center gap-4">
                                 <button onClick={() => setShowTechModal(true)} className="p-2 rounded hover:bg-white/10 text-jpm-accent transition-colors animate-pulse-soft hover:shadow-[0_0_15px_rgba(197,157,95,0.4)]" title="Tech Insights"><i className="fas fa-globe-americas"></i></button>
@@ -1627,7 +1629,6 @@
     </script>
 </body>
 </html>
-
 
 
 
