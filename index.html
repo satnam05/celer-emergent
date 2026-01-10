@@ -1019,6 +1019,7 @@
             const [interimText, setInterimText] = useState(""); // Stores live speech before it's sent
 
             const recognitionRef = useRef(null);
+            const fullTranscriptRef = useRef(""); // NEW: Persistent Master Record of your answer
             const lastSpokenTextRef = useRef(""); // New: Stores text for live-restarts
             const currentAudioRef = useRef(null); // New: Tracks active audio object
             const [isPaused, setIsPaused] = useState(false); // New: Paused state
@@ -1131,7 +1132,7 @@
                 recognition.lang = 'en-GB';
 
                 let silencerTimeout = null;
-                let fullTranscript = "";
+                fullTranscriptRef.current = ""; // Reset only at the very start of a new turn
 
                 recognition.onstart = () => {
                     setStatus("LISTENING");
@@ -1140,26 +1141,36 @@
 
                 recognition.onresult = (e) => {
                     if (silencerTimeout) clearTimeout(silencerTimeout);
+
                     let interim = "";
+                    let newFinalText = "";
+
                     for (let i = e.resultIndex; i < e.results.length; ++i) {
                         if (e.results[i].isFinal) {
-                            fullTranscript += e.results[i][0].transcript + " ";
+                            newFinalText += e.results[i][0].transcript + " ";
                         } else {
                             interim += e.results[i][0].transcript;
                         }
                     }
-                    setInterimText(fullTranscript + interim);
 
-                    if (fullTranscript.trim() || interim.trim()) {
+                    // Add only newly finalized words to the master record
+                    fullTranscriptRef.current += newFinalText;
+
+                    // Combine the Master Record with what you are currently saying (interim)
+                    const liveOutput = (fullTranscriptRef.current + interim).trim();
+                    setInterimText(liveOutput);
+
+                    if (liveOutput) {
+                        // Wait for 2 seconds of silence before sending the WHOLE answer
                         silencerTimeout = setTimeout(() => {
-                            sendMessage((fullTranscript + interim).trim());
+                            sendMessage(liveOutput);
                             recognition.stop();
+                            setInterimText("");
                         }, 2000);
                     }
                 };
 
                 recognition.onend = () => {
-                    // Use a functional update to check status safely
                     setStatus(prev => prev === "LISTENING" ? "IDLE" : prev);
                 };
 
@@ -1320,8 +1331,8 @@
 
                         {/* END - THE DYNAMIC PREMIUM AI ORB */}
                         
-                        {/* Session Control Buttons - Refined for Sleek Production Look */}
-                        <div className="mt-12 flex flex-col gap-3 w-full px-4">
+                        {/* Session Control Buttons - Condensed Architect Layout */}
+                        <div className="mt-6 flex flex-col gap-2 w-full px-4">
                             {status === 'IDLE' ? (
                                 <button
                                     onClick={startListening}
@@ -1331,21 +1342,18 @@
                                 </button>
                             ) : (
                                 <>
-                                    {/* SLEEK PAUSE BUTTON: Matching 'End Session' style but in Amber */}
-                                    {(status === 'SPEAKING' || status === 'PAUSED' || status === 'LISTENING' || status === 'THINKING') && (
-                                        <button
-                                            onClick={togglePause}
-                                            className={`w-full border py-3 rounded-xl font-mono text-[10px] uppercase tracking-widest transition-all ${isPaused
-                                                    ? 'bg-amber-600/20 border-amber-500 text-white animate-pulse'
-                                                    : 'border-amber-900/50 text-amber-500 hover:bg-amber-900/10'
-                                                }`}
-                                        >
-                                            <i className={`fas ${isPaused ? 'fa-play' : 'fa-pause'} mr-2`}></i>
-                                            {isPaused ? 'Resume Speech' : 'Pause Speech'}
-                                        </button>
-                                    )}
+                                    {/* SLEEK AMBER PAUSE BUTTON: Sits elegantly above End Session */}
+                                    <button
+                                        onClick={togglePause}
+                                        className={`w-full border py-3 rounded-xl font-mono text-[10px] uppercase tracking-widest transition-all ${isPaused
+                                                ? 'bg-amber-600/20 border-amber-500 text-white animate-pulse'
+                                                : 'border-amber-900/50 text-amber-500 hover:bg-amber-900/10'
+                                            }`}
+                                    >
+                                        <i className={`fas ${isPaused ? 'fa-play' : 'fa-pause'} mr-2`}></i>
+                                        {isPaused ? 'Resume Session' : 'Pause Session'}
+                                    </button>
 
-                                    {/* END SESSION BUTTON: Always visible once session starts */}
                                     <button
                                         onClick={stopEverything}
                                         className="w-full border border-red-900 text-red-500 font-mono text-[10px] py-3 rounded-xl hover:bg-red-900/10 transition uppercase tracking-widest"
@@ -1355,11 +1363,9 @@
                                 </>
                             )}
 
-                            <button
-                                onClick={() => setShowConfig(!showConfig)}
-                                className="text-[10px] text-slate-500 hover:text-jpm-accent transition-colors font-mono mt-2 self-center"
-                            >
-                                <i className="fas fa-cog mr-2"></i>Configure Neural Link
+                            {/* Condensed Neural Link Toggle */}
+                            <button onClick={() => setShowConfig(!showConfig)} className="text-[10px] text-slate-500 hover:text-jpm-accent transition-colors font-mono mt-2 self-center">
+                                <i className="fas fa-cog mr-2"></i>Neural Link
                             </button>
                         </div>
 
