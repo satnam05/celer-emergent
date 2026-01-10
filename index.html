@@ -1018,11 +1018,75 @@
                 const [showConfig, setShowConfig] = useState(!localStorage.getItem('jpm_ai_url'));
                 const [interimText, setInterimText] = useState(""); // Stores live speech before it's sent
 
-                const recognitionRef = useRef(null);
+                const recognitionRef = React.useRef(null);
                 const fullTranscriptRef = useRef(""); // NEW: Persistent Master Record of your answer
                 const lastSpokenTextRef = useRef(""); // New: Stores text for live-restarts
-                const currentAudioRef = useRef(null); // New: Tracks active audio object
+                const currentAudioRef = React.useRef(null); // New: Tracks active audio object
                 const [isPaused, setIsPaused] = useState(false); // New: Paused state
+                const [liveTranscript, setLiveTranscript] = React.useState("");
+                const isBotSpeakingRef = React.useRef(false);
+
+                // FIX 3: Improved Speech Initialization
+                const initSpeech = React.useCallback(() => {
+                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    if (!SpeechRecognition) return;
+
+                    const recognition = new SpeechRecognition();
+                    recognition.continuous = true;
+                    recognition.interimResults = true; // Real-time feedback
+                    recognition.lang = region || 'en-GB'; // High precision locale
+
+                    recognition.onresult = (event) => {
+                        if (isBotSpeakingRef.current) return; // Ignore if bot is speaking
+
+                        let interim = "";
+                        for (let i = event.resultIndex; i < event.results.length; ++i) {
+                            if (event.results[i].isFinal) {
+                                handleUserSpeechFinal(event.results[i][0].transcript);
+                            } else {
+                                interim += event.results[i][0].transcript;
+                            }
+                        }
+                        setLiveTranscript(interim);
+                    };
+
+                    recognition.onend = () => {
+                        // Auto-restart only if session is active and bot isn't speaking
+                        if (!isBotSpeakingRef.current && isSessionActive) {
+                            recognition.start();
+                        }
+                    };
+
+                    recognitionRef.current = recognition;
+                }, [region]);
+
+                // FIX 1 & 2: Bot Speech & Hard Stop Logic
+                const playBotResponse = async (text) => {
+                    isBotSpeakingRef.current = true;
+                    if (recognitionRef.current) recognitionRef.current.stop();
+
+                    const url = await getPollyAudio(text, gender, speed); // Your existing AWS logic
+                    const audio = new Audio(url);
+                    currentAudioRef.current = audio;
+
+                    audio.onended = () => {
+                        isBotSpeakingRef.current = false;
+                        setLiveTranscript("");
+                        if (recognitionRef.current) recognitionRef.current.start();
+                    };
+
+                    audio.play().catch(e => console.error("Playback failed", e));
+                };
+
+                const handleStopOrPause = () => {
+                    if (currentAudioRef.current) {
+                        currentAudioRef.current.pause();
+                        currentAudioRef.current.src = ""; // Hard Clear: Prevents resuming old audio
+                        currentAudioRef.current.load();
+                    }
+                    isBotSpeakingRef.current = false;
+                    if (recognitionRef.current) recognitionRef.current.stop();
+                };
 
                 /*Real-time Voice Adoption. 
                 When Satnam changes Speed, Gender, or Region, the current audio stops 
@@ -1342,16 +1406,16 @@
                                     </button>
                                 ) : (
                                     <>
-                                        {/* SLEEK AMBER PAUSE BUTTON: Sits elegantly above End Session */}
+                                        {/* SLEEK AMBER PAUSE BUTTON: Fix #2 Applied */}
                                         <button
                                             onClick={togglePause}
-                                            className={`w-full border py-3 rounded-xl font-mono text-[10px] uppercase tracking-widest transition-all ${isPaused
+                                            className={`w-full border py-3 rounded-xl font-mono text-[10px] uppercase tracking-widest transition-all cursor-pointer ${isPaused
                                                 ? 'bg-amber-600/20 border-amber-500 text-white animate-pulse'
                                                 : 'border-amber-900/50 text-amber-500 hover:bg-amber-900/10'
                                                 }`}
                                         >
-                                            <i className={`fas ${isPaused ? 'fa-play' : 'fa-pause'} mr-2`}></i>
-                                            {isPaused ? 'Resume Session' : 'Pause Session'}
+                                            <i className={`fas ${isPaused ? 'fa-play' : 'fa-pause'} mr-2 pointer-events-none`}></i>
+                                            <span className="pointer-events-none">{isPaused ? 'Resume Session' : 'Pause Session'}</span>
                                         </button>
 
                                         <button
@@ -1431,7 +1495,7 @@
                                     </div>
                                 )}
 
-                                {/* LIVE TELEPROMPTER: Shows Satnam's words in real-time */}
+                                {/* LIVE TELEPROMPTER: Fix #1 & #3 Applied - Only active when status is LISTENING */}
                                 {status === 'LISTENING' && interimText && (
                                     <div className="flex justify-end animate-pulse">
                                         <div className="max-w-[85%] p-5 rounded-2xl leading-relaxed text-base border border-blue-500 bg-blue-900/20 text-blue-100 shadow-lg">
