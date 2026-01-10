@@ -1016,6 +1016,7 @@
             const [messages, setMessages] = useState([]);
             const [url, setUrl] = useState(localStorage.getItem('jpm_ai_url') || "");
             const [showConfig, setShowConfig] = useState(!localStorage.getItem('jpm_ai_url'));
+            const [interimText, setInterimText] = useState(""); // Stores live speech before it's sent
 
             const recognitionRef = useRef(null);
             const lastSpokenTextRef = useRef(""); // New: Stores text for live-restarts
@@ -1064,12 +1065,26 @@
                             })
                         });
                         const result = await res.json();
+
+                        /* Strategic History Fix. Ensures both Satnam's words 
+                            and the AI's responses are mapped to the 'text' property 
+                            so they both appear in the transcript window. */
+
                         if (result.data?.history) {
-                            setMessages(result.data.history.map(h => ({
-                                role: h.role || (h.aiSaid ? 'model' : 'user'),
-                                text: h.aiSaid || h.userSaid
-                            })));
+                            const historicalMessages = [];
+                            result.data.history.forEach(h => {
+                                // 1. Add User message first (if it exists in that log entry)
+                                if (h.userSaid) {
+                                    historicalMessages.push({ role: 'user', text: h.userSaid });
+                                }
+                                // 2. Add AI message second
+                                if (h.aiSaid) {
+                                    historicalMessages.push({ role: 'model', text: h.aiSaid });
+                                }
+                            });
+                            setMessages(historicalMessages);
                         }
+                        
                     } catch (e) { console.error("History fetch failed:", e); }
                 };
                 fetchCloudHistory();
@@ -1107,33 +1122,44 @@
                Satnam mid-sentence during complex technical answers. */
                
             const startListening = () => {
-                if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) return alert("Browser not supported");
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!('webkitSpeechRecognition' in window)) return alert("Browser not supported");
+                const SpeechRecognition = window.webkitSpeechRecognition;
                 const recognition = new SpeechRecognition();
 
-                recognition.continuous = true; // Key: Don't stop on short breaths
-                recognition.interimResults = true;
+                recognition.continuous = true;
+                recognition.interimResults = true; // CRITICAL: Allows real-time viewing
                 recognition.lang = 'en-GB';
 
                 let silencerTimeout = null;
+                let fullTranscript = ""; // Accumulator for the whole speech
 
-                recognition.onstart = () => setStatus("LISTENING");
+                recognition.onstart = () => {
+                    setStatus("LISTENING");
+                    setInterimText("");
+                };
 
                 recognition.onresult = (e) => {
-                    // Reset the timer every time Satnam speaks a new word
                     if (silencerTimeout) clearTimeout(silencerTimeout);
 
-                    let finalTranscript = '';
+                    let interim = "";
                     for (let i = e.resultIndex; i < e.results.length; ++i) {
-                        if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript;
+                        if (e.results[i].isFinal) {
+                            fullTranscript += e.results[i][0].transcript + " ";
+                        } else {
+                            interim += e.results[i][0].transcript;
+                        }
                     }
 
-                    if (finalTranscript.trim()) {
-                        // Wait for exactly 1.5 seconds of silence before AI takes over
+                    // Show Satnam his live words so he knows the mic is working
+                    setInterimText(fullTranscript + interim);
+
+                    if (fullTranscript.trim() || interim.trim()) {
                         silencerTimeout = setTimeout(() => {
-                            sendMessage(finalTranscript);
+                            const finalSpeech = (fullTranscript + interim).trim();
+                            sendMessage(finalSpeech); // Send the WHOLE technical answer
                             recognition.stop();
-                        }, 1500);
+                            setInterimText(""); // Clear for next round
+                        }, 2000); // Increased to 2s to allow for deeper ISO 20022 thought pauses
                     }
                 };
 
@@ -1379,6 +1405,19 @@
                                 <div className="h-64 flex flex-col items-center justify-center text-slate-700 text-center">
                                     <i className="fas fa-comments text-4xl mb-4 opacity-20"></i>
                                     <p className="font-quote italic text-xl">The panel is ready for your introduction...</p>
+                                </div>
+                            )}
+
+                            {/* LIVE TELEPROMPTER: Shows Satnam's words in real-time */}
+                            {status === 'LISTENING' && interimText && (
+                                <div className="flex justify-end animate-pulse">
+                                    <div className="max-w-[85%] p-5 rounded-2xl leading-relaxed text-base border border-blue-500 bg-blue-900/20 text-blue-100 shadow-lg">
+                                        <div className="flex items-center gap-2 mb-2 opacity-50">
+                                            <i className="fas fa-microphone-alt text-xs"></i>
+                                            <span className="text-[10px] font-bold uppercase tracking-widest font-mono">Live Transcript</span>
+                                        </div>
+                                        {interimText}...
+                                    </div>
                                 </div>
                             )}
 
