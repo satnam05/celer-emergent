@@ -1009,7 +1009,7 @@
         };
 
         // ---START AI MODE ---
-            // --- GEMINI LIVE VOICE MODE (UPDATED: FIXED BUTTONS & SPEED BUTTON) ---
+            // --- GEMINI LIVE VOICE MODE (UPDATED: AUTO-SCROLL ON LOAD + SCROLL DOWN BUTTON) ---
             const AIMode = ({ onEnd, toggleFocus, isFocusMode, gender, speed, region, setGender, setSpeed, setRegion }) => {
                 const [status, setStatus] = useState("IDLE");
                 const [thinkingMode, setThinkingMode] = useState("low");
@@ -1019,7 +1019,7 @@
                 
                 // --- INPUT MODAL STATES ---
                 const [isComposerOpen, setIsComposerOpen] = useState(false);
-                const [reviewMode, setReviewMode] = useState(false); // False = Typing/Rec, True = Review
+                const [reviewMode, setReviewMode] = useState(false);
                 const [inputValue, setInputValue] = useState("");
                 const [inputAudioUrl, setInputAudioUrl] = useState(null);
                 
@@ -1034,12 +1034,12 @@
                 const audioChunksRef = useRef([]);
                 const speechStartRef = useRef(0);
                 const totalSpeechWordsRef = useRef(0);
-                const currentAudioRef = useRef(null); // Track AI Audio
+                const currentAudioRef = useRef(null);
+                const chatScrollRef = useRef(null); 
                 const [isPaused, setIsPaused] = useState(false);
 
                 // --- 1. CORE AI LIFECYCLE ---
                 
-                // Clean up on unmount
                 useEffect(() => {
                     return () => {
                         stopEverything();
@@ -1050,14 +1050,22 @@
                     };
                 }, []);
 
-                // End Signal Listener
+                // AUTO-SCROLL LOGIC (Triggers on Load, New Message, or Status Change)
+                useEffect(() => {
+                    if (chatScrollRef.current) {
+                        chatScrollRef.current.scrollTo({
+                            top: chatScrollRef.current.scrollHeight,
+                            behavior: 'smooth'
+                        });
+                    }
+                }, [messages, status, interimText]); 
+
                 useEffect(() => {
                     const handleEndSignal = () => { stopEverything(); onEnd(0, []); };
                     window.addEventListener('jpm-trigger-end', handleEndSignal);
                     return () => window.removeEventListener('jpm-trigger-end', handleEndSignal);
                 }, [onEnd]);
 
-                // Settings Change Listener (Instant Apply)
                 useEffect(() => {
                     if (status === "SPEAKING" && currentAudioRef.current && messages.length > 0) {
                         const lastAiMsg = [...messages].reverse().find(m => m.role === 'model');
@@ -1068,7 +1076,6 @@
                     }
                 }, [gender, speed, region]);
 
-                // Fetch History
                 useEffect(() => {
                     const fetchCloudHistory = async () => {
                         const aiUrl = localStorage.getItem('jpm_ai_url');
@@ -1093,7 +1100,7 @@
                     fetchCloudHistory();
                 }, []);
 
-                // --- 2. RECORDING LOGIC (Copied from TypeMode) ---
+                // --- 2. RECORDING LOGIC ---
                 const countW = (s) => s && s.trim() ? s.trim().split(/\s+/).length : 0;
                 
                 const startAudioRec = async () => {
@@ -1121,7 +1128,7 @@
                     const recognition = new SpeechRecognition();
                     recognition.continuous = true;
                     recognition.interimResults = true;
-                    recognition.lang = 'en-GB'; // Use 'en-US' or region state if preferred
+                    recognition.lang = 'en-GB';
                     
                     if (speechStartRef.current === 0) speechStartRef.current = Date.now();
                     
@@ -1132,15 +1139,12 @@
                             if (event.results[i].isFinal) finalChunk += event.results[i][0].transcript;
                             else interimChunk += event.results[i][0].transcript;
                         }
-                        
                         setInterimText(interimChunk);
-                        
                         if (finalChunk) {
                             totalSpeechWordsRef.current += countW(finalChunk);
                             setInputValue(prev => (prev ? prev + ' ' : '') + finalChunk.trim());
                             setInterimText("");
                         }
-                        
                         const currentSessionWords = totalSpeechWordsRef.current + countW(interimChunk);
                         const mins = (Date.now() - speechStartRef.current) / 60000;
                         const wpm = mins > 0.05 ? Math.round(currentSessionWords / mins) : 0;
@@ -1148,12 +1152,7 @@
                     };
 
                     recognition.onend = () => {
-                        // If explicitly stopped by user (isRecording false), don't restart. 
-                        // But since state might not update inside callback, we handle stop externally.
-                        if (recognitionRef.current && isRecording) {
-                           // Keep going if we didn't mean to stop (browser timeout)
-                           // For simplicity in this mode, we rely on the button toggle.
-                        }
+                        if (recognitionRef.current && isRecording) { }
                     };
                     
                     recognitionRef.current = recognition;
@@ -1162,17 +1161,15 @@
 
                 const toggleRecording = () => {
                     if (isRecording) {
-                        // STOP
                         if (recognitionRef.current) recognitionRef.current.stop();
                         if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") mediaRecorderRef.current.stop();
                         setIsRecording(false);
                         setInterimText("");
                     } else {
-                        // START
                         speechStartRef.current = 0;
                         totalSpeechWordsRef.current = 0;
                         setLiveWpm(0);
-                        setInputAudioUrl(null); // Clear previous audio
+                        setInputAudioUrl(null);
                         setIsRecording(true);
                         startAudioRec();
                         startSpeechEngine();
@@ -1182,7 +1179,6 @@
                 const getWpmColor = (wpm) => { if (wpm === 0) return 'bg-gray-700 text-gray-400'; if (wpm < 110) return 'bg-yellow-900/50 text-yellow-300 border-yellow-700'; if (wpm > 160) return 'bg-red-900/50 text-red-300 border-red-700'; return 'bg-green-900/50 text-green-300 border-green-700'; };
 
                 // --- 3. INPUT FLOW HANDLERS ---
-                
                 const openComposer = () => {
                     if (status !== 'IDLE' && status !== 'PAUSED') return;
                     setIsComposerOpen(true);
@@ -1198,10 +1194,7 @@
                     setReviewMode(true);
                 };
 
-                const handleEdit = () => {
-                    setReviewMode(false);
-                };
-
+                const handleEdit = () => { setReviewMode(false); };
                 const handleCancel = () => {
                     if (isRecording) toggleRecording();
                     setIsComposerOpen(false);
@@ -1209,14 +1202,12 @@
 
                 const handleSubmit = () => {
                     setIsComposerOpen(false);
-                    // Combine final input with any leftover interim text if user forgot to stop
                     const finalMsg = (inputValue + " " + interimText).trim();
                     if (!finalMsg) return;
                     sendMessage(finalMsg);
                 };
 
                 // --- 4. AI & AUDIO LOGIC ---
-
                 const stopEverything = () => {
                     if (recognitionRef.current) recognitionRef.current.stop();
                     if (mediaRecorderRef.current) mediaRecorderRef.current.stop();
@@ -1259,7 +1250,6 @@
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ data: { action: "getSpeech", text, gender, speed, region } })
                         });
-
                         if (!response.ok) throw new Error("Backend failed");
                         const blob = await response.blob();
                         if (blob.size < 500) return setStatus("IDLE");
@@ -1269,14 +1259,11 @@
                         currentAudioRef.current = audio;
 
                         audio.onplay = () => setStatus("SPEAKING");
-                        
-                        // IMPORTANT: When AI is done, go to IDLE (do not auto-record)
                         audio.onended = () => {
                             URL.revokeObjectURL(audioUrl);
                             setStatus("IDLE");
                             currentAudioRef.current = null;
                         };
-                        
                         audio.onerror = () => setStatus("IDLE");
                         await audio.play();
                     } catch (e) {
@@ -1324,12 +1311,9 @@
 
                 return (
                     <div className="flex h-full w-full bg-slate-950 text-white overflow-hidden relative">
-                        
-                        {/* --- MODAL: COMPOSER (TYPE/SPEAK) --- */}
                         {isComposerOpen && (
                             <div className="absolute inset-0 z-50 bg-slate-900/90 backdrop-blur-lg flex flex-col p-4 md:p-8 animate-slide-in">
                                 <div className="max-w-4xl mx-auto w-full h-full flex flex-col">
-                                    {/* Header */}
                                     <div className="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-full bg-jpm-accent text-slate-900 flex items-center justify-center font-bold shadow-[0_0_15px_rgba(197,157,95,0.4)]">
@@ -1342,11 +1326,8 @@
                                         </div>
                                         <button onClick={handleCancel} className="p-2 text-gray-500 hover:text-white transition"><i className="fas fa-times text-xl"></i></button>
                                     </div>
-
-                                    {/* Content Area */}
                                     <div className="flex-grow flex flex-col relative bg-slate-800/50 rounded-2xl border border-slate-700 overflow-hidden shadow-inner">
                                         {reviewMode ? (
-                                            // REVIEW MODE
                                             <div className="p-6 h-full flex flex-col">
                                                  <div className="flex-grow overflow-y-auto mb-4 p-4 bg-slate-900/50 rounded-xl border border-slate-800">
                                                     <p className="text-gray-200 text-lg leading-relaxed font-sans whitespace-pre-wrap">{inputValue} {interimText}</p>
@@ -1362,7 +1343,6 @@
                                                  )}
                                             </div>
                                         ) : (
-                                            // INPUT MODE
                                             <div className="h-full flex flex-col">
                                                 <textarea 
                                                     className="w-full h-full bg-transparent p-6 text-xl text-gray-200 placeholder-gray-600 focus:outline-none resize-none font-sans"
@@ -1371,7 +1351,6 @@
                                                     onChange={(e) => setInputValue(e.target.value)}
                                                     readOnly={isRecording}
                                                 />
-                                                {/* Voice Controls Overlay */}
                                                 <div className="absolute bottom-6 right-6 flex items-center gap-4">
                                                     {isRecording && (
                                                         <div className="flex flex-col items-end gap-1 animate-slide-in"> 
@@ -1379,46 +1358,34 @@
                                                             <span className={`text-[10px] font-bold px-2 py-1 rounded border ${getWpmColor(liveWpm)}`}>{liveWpm} WPM</span> 
                                                         </div>
                                                     )}
-                                                    <button 
-                                                        onClick={toggleRecording} 
-                                                        className={`p-4 rounded-full shadow-xl transition-all hover:scale-105 active:scale-95 border ${isRecording ? 'bg-red-600 text-white border-red-500 animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.5)]' : 'bg-slate-700 text-jpm-accent border-slate-600 hover:bg-slate-600'}`}
-                                                    >
+                                                    <button onClick={toggleRecording} className={`p-4 rounded-full shadow-xl transition-all hover:scale-105 active:scale-95 border ${isRecording ? 'bg-red-600 text-white border-red-500 animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.5)]' : 'bg-slate-700 text-jpm-accent border-slate-600 hover:bg-slate-600'}`}>
                                                         <i className={`fas ${isRecording ? 'fa-stop' : 'fa-microphone'} text-2xl`}></i>
                                                     </button>
                                                 </div>
                                             </div>
                                         )}
                                     </div>
-
-                                    {/* Footer Actions */}
                                     <div className="mt-6 flex gap-4">
                                         {reviewMode ? (
                                             <>
                                                 <button onClick={handleEdit} className="flex-1 py-4 bg-slate-800 text-white rounded-xl font-bold border border-slate-700 hover:bg-slate-700 transition">Edit</button>
-                                                <button onClick={handleSubmit} className="flex-[2] py-4 bg-jpm-accent text-slate-900 rounded-xl font-bold shadow-[0_0_20px_rgba(197,157,95,0.3)] hover:bg-[#b08d55] transition active:scale-95">
-                                                    <i className="fas fa-paper-plane mr-2"></i> Submit to AI
-                                                </button>
+                                                <button onClick={handleSubmit} className="flex-[2] py-4 bg-jpm-accent text-slate-900 rounded-xl font-bold shadow-[0_0_20px_rgba(197,157,95,0.3)] hover:bg-[#b08d55] transition active:scale-95"><i className="fas fa-paper-plane mr-2"></i> Submit to AI</button>
                                             </>
                                         ) : (
-                                            <button onClick={handleDoneWriting} className="w-full py-4 bg-slate-700 text-white rounded-xl font-bold hover:bg-slate-600 transition border border-slate-600">
-                                                Done
-                                            </button>
+                                            <button onClick={handleDoneWriting} className="w-full py-4 bg-slate-700 text-white rounded-xl font-bold hover:bg-slate-600 transition border border-slate-600">Done</button>
                                         )}
                                     </div>
                                 </div>
                             </div>
                         )}
 
-                        {/* LEFT PANEL: ORB & CONTROLS */}
+                        {/* LEFT PANEL */}
                         <div className="w-1/3 border-r border-slate-800 flex flex-col items-center justify-center p-6 bg-slate-900/50 relative">
-                            {/* Status Pill */}
                             <div className="flex flex-col items-center mb-8">
                                 <div className={`px-3 py-1 rounded-full border text-[11px] font-bold font-mono transition-all duration-300 ${status === 'THINKING' ? 'bg-purple-900/30 border-purple-500 text-purple-400' : status === 'SPEAKING' ? 'bg-jpm-accent/20 border-jpm-accent text-jpm-accent' : 'bg-slate-800 border-slate-700 text-slate-500'}`}>
                                     {status === 'IDLE' ? 'READY' : status}
                                 </div>
                             </div>
-
-                            {/* AI Orb */}
                             <div className={`relative w-48 h-48 rounded-full flex items-center justify-center transition-all duration-700 shadow-2xl ${status === 'SPEAKING' ? 'bg-jpm-accent/30 shadow-[0_0_60px_rgba(197,157,95,0.6)] animate-[orb-wobble_1.5s_infinite]' : status === 'THINKING' ? 'bg-purple-500/20 shadow-[0_0_60px_rgba(168,85,247,0.6)]' : 'bg-slate-800/40 shadow-inner'}`}>
                                 <div className="w-36 h-36 rounded-full border-2 border-white/10 flex items-center justify-center overflow-hidden bg-slate-950">
                                     <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center relative bg-black/20">
@@ -1427,32 +1394,21 @@
                                         </div>
                                     </div>
                                 </div>
-                                {/* FIX: Added pointer-events-none so click passes through to buttons below */}
                                 {status === 'SPEAKING' && <div className="absolute inset-0 rounded-full border-2 border-jpm-accent/40 animate-ping pointer-events-none"></div>}
                             </div>
-
-                            {/* Controls */}
-                            {/* FIX: Added relative z-10 to ensure buttons are clickable above any orb overflow */}
                             <div className="mt-6 flex flex-col gap-2 w-full px-4 relative z-10">
                                 {status === 'IDLE' ? (
-                                    <button onClick={openComposer} className="w-full bg-jpm-accent text-black font-bold py-4 rounded-xl hover:scale-105 transition shadow-lg shadow-jpm-accent/20 flex items-center justify-center gap-2">
-                                        <i className="fas fa-pen-to-square"></i> REPLY / START
-                                    </button>
+                                    <button onClick={openComposer} className="w-full bg-jpm-accent text-black font-bold py-4 rounded-xl hover:scale-105 transition shadow-lg shadow-jpm-accent/20 flex items-center justify-center gap-2"><i className="fas fa-pen-to-square"></i> REPLY / START</button>
                                 ) : (
                                     <>
                                         <button onClick={togglePause} className={`w-full border py-3 rounded-xl font-mono text-[10px] uppercase tracking-widest transition-all ${isPaused ? 'bg-amber-600/20 border-amber-500 text-white animate-pulse' : 'border-amber-900/50 text-amber-500 hover:bg-amber-900/10'}`}>
-                                            <i className={`fas ${isPaused ? 'fa-play' : 'fa-pause'} mr-2`}></i>
-                                            {isPaused ? 'Resume Speech' : 'Pause Speech'}
+                                            <i className={`fas ${isPaused ? 'fa-play' : 'fa-pause'} mr-2`}></i> {isPaused ? 'Resume Speech' : 'Pause Speech'}
                                         </button>
-                                        <button onClick={stopEverything} className="w-full border border-red-900 text-red-500 font-mono text-[10px] py-3 rounded-xl hover:bg-red-900/10 transition uppercase tracking-widest">
-                                            End Session
-                                        </button>
+                                        <button onClick={stopEverything} className="w-full border border-red-900 text-red-500 font-mono text-[10px] py-3 rounded-xl hover:bg-red-900/10 transition uppercase tracking-widest">End Session</button>
                                     </>
                                 )}
                                 <button onClick={() => setShowConfig(!showConfig)} className="text-[10px] text-slate-500 hover:text-jpm-accent transition-colors font-mono mt-2 self-center"><i className="fas fa-cog mr-2"></i>Neural Link</button>
                             </div>
-
-                            {/* Settings (Persona Panel) */}
                             <div className="bg-slate-800/40 p-5 rounded-3xl border border-slate-700 shadow-inner w-full space-y-5 mt-4 relative z-10">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-bold text-gray-500 uppercase font-mono tracking-widest block text-left">Panel Region</label>
@@ -1468,16 +1424,11 @@
                                         <button onClick={() => setGender('female')} className={`px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all ${gender === 'female' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-500'}`}>F</button>
                                     </div>
                                 </div>
-                                {/* FIX: Speed Control is now a Button instead of a Range Slider */}
                                 <div className="flex justify-between items-center pt-2">
                                     <label className="text-[10px] font-bold text-gray-500 uppercase font-mono tracking-widest">Speed</label>
-                                    <button onClick={cycleSpeed} className="px-4 py-1.5 rounded-lg text-[10px] font-bold bg-slate-700 text-jpm-accent border border-slate-600 hover:bg-slate-600 transition shadow-sm w-24">
-                                        {speed.toFixed(1)}x
-                                    </button>
+                                    <button onClick={cycleSpeed} className="px-4 py-1.5 rounded-lg text-[10px] font-bold bg-slate-700 text-jpm-accent border border-slate-600 hover:bg-slate-600 transition shadow-sm w-24">{speed.toFixed(1)}x</button>
                                 </div>
                             </div>
-                            
-                            {/* Neural Link Popup */}
                             {showConfig && (
                                 <div className="absolute bottom-10 left-6 right-6 z-50 bg-slate-900 border border-slate-700 p-4 rounded-xl shadow-2xl animate-slide-in">
                                     <input type="text" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Function URL" className="bg-black/50 border border-slate-600 rounded p-2 text-white w-full text-[10px] font-mono mb-2" />
@@ -1486,9 +1437,9 @@
                             )}
                         </div>
 
-                        {/* RIGHT PANEL: TRANSCRIPT */}
-                        <div className="w-2/3 flex flex-col p-8 overflow-y-auto scroll-touch relative bg-black/20">
-                            <div className="space-y-6 pb-20">
+                        {/* RIGHT PANEL: TRANSCRIPT (With Auto-Scroll & Dual Buttons) */}
+                        <div ref={chatScrollRef} className="w-2/3 flex flex-col p-8 overflow-y-auto scroll-touch relative bg-black/20 pb-24">
+                            <div className="space-y-6">
                                 {messages.length === 0 && (
                                     <div className="h-64 flex flex-col items-center justify-center text-slate-700 text-center">
                                         <i className="fas fa-comments text-4xl mb-4 opacity-20"></i>
@@ -1499,9 +1450,7 @@
                                     <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-slide-in`}>
                                         <div className={`max-w-[85%] p-5 rounded-2xl leading-relaxed text-base border shadow-xl ${msg.role === 'user' ? 'bg-slate-800 border-slate-700 text-gray-200' : 'bg-slate-900 border-jpm-accent/20 text-white'}`}>
                                             <div className="flex justify-between items-center mb-2 gap-4">
-                                                <span className="text-[10px] font-bold uppercase tracking-widest opacity-50 font-mono">
-                                                    {msg.role === 'user' ? 'Satnam Singh' : 'J.P. Morgan Panel'}
-                                                </span>
+                                                <span className="text-[10px] font-bold uppercase tracking-widest opacity-50 font-mono">{msg.role === 'user' ? 'Satnam Singh' : 'J.P. Morgan Panel'}</span>
                                                 <span className="text-[9px] font-mono opacity-30">{new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
                                             </div>
                                             {msg.text}
@@ -1510,13 +1459,31 @@
                                 ))}
                                 {status === 'THINKING' && (
                                     <div className="flex justify-start animate-pulse">
-                                        <div className="bg-slate-900 p-4 rounded-xl text-jpm-accent font-mono text-xs border border-jpm-accent/10">
-                                            Panel is analyzing...
-                                        </div>
+                                        <div className="bg-slate-900 p-4 rounded-xl text-jpm-accent font-mono text-xs border border-jpm-accent/10">Panel is analyzing...</div>
                                     </div>
                                 )}
                             </div>
                         </div>
+
+                        {/* SCROLL CONTROLS (Floating) */}
+                        {messages.length > 3 && (
+                            <div className="absolute bottom-6 right-6 z-20 flex flex-col gap-2">
+                                <button 
+                                    onClick={() => chatScrollRef.current && chatScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' })}
+                                    className="w-10 h-10 bg-slate-800 text-gray-400 rounded-full shadow-lg border border-slate-700 hover:bg-slate-700 hover:text-white transition-all active:scale-95 flex items-center justify-center hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]"
+                                    title="Scroll to Top"
+                                >
+                                    <i className="fas fa-arrow-up"></i>
+                                </button>
+                                <button 
+                                    onClick={() => chatScrollRef.current && chatScrollRef.current.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: 'smooth' })}
+                                    className="w-10 h-10 bg-slate-800 text-jpm-accent rounded-full shadow-lg border border-slate-700 hover:bg-slate-700 transition-all active:scale-95 flex items-center justify-center hover:shadow-[0_0_15px_rgba(197,157,95,0.3)]"
+                                    title="Scroll to Bottom"
+                                >
+                                    <i className="fas fa-arrow-down"></i>
+                                </button>
+                            </div>
+                        )}
                     </div>
                 );
             };
