@@ -1010,45 +1010,66 @@
 
         // ---START AI MODE ---
             // --- GEMINI LIVE VOICE MODE ---
+            // --- GEMINI LIVE VOICE MODE (ENHANCED: TYPE/SPEAK + REVIEW) ---
             const AIMode = ({ onEnd, toggleFocus, isFocusMode, gender, speed, region, setGender, setSpeed, setRegion }) => {
                 const [status, setStatus] = useState("IDLE");
-                const [thinkingMode, setThinkingMode] = useState("low"); //default thinking mode
+                const [thinkingMode, setThinkingMode] = useState("low");
                 const [messages, setMessages] = useState([]);
                 const [url, setUrl] = useState(localStorage.getItem('jpm_ai_url') || "");
                 const [showConfig, setShowConfig] = useState(!localStorage.getItem('jpm_ai_url'));
-                const [interimText, setInterimText] = useState(""); // Stores live speech before it's sent
-
+                
+                // --- INPUT MODAL STATES ---
+                const [isComposerOpen, setIsComposerOpen] = useState(false);
+                const [reviewMode, setReviewMode] = useState(false); // False = Typing/Rec, True = Review
+                const [inputValue, setInputValue] = useState("");
+                const [inputAudioUrl, setInputAudioUrl] = useState(null);
+                
+                // --- RECORDING & WPM STATES ---
+                const [isRecording, setIsRecording] = useState(false);
+                const [liveWpm, setLiveWpm] = useState(0);
+                const [interimText, setInterimText] = useState("");
+                
+                // --- REFS ---
                 const recognitionRef = useRef(null);
-                const fullTranscriptRef = useRef(""); // NEW: Persistent Master Record of your answer
-                const lastSpokenTextRef = useRef(""); // New: Stores text for live-restarts
-                const currentAudioRef = useRef(null); // New: Tracks active audio object
-                const [isPaused, setIsPaused] = useState(false); // New: Paused state
+                const mediaRecorderRef = useRef(null);
+                const audioChunksRef = useRef([]);
+                const speechStartRef = useRef(0);
+                const totalSpeechWordsRef = useRef(0);
+                const currentAudioRef = useRef(null); // Track AI Audio
+                const [isPaused, setIsPaused] = useState(false);
 
-                /*Real-time Voice Adoption. 
-                When Satnam changes Speed, Gender, or Region, the current audio stops 
-                and restarts immediately with the new settings using the same text. */
+                // --- 1. CORE AI LIFECYCLE ---
+                
+                // Clean up on unmount
                 useEffect(() => {
-                    if (status === "SPEAKING" && currentAudioRef.current) {
-                        // Stop current audio
-                        currentAudioRef.current.pause();
-                        currentAudioRef.current.src = "";
-
-                        // Restart with same text but new settings
-                        if (lastSpokenTextRef.current) {
-                            speakResponse(lastSpokenTextRef.current);
+                    return () => {
+                        stopEverything();
+                        if (currentAudioRef.current) {
+                            currentAudioRef.current.pause();
+                            currentAudioRef.current = null;
                         }
-                    }
-                }, [gender, speed, region]); // Watch for any setting change
+                    };
+                }, []);
 
-                //Ends the session cleanly in AI mode when END button is hit 
+                // End Signal Listener
                 useEffect(() => {
                     const handleEndSignal = () => { stopEverything(); onEnd(0, []); };
                     window.addEventListener('jpm-trigger-end', handleEndSignal);
                     return () => window.removeEventListener('jpm-trigger-end', handleEndSignal);
                 }, [onEnd]);
 
-                /* CONTEXT: Strategic History Fetch. Pulls previous JPM interview 
-                transcripts from the cloud to ensure session continuity when returning to AI Mode. */
+                // Settings Change Listener (Instant Apply)
+                useEffect(() => {
+                    if (status === "SPEAKING" && currentAudioRef.current && messages.length > 0) {
+                        const lastAiMsg = [...messages].reverse().find(m => m.role === 'model');
+                        if (lastAiMsg) {
+                            currentAudioRef.current.pause();
+                            speakResponse(lastAiMsg.text);
+                        }
+                    }
+                }, [gender, speed, region]);
+
+                // Fetch History
                 useEffect(() => {
                     const fetchCloudHistory = async () => {
                         const aiUrl = localStorage.getItem('jpm_ai_url');
@@ -1057,46 +1078,160 @@
                             const res = await fetch(aiUrl, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    data: {
-                                        action: "fetchHistory",
-                                        userID: "satnam_default",
-                                        sessionID: "voice-session-satnam"
-                                    }
-                                })
+                                body: JSON.stringify({ data: { action: "fetchHistory", userID: "satnam_default", sessionID: "voice-session-satnam" } })
                             });
                             const result = await res.json();
-
-                            /* Strategic History Fix. Ensures both Satnam's words 
-                                and the AI's responses are mapped to the 'text' property 
-                                so they both appear in the transcript window. */
-
                             if (result.data?.history) {
                                 const historicalMessages = [];
                                 result.data.history.forEach(h => {
-                                    // 1. Add User message first (if it exists in that log entry)
-                                    if (h.userSaid) {
-                                        historicalMessages.push({ role: 'user', text: h.userSaid });
-                                    }
-                                    // 2. Add AI message second
-                                    if (h.aiSaid) {
-                                        historicalMessages.push({ role: 'model', text: h.aiSaid });
-                                    }
+                                    if (h.userSaid) historicalMessages.push({ role: 'user', text: h.userSaid });
+                                    if (h.aiSaid) historicalMessages.push({ role: 'model', text: h.aiSaid });
                                 });
                                 setMessages(historicalMessages);
                             }
-
                         } catch (e) { console.error("History fetch failed:", e); }
                     };
                     fetchCloudHistory();
                 }, []);
 
+                // --- 2. RECORDING LOGIC (Copied from TypeMode) ---
+                const countW = (s) => s && s.trim() ? s.trim().split(/\s+/).length : 0;
+                
+                const startAudioRec = async () => {
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        mediaRecorderRef.current = new MediaRecorder(stream);
+                        audioChunksRef.current = [];
+                        mediaRecorderRef.current.ondataavailable = (event) => {
+                            if (event.data.size > 0) audioChunksRef.current.push(event.data);
+                        };
+                        mediaRecorderRef.current.onstop = () => {
+                            const type = mediaRecorderRef.current.mimeType || 'audio/webm';
+                            const audioBlob = new Blob(audioChunksRef.current, { type });
+                            const url = URL.createObjectURL(audioBlob);
+                            setInputAudioUrl(url);
+                            stream.getTracks().forEach(track => track.stop());
+                        };
+                        mediaRecorderRef.current.start();
+                    } catch (err) { console.warn("Audio recording failed", err); alert("Microphone blocked"); }
+                };
+
+                const startSpeechEngine = useCallback(() => {
+                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    if (!SpeechRecognition) return;
+                    const recognition = new SpeechRecognition();
+                    recognition.continuous = true;
+                    recognition.interimResults = true;
+                    recognition.lang = 'en-GB'; // Use 'en-US' or region state if preferred
+                    
+                    if (speechStartRef.current === 0) speechStartRef.current = Date.now();
+                    
+                    recognition.onresult = (event) => {
+                        let finalChunk = '';
+                        let interimChunk = '';
+                        for (let i = event.resultIndex; i < event.results.length; ++i) {
+                            if (event.results[i].isFinal) finalChunk += event.results[i][0].transcript;
+                            else interimChunk += event.results[i][0].transcript;
+                        }
+                        
+                        setInterimText(interimChunk);
+                        
+                        if (finalChunk) {
+                            totalSpeechWordsRef.current += countW(finalChunk);
+                            setInputValue(prev => (prev ? prev + ' ' : '') + finalChunk.trim());
+                            setInterimText("");
+                        }
+                        
+                        const currentSessionWords = totalSpeechWordsRef.current + countW(interimChunk);
+                        const mins = (Date.now() - speechStartRef.current) / 60000;
+                        const wpm = mins > 0.05 ? Math.round(currentSessionWords / mins) : 0;
+                        setLiveWpm(wpm);
+                    };
+
+                    recognition.onend = () => {
+                        // If explicitly stopped by user (isRecording false), don't restart. 
+                        // But since state might not update inside callback, we handle stop externally.
+                        if (recognitionRef.current && isRecording) {
+                           // Keep going if we didn't mean to stop (browser timeout)
+                           // For simplicity in this mode, we rely on the button toggle.
+                        }
+                    };
+                    
+                    recognitionRef.current = recognition;
+                    recognition.start();
+                }, [isRecording]);
+
+                const toggleRecording = () => {
+                    if (isRecording) {
+                        // STOP
+                        if (recognitionRef.current) recognitionRef.current.stop();
+                        if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") mediaRecorderRef.current.stop();
+                        setIsRecording(false);
+                        setInterimText("");
+                    } else {
+                        // START
+                        speechStartRef.current = 0;
+                        totalSpeechWordsRef.current = 0;
+                        setLiveWpm(0);
+                        setInputAudioUrl(null); // Clear previous audio
+                        setIsRecording(true);
+                        startAudioRec();
+                        startSpeechEngine();
+                    }
+                };
+                
+                const getWpmColor = (wpm) => { if (wpm === 0) return 'bg-gray-700 text-gray-400'; if (wpm < 110) return 'bg-yellow-900/50 text-yellow-300 border-yellow-700'; if (wpm > 160) return 'bg-red-900/50 text-red-300 border-red-700'; return 'bg-green-900/50 text-green-300 border-green-700'; };
+
+                // --- 3. INPUT FLOW HANDLERS ---
+                
+                const openComposer = () => {
+                    if (status !== 'IDLE' && status !== 'PAUSED') return;
+                    setIsComposerOpen(true);
+                    setReviewMode(false);
+                    setInputValue("");
+                    setInputAudioUrl(null);
+                    setInterimText("");
+                    setLiveWpm(0);
+                };
+
+                const handleDoneWriting = () => {
+                    if (isRecording) toggleRecording();
+                    setReviewMode(true);
+                };
+
+                const handleEdit = () => {
+                    setReviewMode(false);
+                };
+
+                const handleCancel = () => {
+                    if (isRecording) toggleRecording();
+                    setIsComposerOpen(false);
+                };
+
+                const handleSubmit = () => {
+                    setIsComposerOpen(false);
+                    // Combine final input with any leftover interim text if user forgot to stop
+                    const finalMsg = (inputValue + " " + interimText).trim();
+                    if (!finalMsg) return;
+                    sendMessage(finalMsg);
+                };
+
+                // --- 4. AI & AUDIO LOGIC ---
+
                 const stopEverything = () => {
                     if (recognitionRef.current) recognitionRef.current.stop();
+                    if (mediaRecorderRef.current) mediaRecorderRef.current.stop();
                     window.speechSynthesis.cancel();
+                    if (currentAudioRef.current) {
+                         currentAudioRef.current.pause();
+                         currentAudioRef.current = null;
+                    }
                     setStatus("IDLE");
+                    setIsPaused(false);
+                    setIsComposerOpen(false);
+                    setIsRecording(false);
                 };
-                //  New: Toggle Pause/Resume for current audio
+
                 const togglePause = () => {
                     if (!currentAudioRef.current) return;
                     if (isPaused) {
@@ -1110,6 +1245,69 @@
                     }
                 };
 
+                const speakResponse = async (text) => {
+                    const aiUrl = localStorage.getItem('jpm_ai_url');
+                    try {
+                        const response = await fetch(aiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ data: { action: "getSpeech", text, gender, speed, region } })
+                        });
+
+                        if (!response.ok) throw new Error("Backend failed");
+                        const blob = await response.blob();
+                        if (blob.size < 500) return setStatus("IDLE");
+
+                        const audioUrl = URL.createObjectURL(blob);
+                        const audio = new Audio(audioUrl);
+                        currentAudioRef.current = audio;
+
+                        audio.onplay = () => setStatus("SPEAKING");
+                        
+                        // IMPORTANT: When AI is done, go to IDLE (do not auto-record)
+                        audio.onended = () => {
+                            URL.revokeObjectURL(audioUrl);
+                            setStatus("IDLE");
+                            currentAudioRef.current = null;
+                        };
+                        
+                        audio.onerror = () => setStatus("IDLE");
+                        await audio.play();
+                    } catch (e) {
+                        console.error(e);
+                        setStatus("IDLE");
+                    }
+                };
+
+                const sendMessage = async (text) => {
+                    setStatus("THINKING");
+                    const userMsg = { role: 'user', text };
+                    const updatedHistory = [...messages, userMsg];
+                    setMessages(updatedHistory);
+
+                    try {
+                        const payload = {
+                            data: {
+                                message: text,
+                                sessionID: "voice-session-satnam",
+                                history: updatedHistory.map(m => ({ role: m.role === 'model' ? 'ai' : 'user', text: m.text })),
+                                thinking_level: thinkingMode
+                            }
+                        };
+                        const response = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        const data = await response.json();
+                        const aiText = data.data?.text || "Connection error.";
+                        setMessages(prev => [...prev, { role: 'model', text: aiText }]);
+                        speakResponse(aiText);
+                    } catch (error) {
+                        setStatus("ERROR");
+                    }
+                };
+
                 const handleConnect = () => {
                     if (!url.trim()) return;
                     const cleanUrl = url.trim().replace(/\/$/, "");
@@ -1118,333 +1316,177 @@
                     setShowConfig(false);
                 };
 
-                /* Strategic Turn-Taking Logic. 
-                   Uses a 2s 'silenceTimeout' to prevent the AI from interrupting 
-                   Satnam mid-sentence during complex technical answers. */
-
-                const startListening = () => {
-                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                    if (!SpeechRecognition) return alert("Browser not supported");
-
-                    const recognition = new SpeechRecognition();
-                    recognition.continuous = true;
-                    recognition.interimResults = true;
-                    recognition.lang = 'en-GB';
-
-                    let silencerTimeout = null;
-                    fullTranscriptRef.current = ""; // Reset only at the very start of a new turn
-
-                    recognition.onstart = () => {
-                        setStatus("LISTENING");
-                        setInterimText("");
-                    };
-
-                    recognition.onresult = (e) => {
-                        if (silencerTimeout) clearTimeout(silencerTimeout);
-
-                        let interim = "";
-                        let newFinalText = "";
-
-                        for (let i = e.resultIndex; i < e.results.length; ++i) {
-                            if (e.results[i].isFinal) {
-                                newFinalText += e.results[i][0].transcript + " ";
-                            } else {
-                                interim += e.results[i][0].transcript;
-                            }
-                        }
-
-                        // Add only newly finalized words to the master record
-                        fullTranscriptRef.current += newFinalText;
-
-                        // Combine the Master Record with what you are currently saying (interim)
-                        const liveOutput = (fullTranscriptRef.current + interim).trim();
-                        setInterimText(liveOutput);
-
-                        if (liveOutput) {
-                            // Wait for 2 seconds of silence before sending the WHOLE answer
-                            silencerTimeout = setTimeout(() => {
-                                sendMessage(liveOutput);
-                                recognition.stop();
-                                setInterimText("");
-                            }, 2000);
-                        }
-                    };
-
-                    recognition.onend = () => {
-                        setStatus(prev => prev === "LISTENING" ? "IDLE" : prev);
-                    };
-
-                    recognitionRef.current = recognition;
-                    recognition.start();
-                };
-
-                /* Robust AWS Polly Bridge. Fixed the missing 'region' parameter 
-                and added error handling to prevent the 'Stuck in Speaking' bug. */
-
-                const speakResponse = async (text) => {
-                    lastSpokenTextRef.current = text; // Store for potential restart
-                    const aiUrl = localStorage.getItem('jpm_ai_url');
-                    console.log("DEBUG: Sending text to speech:", text.substring(0, 20) + "...");
-                    try {
-                        const response = await fetch(aiUrl, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ data: { action: "getSpeech", text, gender, speed, region } })
-                        });
-
-                        // DIAGNOSTIC LOGS
-                        console.log("DEBUG: Response Status:", response.status);
-                        console.log("DEBUG: Content-Type:", response.headers.get('Content-Type'));
-
-                        if (!response.ok) {
-                            const errText = await response.text();
-                            console.error("DEBUG: Backend Error Body:", errText);
-                            throw new Error("Backend failed");
-                        }
-
-                        const blob = await response.blob();
-                        console.log("DEBUG: Audio Blob Size:", blob.size, "bytes");
-
-                        if (blob.size < 500) {
-                            console.error("DEBUG: Blob too small. Likely an error message masked as a blob.");
-                            setStatus("IDLE");
-                            return;
-                        }
-
-                        const audioUrl = URL.createObjectURL(blob);
-                        const audio = new Audio(audioUrl);
-                        currentAudioRef.current = audio; // Track this audio
-                        const togglePause = () => {
-                            if (!currentAudioRef.current) return;
-
-                            if (isPaused) {
-                                currentAudioRef.current.play();
-                                setIsPaused(false);
-                                setStatus("SPEAKING");
-                            } else {
-                                currentAudioRef.current.pause();
-                                setIsPaused(true);
-                                setStatus("PAUSED"); // Add this state to your status list
-                            }
-                        };
-
-                        audio.onplay = () => setStatus("SPEAKING");
-                        /* Continuous AI Flow Fix. 
-                            Removes the flicker to IDLE after speaking, keeping the UI in a 
-                            professional 'ready' state for Satnam's next response. */
-                        audio.onended = () => {
-                            URL.revokeObjectURL(audioUrl);
-                            // Directly transition from SPEAKING to LISTENING without hitting IDLE
-                            startListening();
-                        };
-
-                        audio.onerror = (e) => { console.error("DEBUG: Audio Playback Error:", e); setStatus("IDLE"); };
-                        await audio.play();
-                    } catch (e) {
-                        console.error("DEBUG: Catch Block Error:", e);
-                        setStatus("IDLE");
-                    }
-                };
-
-
-                /* --- AI CONVERSATION HISTORY UPDATE SATNAM --- */
-                const sendMessage = async (text) => {
-                    setStatus("THINKING");
-                    const userMsg = { role: 'user', text };
-
-                    // 1. Immediately update UI to show user's message so it doesn't "disappear"
-                    const updatedHistory = [...messages, userMsg];
-                    setMessages(updatedHistory);
-
-                    try {
-
-                        // CHANGE THIS: Replace the dynamic timestamp with a stable session ID
-                        const payload = {
-                            data: {
-                                message: text,
-                                sessionID: "voice-session-satnam", // STABLE ID
-                                history: updatedHistory.map(m => ({
-                                    role: m.role === 'model' ? 'ai' : 'user',
-                                    text: m.text
-                                })),
-                                thinking_level: thinkingMode
-                            }
-                        };
-
-                        const response = await fetch(url, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        });
-
-                        const data = await response.json();
-                        const aiText = data.data?.text || "I'm having trouble connecting to the panel.";
-
-                        // 3. Append the AI response to the existing history
-                        setMessages(prev => [...prev, { role: 'model', text: aiText }]);
-                        speakResponse(aiText);
-                    } catch (error) {
-                        console.error(error);
-                        setStatus("ERROR");
-                    }
-                };
-
                 return (
-                    <div className="flex h-full w-full bg-slate-950 text-white overflow-hidden">
-                        {/* LEFT PANEL: The Animated AI Orb (The "Brain") */}
+                    <div className="flex h-full w-full bg-slate-950 text-white overflow-hidden relative">
+                        
+                        {/* --- MODAL: COMPOSER (TYPE/SPEAK) --- */}
+                        {isComposerOpen && (
+                            <div className="absolute inset-0 z-50 bg-slate-900/90 backdrop-blur-lg flex flex-col p-4 md:p-8 animate-slide-in">
+                                <div className="max-w-4xl mx-auto w-full h-full flex flex-col">
+                                    {/* Header */}
+                                    <div className="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-jpm-accent text-slate-900 flex items-center justify-center font-bold shadow-[0_0_15px_rgba(197,157,95,0.4)]">
+                                                <i className={`fas ${reviewMode ? 'fa-check' : 'fa-pen'}`}></i>
+                                            </div>
+                                            <div>
+                                                <h2 className="text-xl font-bold font-quote text-white">{reviewMode ? 'Review Your Answer' : 'Compose Answer'}</h2>
+                                                <p className="text-[10px] text-gray-400 font-mono uppercase tracking-widest">{reviewMode ? 'Check before submitting' : 'Type or use voice'}</p>
+                                            </div>
+                                        </div>
+                                        <button onClick={handleCancel} className="p-2 text-gray-500 hover:text-white transition"><i className="fas fa-times text-xl"></i></button>
+                                    </div>
 
+                                    {/* Content Area */}
+                                    <div className="flex-grow flex flex-col relative bg-slate-800/50 rounded-2xl border border-slate-700 overflow-hidden shadow-inner">
+                                        {reviewMode ? (
+                                            // REVIEW MODE
+                                            <div className="p-6 h-full flex flex-col">
+                                                 <div className="flex-grow overflow-y-auto mb-4 p-4 bg-slate-900/50 rounded-xl border border-slate-800">
+                                                    <p className="text-gray-200 text-lg leading-relaxed font-sans whitespace-pre-wrap">{inputValue} {interimText}</p>
+                                                 </div>
+                                                 {inputAudioUrl && (
+                                                     <div className="flex items-center gap-4 p-4 bg-slate-800 rounded-xl border border-slate-700 mb-2">
+                                                         <div className="w-10 h-10 rounded-full bg-slate-700 text-jpm-accent flex items-center justify-center border border-slate-600"><i className="fas fa-play"></i></div>
+                                                         <div className="flex-grow">
+                                                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Your Voice Recording</p>
+                                                             <audio controls src={inputAudioUrl} className="w-full h-8"></audio>
+                                                         </div>
+                                                     </div>
+                                                 )}
+                                            </div>
+                                        ) : (
+                                            // INPUT MODE
+                                            <div className="h-full flex flex-col">
+                                                <textarea 
+                                                    className="w-full h-full bg-transparent p-6 text-xl text-gray-200 placeholder-gray-600 focus:outline-none resize-none font-sans"
+                                                    placeholder="Type your answer here or click the microphone to speak..."
+                                                    value={inputValue + (isRecording ? interimText : "")}
+                                                    onChange={(e) => setInputValue(e.target.value)}
+                                                    readOnly={isRecording}
+                                                />
+                                                {/* Voice Controls Overlay */}
+                                                <div className="absolute bottom-6 right-6 flex items-center gap-4">
+                                                    {isRecording && (
+                                                        <div className="flex flex-col items-end gap-1 animate-slide-in"> 
+                                                            <div className="flex gap-1 h-6 items-end audio-wave"><span></span><span></span><span></span><span></span><span></span></div> 
+                                                            <span className={`text-[10px] font-bold px-2 py-1 rounded border ${getWpmColor(liveWpm)}`}>{liveWpm} WPM</span> 
+                                                        </div>
+                                                    )}
+                                                    <button 
+                                                        onClick={toggleRecording} 
+                                                        className={`p-4 rounded-full shadow-xl transition-all hover:scale-105 active:scale-95 border ${isRecording ? 'bg-red-600 text-white border-red-500 animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.5)]' : 'bg-slate-700 text-jpm-accent border-slate-600 hover:bg-slate-600'}`}
+                                                    >
+                                                        <i className={`fas ${isRecording ? 'fa-stop' : 'fa-microphone'} text-2xl`}></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Footer Actions */}
+                                    <div className="mt-6 flex gap-4">
+                                        {reviewMode ? (
+                                            <>
+                                                <button onClick={handleEdit} className="flex-1 py-4 bg-slate-800 text-white rounded-xl font-bold border border-slate-700 hover:bg-slate-700 transition">Edit</button>
+                                                <button onClick={handleSubmit} className="flex-[2] py-4 bg-jpm-accent text-slate-900 rounded-xl font-bold shadow-[0_0_20px_rgba(197,157,95,0.3)] hover:bg-[#b08d55] transition active:scale-95">
+                                                    <i className="fas fa-paper-plane mr-2"></i> Submit to AI
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <button onClick={handleDoneWriting} className="w-full py-4 bg-slate-700 text-white rounded-xl font-bold hover:bg-slate-600 transition border border-slate-600">
+                                                Done
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* LEFT PANEL: ORB & CONTROLS */}
                         <div className="w-1/3 border-r border-slate-800 flex flex-col items-center justify-center p-6 bg-slate-900/50 relative">
-
-                            {/* CONTEXT: Cleaned UI for premium focus. Removed redundant System Interface label. */}
+                            {/* Status Pill */}
                             <div className="flex flex-col items-center mb-8">
-                                <div className={`px-3 py-1 rounded-full border text-[11px] font-bold font-mono transition-all duration-300 ${status === 'LISTENING' ? 'bg-blue-900/30 border-blue-500 text-blue-400' :
-                                    status === 'THINKING' ? 'bg-purple-900/30 border-purple-500 text-purple-400' :
-                                        status === 'SPEAKING' ? 'bg-jpm-accent/20 border-jpm-accent text-jpm-accent' :
-                                            'bg-slate-800 border-slate-700 text-slate-500'
-                                    }`}>
-                                    {status}
+                                <div className={`px-3 py-1 rounded-full border text-[11px] font-bold font-mono transition-all duration-300 ${status === 'THINKING' ? 'bg-purple-900/30 border-purple-500 text-purple-400' : status === 'SPEAKING' ? 'bg-jpm-accent/20 border-jpm-accent text-jpm-accent' : 'bg-slate-800 border-slate-700 text-slate-500'}`}>
+                                    {status === 'IDLE' ? 'READY' : status}
                                 </div>
                             </div>
 
-                            {/* START - THE DYNAMIC PREMIUM AI ORB - ALL STATES ENHANCED */}
-
-                            <div className={`relative w-48 h-48 rounded-full flex items-center justify-center transition-all duration-700 shadow-2xl ${status === 'LISTENING' ? 'bg-blue-500/20 shadow-[0_0_60px_rgba(59,130,246,0.6)] animate-[orb-wobble_3s_infinite]' :
-                                status === 'SPEAKING' ? 'bg-jpm-accent/30 shadow-[0_0_60px_rgba(197,157,95,0.6)] animate-[orb-wobble_1.5s_infinite]' :
-                                    status === 'THINKING' ? 'bg-purple-500/20 shadow-[0_0_60px_rgba(168,85,247,0.6)]' :
-                                        'bg-slate-800/40 shadow-inner'}`}>
-
-                                <div className={`w-36 h-36 rounded-full border-2 border-white/10 flex items-center justify-center overflow-hidden bg-slate-950 ${status === 'LISTENING' ? 'animate-pulse' : ''}`}>
-                                    {/* PREMIUM CIRCULAR MASK: This forced rounding ensures no square edges can ever show */}
+                            {/* AI Orb */}
+                            <div className={`relative w-48 h-48 rounded-full flex items-center justify-center transition-all duration-700 shadow-2xl ${status === 'SPEAKING' ? 'bg-jpm-accent/30 shadow-[0_0_60px_rgba(197,157,95,0.6)] animate-[orb-wobble_1.5s_infinite]' : status === 'THINKING' ? 'bg-purple-500/20 shadow-[0_0_60px_rgba(168,85,247,0.6)]' : 'bg-slate-800/40 shadow-inner'}`}>
+                                <div className="w-36 h-36 rounded-full border-2 border-white/10 flex items-center justify-center overflow-hidden bg-slate-950">
                                     <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center relative bg-black/20">
-                                        <div className={`text-6xl select-none flex items-center justify-center w-full h-full transition-all duration-500 ${status === 'IDLE' ? 'animate-[ai-glow-idle_12s_linear_infinite]' :
-                                            status === 'THINKING' ? 'animate-[brain-think_2.5s_infinite]' : 'filter drop-shadow-lg'}`}>
-                                            {/* CHANGED IDLE EMOJI TO STANDALONE DIAMOND FOR BETTER ROTATION */}
-                                            {status === 'SPEAKING' ? '🤖' : status === 'LISTENING' ? '🎙️' : status === 'THINKING' ? '🧠' : '✨'}
+                                        <div className={`text-6xl select-none flex items-center justify-center w-full h-full transition-all duration-500 ${status === 'IDLE' ? 'animate-[ai-glow-idle_12s_linear_infinite]' : status === 'THINKING' ? 'animate-[brain-think_2.5s_infinite]' : 'filter drop-shadow-lg'}`}>
+                                            {status === 'SPEAKING' ? '🤖' : status === 'THINKING' ? '🧠' : '✨'}
                                         </div>
                                     </div>
                                 </div>
-
-                                {/* Dynamic Ping-Rings */}
                                 {status === 'SPEAKING' && <div className="absolute inset-0 rounded-full border-2 border-jpm-accent/40 animate-ping"></div>}
-                                {status === 'LISTENING' && <div className="absolute inset-0 rounded-full border-2 border-blue-400/30 animate-pulse"></div>}
                             </div>
 
-                            {/* END - THE DYNAMIC PREMIUM AI ORB */}
-
-                            {/* Session Control Buttons - Condensed Architect Layout */}
+                            {/* Controls */}
                             <div className="mt-6 flex flex-col gap-2 w-full px-4">
                                 {status === 'IDLE' ? (
-                                    <button
-                                        onClick={startListening}
-                                        className="w-full bg-jpm-accent text-black font-bold py-4 rounded-xl hover:scale-105 transition shadow-lg shadow-jpm-accent/20"
-                                    >
-                                        START SESSION
+                                    <button onClick={openComposer} className="w-full bg-jpm-accent text-black font-bold py-4 rounded-xl hover:scale-105 transition shadow-lg shadow-jpm-accent/20 flex items-center justify-center gap-2">
+                                        <i className="fas fa-pen-to-square"></i> REPLY / START
                                     </button>
                                 ) : (
                                     <>
-                                        {/* SLEEK AMBER PAUSE BUTTON: Sits elegantly above End Session */}
-                                        <button
-                                            onClick={togglePause}
-                                            className={`w-full border py-3 rounded-xl font-mono text-[10px] uppercase tracking-widest transition-all ${isPaused
-                                                ? 'bg-amber-600/20 border-amber-500 text-white animate-pulse'
-                                                : 'border-amber-900/50 text-amber-500 hover:bg-amber-900/10'
-                                                }`}
-                                        >
+                                        <button onClick={togglePause} className={`w-full border py-3 rounded-xl font-mono text-[10px] uppercase tracking-widest transition-all ${isPaused ? 'bg-amber-600/20 border-amber-500 text-white animate-pulse' : 'border-amber-900/50 text-amber-500 hover:bg-amber-900/10'}`}>
                                             <i className={`fas ${isPaused ? 'fa-play' : 'fa-pause'} mr-2`}></i>
-                                            {isPaused ? 'Resume Session' : 'Pause Session'}
+                                            {isPaused ? 'Resume Speech' : 'Pause Speech'}
                                         </button>
-
-                                        <button
-                                            onClick={stopEverything}
-                                            className="w-full border border-red-900 text-red-500 font-mono text-[10px] py-3 rounded-xl hover:bg-red-900/10 transition uppercase tracking-widest"
-                                        >
+                                        <button onClick={stopEverything} className="w-full border border-red-900 text-red-500 font-mono text-[10px] py-3 rounded-xl hover:bg-red-900/10 transition uppercase tracking-widest">
                                             End Session
                                         </button>
                                     </>
                                 )}
-
-                                {/* Condensed Neural Link Toggle */}
-                                <button onClick={() => setShowConfig(!showConfig)} className="text-[10px] text-slate-500 hover:text-jpm-accent transition-colors font-mono mt-2 self-center">
-                                    <i className="fas fa-cog mr-2"></i>Neural Link
-                                </button>
+                                <button onClick={() => setShowConfig(!showConfig)} className="text-[10px] text-slate-500 hover:text-jpm-accent transition-colors font-mono mt-2 self-center"><i className="fas fa-cog mr-2"></i>Neural Link</button>
                             </div>
 
-                            {/* LEFT PANEL: VOICE SETTINGS */}
-
-                            <div className="bg-slate-800/40 p-5 rounded-3xl border border-slate-700 shadow-inner w-full space-y-5">
+                            {/* Settings (Persona Panel) */}
+                            <div className="bg-slate-800/40 p-5 rounded-3xl border border-slate-700 shadow-inner w-full space-y-5 mt-4">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-bold text-gray-500 uppercase font-mono tracking-widest block text-left">Panel Region</label>
                                     <div className="flex gap-2">
-                                        <button onClick={() => setRegion('en-GB')} className={`flex-1 text-[10px] py-2 rounded-lg font-mono border transition-all ${region === 'en-GB' ? 'bg-jpm-accent text-black border-jpm-accent shadow-lg' : 'bg-slate-700 text-gray-400 border-slate-600 opacity-60'}`}>UK ACCENT</button>
-                                        <button onClick={() => setRegion('en-US')} className={`flex-1 text-[10px] py-2 rounded-lg font-mono border transition-all ${region === 'en-US' ? 'bg-jpm-accent text-black border-jpm-accent shadow-lg' : 'bg-slate-700 text-gray-400 border-slate-600 opacity-60'}`}>US ACCENT</button>
+                                        <button onClick={() => setRegion('en-GB')} className={`flex-1 text-[10px] py-2 rounded-lg font-mono border transition-all ${region === 'en-GB' ? 'bg-jpm-accent text-black border-jpm-accent shadow-lg' : 'bg-slate-700 text-gray-400 border-slate-600 opacity-60'}`}>UK</button>
+                                        <button onClick={() => setRegion('en-US')} className={`flex-1 text-[10px] py-2 rounded-lg font-mono border transition-all ${region === 'en-US' ? 'bg-jpm-accent text-black border-jpm-accent shadow-lg' : 'bg-slate-700 text-gray-400 border-slate-600 opacity-60'}`}>US</button>
                                     </div>
                                 </div>
                                 <div className="flex justify-between items-center pt-2">
-                                    <label className="text-[10px] font-bold text-gray-500 uppercase font-mono tracking-widest">Panel Voice</label>
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase font-mono tracking-widest">Voice</label>
                                     <div className="flex bg-black/40 p-1 rounded-xl border border-white/5">
-                                        <button onClick={() => setGender('male')} className={`px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all ${gender === 'male' ? 'bg-jpm-accent text-black shadow-md' : 'text-gray-500'}`}>MALE</button>
-                                        <button onClick={() => setGender('female')} className={`px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all ${gender === 'female' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-500'}`}>FEMALE</button>
+                                        <button onClick={() => setGender('male')} className={`px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all ${gender === 'male' ? 'bg-jpm-accent text-black shadow-md' : 'text-gray-500'}`}>M</button>
+                                        <button onClick={() => setGender('female')} className={`px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all ${gender === 'female' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-500'}`}>F</button>
                                     </div>
                                 </div>
                                 <div className="space-y-1 pt-2">
                                     <div className="flex justify-between items-center text-[10px] font-mono text-gray-500">
-                                        <span className="uppercase tracking-widest">Reading Speed</span>
+                                        <span className="uppercase tracking-widest">Speed</span>
                                         <span className="text-jpm-accent font-bold">{speed}x</span>
                                     </div>
                                     <input type="range" min="0.5" max="1.5" step="0.1" value={speed} onChange={(e) => setSpeed(parseFloat(e.target.value))} className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-jpm-accent" />
                                 </div>
                             </div>
-
-                            {/* LEFT PANEL: SYNC AI MODEL URL SYNC POPUP */}
+                            
+                            {/* Neural Link Popup */}
                             {showConfig && (
                                 <div className="absolute bottom-10 left-6 right-6 z-50 bg-slate-900 border border-slate-700 p-4 rounded-xl shadow-2xl animate-slide-in">
                                     <input type="text" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Function URL" className="bg-black/50 border border-slate-600 rounded p-2 text-white w-full text-[10px] font-mono mb-2" />
                                     <button onClick={handleConnect} className="w-full bg-jpm-accent text-black font-bold text-[10px] py-2 rounded">SYNC</button>
                                 </div>
                             )}
-
-                            {/* LEFT PANEL: The Animated AI Orb (The "Brain")'s THINKING TOGGLE BUTTON */}
-                            <div className="flex items-center justify-between w-full px-4 mt-8 bg-slate-800/40 p-4 rounded-2xl border border-slate-700 shadow-inner">
-                                <div className="flex flex-col text-left">
-                                    <span className="text-[10px] font-bold text-gray-500 uppercase font-mono tracking-widest">Logic Depth</span>
-                                    <span className={`text-[11px] font-bold font-mono transition-colors ${thinkingMode === 'high' ? 'text-purple-400' : 'text-jpm-accent'}`}>
-                                        {thinkingMode === 'high' ? 'VP PANEL MODE' : 'SPEED DRILL'}
-                                    </span>
-                                </div>
-                                <button
-                                    onClick={() => setThinkingMode(prev => prev === 'high' ? 'low' : 'high')}
-                                    className={`w-12 h-6 rounded-full relative transition-all duration-300 shadow-lg ${thinkingMode === 'high' ? 'bg-purple-600 shadow-purple-500/20' : 'bg-slate-600'}`}
-                                >
-                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform duration-300 shadow-sm ${thinkingMode === 'high' ? 'translate-x-7' : 'translate-x-1'}`}></div>
-                                </button>
-                            </div>
-
                         </div>
 
-                        {/* RIGHT PANEL: The Persistent Transcript (The "History") with Users Name and Timestamp */}
+                        {/* RIGHT PANEL: TRANSCRIPT */}
                         <div className="w-2/3 flex flex-col p-8 overflow-y-auto scroll-touch relative bg-black/20">
                             <div className="space-y-6 pb-20">
                                 {messages.length === 0 && (
                                     <div className="h-64 flex flex-col items-center justify-center text-slate-700 text-center">
                                         <i className="fas fa-comments text-4xl mb-4 opacity-20"></i>
-                                        <p className="font-quote italic text-xl">The panel is ready for your introduction...</p>
+                                        <p className="font-quote italic text-xl">The panel is ready. Click 'Reply / Start' to begin.</p>
                                     </div>
                                 )}
-
-                                {/* LIVE TELEPROMPTER: Shows Satnam's words in real-time */}
-                                {status === 'LISTENING' && interimText && (
-                                    <div className="flex justify-end animate-pulse">
-                                        <div className="max-w-[85%] p-5 rounded-2xl leading-relaxed text-base border border-blue-500 bg-blue-900/20 text-blue-100 shadow-lg">
-                                            <div className="flex items-center gap-2 mb-2 opacity-50">
-                                                <i className="fas fa-microphone-alt text-xs"></i>
-                                                <span className="text-[10px] font-bold uppercase tracking-widest font-mono">Live Transcript</span>
-                                            </div>
-                                            {interimText}...
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Chat User name and Timestamp in Chat History */}
                                 {messages.map((msg, i) => (
                                     <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-slide-in`}>
                                         <div className={`max-w-[85%] p-5 rounded-2xl leading-relaxed text-base border shadow-xl ${msg.role === 'user' ? 'bg-slate-800 border-slate-700 text-gray-200' : 'bg-slate-900 border-jpm-accent/20 text-white'}`}>
@@ -1458,11 +1500,10 @@
                                         </div>
                                     </div>
                                 ))}
-
                                 {status === 'THINKING' && (
                                     <div className="flex justify-start animate-pulse">
                                         <div className="bg-slate-900 p-4 rounded-xl text-jpm-accent font-mono text-xs border border-jpm-accent/10">
-                                            Analyzing response...
+                                            Panel is analyzing...
                                         </div>
                                     </div>
                                 )}
