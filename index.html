@@ -1009,8 +1009,7 @@
         };
 
         // ---START AI MODE ---
-            // --- GEMINI LIVE VOICE MODE ---
-            // --- GEMINI LIVE VOICE MODE (ENHANCED: TYPE/SPEAK + REVIEW) ---
+            // --- GEMINI LIVE VOICE MODE (UPDATED: FIXED BUTTONS & SPEED BUTTON) ---
             const AIMode = ({ onEnd, toggleFocus, isFocusMode, gender, speed, region, setGender, setSpeed, setRegion }) => {
                 const [status, setStatus] = useState("IDLE");
                 const [thinkingMode, setThinkingMode] = useState("low");
@@ -1245,6 +1244,13 @@
                     }
                 };
 
+                const cycleSpeed = () => {
+                    setSpeed(prev => {
+                        const next = parseFloat((prev + 0.1).toFixed(1));
+                        return next > 1.5 ? 1.0 : next;
+                    });
+                };
+
                 const speakResponse = async (text) => {
                     const aiUrl = localStorage.getItem('jpm_ai_url');
                     try {
@@ -1421,11 +1427,13 @@
                                         </div>
                                     </div>
                                 </div>
-                                {status === 'SPEAKING' && <div className="absolute inset-0 rounded-full border-2 border-jpm-accent/40 animate-ping"></div>}
+                                {/* FIX: Added pointer-events-none so click passes through to buttons below */}
+                                {status === 'SPEAKING' && <div className="absolute inset-0 rounded-full border-2 border-jpm-accent/40 animate-ping pointer-events-none"></div>}
                             </div>
 
                             {/* Controls */}
-                            <div className="mt-6 flex flex-col gap-2 w-full px-4">
+                            {/* FIX: Added relative z-10 to ensure buttons are clickable above any orb overflow */}
+                            <div className="mt-6 flex flex-col gap-2 w-full px-4 relative z-10">
                                 {status === 'IDLE' ? (
                                     <button onClick={openComposer} className="w-full bg-jpm-accent text-black font-bold py-4 rounded-xl hover:scale-105 transition shadow-lg shadow-jpm-accent/20 flex items-center justify-center gap-2">
                                         <i className="fas fa-pen-to-square"></i> REPLY / START
@@ -1445,7 +1453,7 @@
                             </div>
 
                             {/* Settings (Persona Panel) */}
-                            <div className="bg-slate-800/40 p-5 rounded-3xl border border-slate-700 shadow-inner w-full space-y-5 mt-4">
+                            <div className="bg-slate-800/40 p-5 rounded-3xl border border-slate-700 shadow-inner w-full space-y-5 mt-4 relative z-10">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-bold text-gray-500 uppercase font-mono tracking-widest block text-left">Panel Region</label>
                                     <div className="flex gap-2">
@@ -1460,12 +1468,12 @@
                                         <button onClick={() => setGender('female')} className={`px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all ${gender === 'female' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-500'}`}>F</button>
                                     </div>
                                 </div>
-                                <div className="space-y-1 pt-2">
-                                    <div className="flex justify-between items-center text-[10px] font-mono text-gray-500">
-                                        <span className="uppercase tracking-widest">Speed</span>
-                                        <span className="text-jpm-accent font-bold">{speed}x</span>
-                                    </div>
-                                    <input type="range" min="0.5" max="1.5" step="0.1" value={speed} onChange={(e) => setSpeed(parseFloat(e.target.value))} className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-jpm-accent" />
+                                {/* FIX: Speed Control is now a Button instead of a Range Slider */}
+                                <div className="flex justify-between items-center pt-2">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase font-mono tracking-widest">Speed</label>
+                                    <button onClick={cycleSpeed} className="px-4 py-1.5 rounded-lg text-[10px] font-bold bg-slate-700 text-jpm-accent border border-slate-600 hover:bg-slate-600 transition shadow-sm w-24">
+                                        {speed.toFixed(1)}x
+                                    </button>
                                 </div>
                             </div>
                             
