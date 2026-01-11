@@ -487,234 +487,164 @@
         );
 
         // 2. Complex Visualizations
-        // --- JPM GLOBAL PAYMENTS COMMAND CENTER (DATA ENGINEERING EDITION) ---
-        const TechInsights = ({ onBack }) => {
-            const [tick, setTick] = useState(0);
-            const [logs, setLogs] = useState([]);
+        // --- JPM GLOBAL PAYMENTS COMMAND CENTER (RENAMED TO MATCH APP) ---
+            const TechInsightsModal = ({ onBack }) => {
+                // 1. Safe State Initialization
+                const [tick, setTick] = useState(0);
+                const [logs, setLogs] = useState([]);
+                const [metrics, setMetrics] = useState({
+                    tps: 1450,
+                    stpRate: 98.2,
+                    kafkaLag: 12,
+                    liquidity: 42.5,
+                    failed: 0
+                });
 
-            // JPM-Specific Payment Rails & Data Concepts
-            const [metrics, setMetrics] = useState({
-                tps: 1450, // Transactions Per Second
-                stpRate: 98.2, // Straight Through Processing
-                kafkaLag: 12, // ms
-                liquidity: 42.5, // $Bn Intraday
-                failed: 0
-            });
+                // 2. Simulation Loop (Wrapped in Try-Catch for safety)
+                useEffect(() => {
+                    const interval = setInterval(() => {
+                        try {
+                            setTick(t => t + 1);
+                            
+                            // Randomize Metrics
+                            setMetrics(prev => ({
+                                tps: Math.floor(1400 + Math.random() * 300),
+                                stpRate: (98.0 + Math.random() * 1.5).toFixed(1),
+                                kafkaLag: Math.floor(10 + Math.random() * 15),
+                                liquidity: (42 + Math.random()).toFixed(2),
+                                failed: prev.failed + (Math.random() > 0.8 ? 1 : 0)
+                            }));
 
-            // Simulate Live Data Stream
-            useEffect(() => {
-                const interval = setInterval(() => {
-                    setTick(t => t + 1);
+                            // Generate Logs
+                            const types = ['pacs.008', 'pain.001', 'camt.053', 'pacs.002'];
+                            const regions = ['EMEA', 'NAMR', 'APAC', 'LATAM'];
+                            const statuses = ['ACK', 'ACK', 'ACK', 'NACK', 'HELD'];
+                            
+                            const newLog = {
+                                id: Date.now() + Math.random(), // Unique ID
+                                time: new Date().toLocaleTimeString(),
+                                type: types[Math.floor(Math.random() * types.length)],
+                                region: regions[Math.floor(Math.random() * regions.length)],
+                                status: statuses[Math.floor(Math.random() * statuses.length)],
+                                latency: Math.floor(Math.random() * 150) + 'ms'
+                            };
 
-                    // 1. Randomize Metrics
-                    setMetrics(prev => ({
-                        tps: Math.floor(1400 + Math.random() * 300),
-                        stpRate: (98.0 + Math.random() * 1.5).toFixed(1),
-                        kafkaLag: Math.floor(10 + Math.random() * 15),
-                        liquidity: (42 + Math.random()).toFixed(2),
-                        failed: prev.failed + (Math.random() > 0.8 ? 1 : 0)
-                    }));
+                            setLogs(prev => [newLog, ...prev].slice(0, 7)); 
+                        } catch (e) {
+                            console.error("Simulation Error:", e);
+                        }
+                    }, 1500);
+                    return () => clearInterval(interval);
+                }, []);
 
-                    // 2. Generate ISO 20022 Traffic Logs
-                    const types = ['pacs.008.001.08', 'pain.001.001.09', 'camt.053.001.08', 'pacs.002.001.10'];
-                    const regions = ['EMEA (London)', 'NAMR (New York)', 'APAC (Singapore)', 'LATAM (Sao Paulo)'];
-                    const status = ['ACK', 'ACK', 'ACK', 'ACK', 'NACK (Schema)', 'HELD (Sanctions)'];
+                // 3. Render Safety Check
+                if (!metrics) return <div className="text-white p-10">Initializing Command Center...</div>;
 
-                    const newLog = {
-                        id: Date.now(),
-                        time: new Date().toISOString().split('T')[1].slice(0, 8),
-                        type: types[Math.floor(Math.random() * types.length)],
-                        region: regions[Math.floor(Math.random() * regions.length)],
-                        status: status[Math.floor(Math.random() * status.length)],
-                        latency: Math.floor(Math.random() * 150) + 'ms'
-                    };
-
-                    setLogs(prev => [newLog, ...prev].slice(0, 7)); // Keep last 7 logs
-
-                }, 1500);
-                return () => clearInterval(interval);
-            }, []);
-
-            return (
-                <div className="h-full flex flex-col bg-slate-950 text-white animate-fade-in overflow-hidden">
-                    {/* HEADER: DATA PRODUCT CONTEXT */}
-                    <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50 backdrop-blur">
-                        <div>
-                            <h2 className="text-2xl font-bold font-quote text-white flex items-center gap-3">
-                                <i className="fas fa-network-wired text-jpm-accent"></i>
-                                Global Payments Command Center
-                            </h2>
-                            <p className="text-[10px] text-gray-400 font-mono uppercase tracking-widest mt-1">
-                                <span className="text-green-400">● LIVE</span> | DATA MESH NODE: PAYMENTS-CORE-V2 | KAFKA CLUSTER: US-EAST-1
-                            </p>
-                        </div>
-                        <button onClick={onBack} className="px-4 py-2 rounded-lg border border-slate-700 hover:bg-slate-800 text-xs font-bold transition">
-                            EXIT TERMINAL
-                        </button>
-                    </div>
-
-                    {/* DASHBOARD GRID */}
-                    <div className="flex-grow p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-4 gap-6">
-
-                        {/* COL 1: HIGH LEVEL KPI (Executive View) */}
-                        <div className="md:col-span-1 space-y-4">
-                            <div className="bg-slate-900 p-5 rounded-xl border border-slate-800 shadow-lg relative overflow-hidden group">
-                                <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition"><i className="fas fa-bolt text-6xl text-yellow-500"></i></div>
-                                <h3 className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-1">Ingestion Rate (TPS)</h3>
-                                <div className="text-4xl font-mono font-bold text-white">{metrics.tps}</div>
-                                <div className="text-[10px] text-green-400 mt-2 font-mono flex items-center gap-1"><i className="fas fa-arrow-up"></i> +4.2% vs 5m avg</div>
+                return (
+                    <div className="fixed inset-0 z-50 bg-slate-950 text-white overflow-hidden font-sans flex flex-col animate-fade-in">
+                        {/* HEADER */}
+                        <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900">
+                            <div>
+                                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                    <i className="fas fa-network-wired text-yellow-500"></i> 
+                                    Payments Command Center
+                                </h2>
+                                <p className="text-[10px] text-gray-400 font-mono tracking-widest mt-1">
+                                    DATA MESH NODE: PAYMENTS-CORE-V2
+                                </p>
                             </div>
-
-                            <div className="bg-slate-900 p-5 rounded-xl border border-slate-800 shadow-lg relative overflow-hidden">
-                                <h3 className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-1">STP Rate (Straight Through)</h3>
-                                <div className={`text-4xl font-mono font-bold ${metrics.stpRate > 98 ? 'text-green-400' : 'text-yellow-400'}`}>{metrics.stpRate}%</div>
-                                <div className="w-full bg-slate-800 h-1 mt-3 rounded-full overflow-hidden">
-                                    <div className="h-full bg-green-500 transition-all duration-500" style={{ width: `${metrics.stpRate}%` }}></div>
-                                </div>
-                            </div>
-
-                            <div className="bg-slate-900 p-5 rounded-xl border border-slate-800 shadow-lg">
-                                <h3 className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-1">Intraday Liquidity</h3>
-                                <div className="text-2xl font-mono font-bold text-blue-300">${metrics.liquidity} Bn</div>
-                                <p className="text-[9px] text-gray-500 mt-1">Real-time projection (USD + GBP + EUR)</p>
-                            </div>
+                            <button onClick={onBack} className="px-4 py-2 rounded border border-slate-700 hover:bg-slate-800 text-xs font-bold text-gray-300">
+                                EXIT
+                            </button>
                         </div>
 
-                        {/* COL 2 & 3: DATA ENGINEERING & PIPELINE HEALTH */}
-                        <div className="md:col-span-2 flex flex-col gap-6">
-                            {/* Visualizing the Pipeline */}
-                            <div className="bg-slate-900 rounded-xl border border-slate-800 p-1 flex-grow flex flex-col relative overflow-hidden">
-                                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
-                                <div className="p-4 border-b border-slate-800 flex justify-between items-center">
-                                    <h3 className="text-xs font-bold text-jpm-accent uppercase tracking-widest"><i className="fas fa-database mr-2"></i>Payment Data Pipeline (Lambda Arch)</h3>
-                                    <span className="text-[9px] bg-slate-800 px-2 py-1 rounded border border-slate-700 text-blue-300">Spark Streaming: ACTIVE</span>
+                        {/* MAIN GRID */}
+                        <div className="flex-grow p-4 overflow-y-auto grid grid-cols-1 md:grid-cols-4 gap-4">
+                            
+                            {/* KPI CARDS */}
+                            <div className="md:col-span-1 space-y-4">
+                                <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
+                                    <h3 className="text-gray-500 text-[10px] font-bold uppercase mb-1">Ingestion (TPS)</h3>
+                                    <div className="text-3xl font-mono font-bold text-white">{metrics.tps}</div>
                                 </div>
 
-                                <div className="flex-grow p-6 flex items-center justify-between relative z-10">
-                                    {/* Step 1: Ingest */}
-                                    <div className="text-center">
-                                        <div className="w-16 h-16 rounded-full bg-slate-800 border-2 border-blue-500 flex items-center justify-center text-xl shadow-[0_0_15px_rgba(59,130,246,0.3)] animate-pulse">
-                                            <i className="fas fa-satellite-dish text-blue-400"></i>
-                                        </div>
-                                        <p className="text-[9px] font-bold mt-2 uppercase">Gateway</p>
-                                        <p className="text-[9px] text-gray-500 font-mono">Rest/MQ</p>
+                                <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
+                                    <h3 className="text-gray-500 text-[10px] font-bold uppercase mb-1">STP Rate %</h3>
+                                    <div className={`text-3xl font-mono font-bold ${metrics.stpRate > 98 ? 'text-green-400' : 'text-yellow-400'}`}>{metrics.stpRate}%</div>
+                                    <div className="w-full bg-slate-800 h-1 mt-2 rounded-full">
+                                        <div className="h-full bg-green-500" style={{ width: `${metrics.stpRate}%` }}></div>
                                     </div>
+                                </div>
 
-                                    {/* Connector */}
-                                    <div className="flex-grow h-0.5 bg-slate-700 mx-2 relative">
-                                        <div className="absolute top-1/2 left-0 -translate-y-1/2 w-2 h-2 bg-blue-500 rounded-full animate-[ping_2s_linear_infinite]"></div>
-                                    </div>
+                                <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
+                                    <h3 className="text-gray-500 text-[10px] font-bold uppercase mb-1">Liquidity ($Bn)</h3>
+                                    <div className="text-2xl font-mono font-bold text-blue-300">${metrics.liquidity}</div>
+                                </div>
+                            </div>
 
-                                    {/* Step 2: Kafka */}
-                                    <div className="text-center">
-                                        <div className="w-16 h-16 rounded-lg bg-slate-800 border border-slate-600 flex flex-col items-center justify-center relative">
-                                            <i className="fas fa-layer-group text-white mb-1"></i>
-                                            <span className="text-[8px] font-mono text-orange-400">Lag: {metrics.kafkaLag}ms</span>
+                            {/* PIPELINE VISUALIZATION */}
+                            <div className="md:col-span-2 flex flex-col gap-4">
+                                <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 flex-grow flex flex-col justify-center">
+                                    <div className="flex items-center justify-between px-2">
+                                        <div className="text-center">
+                                            <div className="w-12 h-12 mx-auto rounded-full bg-slate-800 border-2 border-blue-500 flex items-center justify-center text-blue-400 mb-2"><i className="fas fa-satellite-dish"></i></div>
+                                            <span className="text-[10px] font-bold uppercase">Gateway</span>
                                         </div>
-                                        <p className="text-[9px] font-bold mt-2 uppercase">Kafka</p>
-                                    </div>
-
-                                    {/* Connector */}
-                                    <div className="flex-grow h-0.5 bg-slate-700 mx-2"></div>
-
-                                    {/* Step 3: Transformation */}
-                                    <div className="text-center">
-                                        <div className="w-16 h-16 rounded-full bg-slate-800 border-2 border-purple-500 flex items-center justify-center text-xl shadow-[0_0_15px_rgba(168,85,247,0.3)]">
-                                            <i className="fas fa-cogs text-purple-400 animate-[spin_4s_linear_infinite]"></i>
+                                        <div className="flex-grow h-0.5 bg-slate-700 mx-2"></div>
+                                        <div className="text-center">
+                                            <div className="w-12 h-12 mx-auto rounded-lg bg-slate-800 border border-orange-500 flex flex-col items-center justify-center text-white mb-2">
+                                                <i className="fas fa-layer-group mb-1"></i>
+                                                <span className="text-[8px] text-orange-400">{metrics.kafkaLag}ms</span>
+                                            </div>
+                                            <span className="text-[10px] font-bold uppercase">Kafka</span>
                                         </div>
-                                        <p className="text-[9px] font-bold mt-2 uppercase">Spark ETL</p>
-                                        <p className="text-[9px] text-gray-500 font-mono">Schema Valid.</p>
-                                    </div>
-
-                                    {/* Connector */}
-                                    <div className="flex-grow h-0.5 bg-slate-700 mx-2"></div>
-
-                                    {/* Step 4: Storage */}
-                                    <div className="text-center">
-                                        <div className="w-16 h-16 rounded-lg bg-slate-800 border border-green-700 flex flex-col items-center justify-center">
-                                            <i className="fas fa-server text-green-500 mb-1"></i>
-                                            <span className="text-[8px] font-mono text-gray-400">Data Lake</span>
+                                        <div className="flex-grow h-0.5 bg-slate-700 mx-2"></div>
+                                        <div className="text-center">
+                                            <div className="w-12 h-12 mx-auto rounded-full bg-slate-800 border-2 border-purple-500 flex items-center justify-center text-purple-400 mb-2"><i className="fas fa-cogs"></i></div>
+                                            <span className="text-[10px] font-bold uppercase">Spark</span>
                                         </div>
-                                        <p className="text-[9px] font-bold mt-2 uppercase">Snowflake</p>
+                                        <div className="flex-grow h-0.5 bg-slate-700 mx-2"></div>
+                                        <div className="text-center">
+                                            <div className="w-12 h-12 mx-auto rounded-lg bg-slate-800 border border-green-700 flex items-center justify-center text-green-500 mb-2"><i className="fas fa-database"></i></div>
+                                            <span className="text-[10px] font-bold uppercase">Lake</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* LIVE LOGS */}
+                                <div className="bg-black/30 rounded-xl border border-slate-800 p-4 h-48 overflow-hidden flex flex-col font-mono text-[10px]">
+                                    <div className="flex justify-between border-b border-slate-800 pb-2 mb-2">
+                                        <span className="text-gray-400">LIVE ISO 20022 TRACE</span>
+                                        <span className="text-green-500 animate-pulse">● RECIEVING</span>
+                                    </div>
+                                    <div className="space-y-1 overflow-y-auto">
+                                        {logs.map((log) => (
+                                            <div key={log.id} className="grid grid-cols-12 gap-2">
+                                                <span className="col-span-2 text-gray-600">{log.time}</span>
+                                                <span className="col-span-2 text-blue-300">{log.type}</span>
+                                                <span className="col-span-2 text-white">{log.region}</span>
+                                                <span className={`col-span-4 font-bold ${log.status.includes('NACK') || log.status.includes('HELD') ? 'text-red-500' : 'text-green-500'}`}>{log.status}</span>
+                                                <span className="col-span-2 text-right text-gray-600">{log.latency}</span>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Live Message Log */}
-                            <div className="bg-black/40 rounded-xl border border-slate-800 p-4 font-mono text-[10px] h-48 overflow-hidden flex flex-col">
-                                <div className="flex justify-between border-b border-slate-800 pb-2 mb-2">
-                                    <span className="text-gray-400">LIVE MESSAGE TRACE (ISO 20022)</span>
-                                    <span className="text-jpm-accent">LISTENING...</span>
-                                </div>
-                                <div className="space-y-1.5 overflow-y-auto scrollbar-hide">
-                                    {logs.map((log) => (
-                                        <div key={log.id} className="grid grid-cols-12 gap-2 animate-slide-in">
-                                            <span className="col-span-2 text-gray-500">{log.time}</span>
-                                            <span className="col-span-3 text-blue-300">{log.type}</span>
-                                            <span className="col-span-3 text-white">{log.region}</span>
-                                            <span className={`col-span-2 font-bold ${log.status.includes('NACK') || log.status.includes('HELD') ? 'text-red-500' : 'text-green-500'}`}>{log.status}</span>
-                                            <span className="col-span-2 text-right text-gray-600">{log.latency}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* COL 4: REGULATORY & COMPLIANCE */}
-                        <div className="md:col-span-1 flex flex-col gap-4">
-                            <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 flex-grow">
-                                <h3 className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-3">Sanctions Screening</h3>
-
-                                <div className="space-y-4">
-                                    <div>
-                                        <div className="flex justify-between text-[10px] mb-1">
-                                            <span className="text-white">OFAC / SDNs</span>
-                                            <span className="text-green-400">0.02% Hit Rate</span>
-                                        </div>
-                                        <div className="w-full bg-slate-800 h-1.5 rounded-full"><div className="w-[15%] h-full bg-blue-500 rounded-full"></div></div>
-                                    </div>
-                                    <div>
-                                        <div className="flex justify-between text-[10px] mb-1">
-                                            <span className="text-white">PEP (Politically Exposed)</span>
-                                            <span className="text-yellow-400">1.4% Review</span>
-                                        </div>
-                                        <div className="w-full bg-slate-800 h-1.5 rounded-full"><div className="w-[35%] h-full bg-yellow-600 rounded-full"></div></div>
-                                    </div>
-                                    <div>
-                                        <div className="flex justify-between text-[10px] mb-1">
-                                            <span className="text-white">Adverse Media</span>
-                                            <span className="text-gray-400">Low Risk</span>
-                                        </div>
-                                        <div className="w-full bg-slate-800 h-1.5 rounded-full"><div className="w-[5%] h-full bg-gray-500 rounded-full"></div></div>
-                                    </div>
-                                </div>
-
-                                <div className="mt-6 pt-6 border-t border-slate-800">
-                                    <div className="text-center">
-                                        <h4 className="text-3xl font-bold text-white">{metrics.failed}</h4>
-                                        <p className="text-[9px] text-red-400 font-bold uppercase">Blocked Transactions</p>
-                                        <p className="text-[8px] text-gray-600 mt-1">Requiring L2 Analyst Review</p>
+                            {/* COMPLIANCE */}
+                            <div className="md:col-span-1">
+                                <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 h-full">
+                                    <h3 className="text-gray-500 text-[10px] font-bold uppercase mb-4">Sanctions Hits</h3>
+                                    <div className="flex flex-col items-center justify-center h-40">
+                                        <div className="text-5xl font-bold text-white mb-2">{metrics.failed}</div>
+                                        <div className="text-xs text-red-400 uppercase font-bold text-center">Blocked<br/>Transactions</div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-
-                    {/* FOOTER TICKER */}
-                    <div className="bg-jpm-primary border-t border-slate-800 py-2 px-4 flex items-center gap-8 overflow-hidden whitespace-nowrap">
-                        <span className="text-[9px] font-bold text-jpm-accent">SYSTEM STATUS:</span>
-                        <div className="flex gap-8 animate-[marquee_20s_linear_infinite] text-[9px] font-mono text-gray-400">
-                            <span>API_GATEWAY_EU: <span className="text-green-500">ONLINE</span> (12ms)</span>
-                            <span>SWIFT_MX_CONVERTER: <span className="text-green-500">STABLE</span></span>
-                            <span>LEDGER_SYNC: <span className="text-yellow-500">SYNCING (98%)</span></span>
-                            <span>FRAUD_AI_MODEL_V4: <span className="text-green-500">ACTIVE</span></span>
-                            <span>ONYX_BLOCKCHAIN_NODE: <span className="text-blue-400">CONNECTED</span></span>
-                            <span>DATABASE_REPLICA_APAC: <span className="text-green-500">HEALTHY</span></span>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
+                );
+            };
 
         // 3. Layout Components
         const Dashboard = ({ active, stats, timer, progressData, streak, totalDecks, pressureMode, onTogglePressure }) => {
