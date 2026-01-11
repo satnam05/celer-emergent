@@ -308,64 +308,8 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef, useMemo, useCallback } = React;
-        //Cloud sync state
-        const [stats, setStats] = useState(JSON.parse(localStorage.getItem('jpm_stats')) || {});
-        const [isSyncing, setIsSyncing] = useState(false);
-        // 1. INITIAL PULL: Sync from Cloud on App Load (Requirement 14)
-        useEffect(() => {
-        const fetchGlobalProgress = async () => {
-            const aiUrl = localStorage.getItem('jpm_ai_url');
-            if (!aiUrl) return;
-            try {
-                const res = await fetch(aiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ data: { action: "fetchStats", userID: "satnam_default" } })
-                });
-                const result = await res.json();
-                if (result.data?.stats) {
-                    setStats(result.data.stats); // Overwrite local with Cloud Truth
-                    localStorage.setItem('jpm_stats', JSON.stringify(result.data.stats));
-                }
-            } catch (e) { console.error("Initial Sync Failed", e); }
-        };
-        fetchGlobalProgress();
-    }, []); // Empty dependency ensures this only runs once at startup
-
-    // 2. DEBOUNCED PUSH: Sync to Cloud whenever Stats change (Requirement 14)
-    useEffect(() => {
-        const syncToCloud = async () => {
-            const aiUrl = localStorage.getItem('jpm_ai_url');
-            if (!aiUrl || Object.keys(stats).length === 0) return;
-            
-            setIsSyncing(true);
-            try {
-                await fetch(aiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ data: { 
-                        action: "syncStats", 
-                        userID: "satnam_default", 
-                        stats: stats 
-                    } })
-                });
-            } catch (e) { console.error("Cloud Push Failed", e); }
-            finally { setIsSyncing(false); }
-        };
-
-        const timer = setTimeout(syncToCloud, 3000); // 3-second debounce
-        return () => clearTimeout(timer);
-    }, [stats]); // Triggers whenever stats change
-
-    const updateStats = (newStats) => {
-        setStats(prev => {
-            const updated = { ...prev, ...newStats };
-            localStorage.setItem('jpm_stats', JSON.stringify(updated));
-            return updated;
-        });
-    };
-
+        // Define hooks globally so ALL components can access them immediately
+        const { useState, useEffect, useRef, useCallback, useMemo } = React;
         // --- 1. CORE UTILS ---
         const parseCSV = (text) => {
             if (!text || typeof text !== 'string') return [];
@@ -1373,13 +1317,26 @@
 
         //END AI MODE
 
+        // ---MAIN APP COMPONENT---
         const App = () => {
+            // 1. CORE DATA & NAVIGATION
             const [data, setData] = useState({ flashcards: [], type: [], mcq: [], study: [], prompts: [], skills: [], vocab: [] });
             const [mode, setMode] = useState('menu');
             const [activeDeck, setActiveDeck] = useState(null);
-            const [stats, setStats] = useState({ correct: 0, completed: 0, total: 0 });
             const [timer, setTimer] = useState(0);
             const [progress, setProgress] = useState({});
+
+            // 2. CONSOLIDATED SYNC ENGINE (Requirement 14)
+            const [stats, setStats] = useState(() => {
+                try {
+                    const saved = localStorage.getItem('jpm_stats');
+                    if (!saved || saved === "undefined") return { correct: 0, completed: 0, total: 0 };
+                    return JSON.parse(saved);
+                } catch (e) { return { correct: 0, completed: 0, total: 0 }; }
+            });
+            const [isSyncing, setIsSyncing] = useState(false);
+
+            // 3. UI & AI CONFIG STATES
             const [modalDeck, setModalDeck] = useState(null);
             const [testResults, setTestResults] = useState(null);
             const [showPrompts, setShowPrompts] = useState(false);
@@ -1391,19 +1348,60 @@
             const [streak, setStreak] = useState(0);
             const [pressureMode, setPressureMode] = useState(false);
             const [focusMode, setFocusMode] = useState(false);
+            const [gender, setGender] = useState('male');
+            const [region, setRegion] = useState('en-GB');
+            const [speed, setSpeed] = useState(1.0);
 
-            /* Initializing the Global Sync Engine states. 
-                'customProjects' will store your future Innovation Lab projects. */
+            // 3. INNOVATION LAB / AI CONFIG
             const [customProjects, setCustomProjects] = useState(() => {
                 const saved = localStorage.getItem('jpm_custom_projects');
                 return saved ? JSON.parse(saved) : [];
             });
             const [showProjectCreator, setShowProjectCreator] = useState(false);
             const [syncStatus, setSyncStatus] = useState('synced');
-            const [gender, setGender] = useState('male');
-            const [region, setRegion] = useState('en-GB');
-            const [speed, setSpeed] = useState(1.0);
 
+            // 4. REQUIREMENT 14: CLOUD SYNC LOGIC
+            // INITIAL PULL: Mount iPad to Cloud
+            useEffect(() => {
+                const fetchGlobalProgress = async () => {
+                    const aiUrl = localStorage.getItem('jpm_ai_url');
+                    if (!aiUrl) return;
+                    try {
+                        const res = await fetch(aiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ data: { action: "fetchStats", userID: "satnam_default" } })
+                        });
+                        const result = await res.json();
+                        if (result.data?.stats) {
+                            setStats(result.data.stats);
+                            localStorage.setItem('jpm_stats', JSON.stringify(result.data.stats));
+                        }
+                    } catch (e) { console.warn("Cloud pull failed, using local."); }
+                };
+                fetchGlobalProgress();
+            }, []);
+
+            // DEBOUNCED PUSH: Sync progress change to Cloud
+            useEffect(() => {
+                const syncToCloud = async () => {
+                    const aiUrl = localStorage.getItem('jpm_ai_url');
+                    if (!aiUrl || Object.keys(stats).length === 0) return;
+                    setIsSyncing(true);
+                    try {
+                        await fetch(aiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ data: { action: "syncStats", userID: "satnam_default", stats: stats } })
+                        });
+                    } finally { setIsSyncing(false); }
+                };
+                const timer = setTimeout(syncToCloud, 3000);
+                return () => clearTimeout(timer);
+            }, [stats]);
+
+
+            // 5. DAILY MOTIVATIONAL QUOTE (REQ 12)
             const quote = useMemo(() => {
                 const quotes = [
                     "\"The Secret Of Getting Ahead Is Getting Started.\" — Mark Twain",
@@ -1592,43 +1590,6 @@
             const handleExport = () => { const blob = new Blob([JSON.stringify(progress)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = "jpm_backup.json"; a.click(); };
             const handleImport = (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const p = JSON.parse(e.target.result); setProgress(p); if (p._settings) setPressureMode(p._settings.pressureMode || false); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(p)); alert("Import Successful!"); } catch (err) { alert("Invalid File"); } }; reader.readAsText(file); };
             const togglePressureMode = () => { const newVal = !pressureMode; setPressureMode(newVal); const newP = { ...progress, _settings: { ...(progress._settings || {}), pressureMode: newVal } }; setProgress(newP); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(newP)); };
-
-            /*Enterprise Auto-Sync. This monitors all application activity 
-            and automatically pushes a master backup to Firebase every 3 seconds 
-            after the last change to ensure iPad/Laptop parity. */
-            /*
-            useEffect(() => {
-                localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(progress));
-                localStorage.setItem('jpm_custom_projects', JSON.stringify(customProjects));
-
-                const syncToCloud = async () => {
-                    const aiUrl = localStorage.getItem('jpm_ai_url');
-                    if (!aiUrl) return;
-
-                    setSyncStatus('saving');
-                    try {
-                        await fetch(aiUrl, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                data: {
-                                    action: "sync",
-                                    userID: "satnam_default",
-                                    payload: { progress, customProjects }
-                                }
-                            })
-                        });
-                        setSyncStatus('synced');
-                    } catch (e) {
-                        setSyncStatus('error');
-                        console.error("Cloud Sync Failed:", e);
-                    }
-                };
-
-                const timer = setTimeout(syncToCloud, 3000);
-                return () => clearTimeout(timer);
-            }, [progress, customProjects]);*/
-
             const startSession = (m, deckName, specificQueue = null) => {
 
                 // ---AI CLICK NOT WORKING FIX STARTS HERE 8th Jan 2025 12:30 AM---
@@ -1704,11 +1665,17 @@
             };
             const markStudyComplete = (mId, deckName) => { saveProgress(mId, deckName, 'Completed', 100); };
 
+            // 5. CONSOLIDATED updateStats (MERGED)
             const updateStats = useCallback(({ completed, correct }) => {
                 setStats(prev => {
-                    if (prev.completed === completed && prev.correct === correct) return prev;
-                    if (!activeDeck) return prev;
-                    return { total: activeDeck.items.length, completed, correct };
+                    const updated = {
+                        ...prev,
+                        total: activeDeck ? activeDeck.items.length : prev.total,
+                        completed,
+                        correct
+                    };
+                    localStorage.setItem('jpm_stats', JSON.stringify(updated));
+                    return updated;
                 });
             }, [activeDeck]);
 
@@ -1786,9 +1753,14 @@
                                     <div className="flex flex-col"><h1 className="text-lg font-bold leading-tight tracking-tight font-quote text-gray-100">JP Morgan Interview Prep</h1><span className="text-xs text-slate-400 font-mono">V20.99 | Premium Edition</span></div>
                                 </div>
                                 <div className="flex items-center gap-4">
+                                    {isSyncing && <span className="text-[9px] text-jpm-accent animate-pulse font-mono tracking-tighter">CLOUD SYNCING...</span>}
                                     <button onClick={() => setShowTechModal(true)} className="p-2 rounded hover:bg-white/10 text-jpm-accent transition-colors animate-pulse-soft hover:shadow-[0_0_15px_rgba(197,157,95,0.4)]" title="Tech Insights"><i className="fas fa-globe-americas"></i></button>
                                     <UKClock />
-                                    {mode !== 'menu' && (<div className="flex gap-2"><button onClick={() => restartSession(mode, activeDeck.name)} className="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded text-sm font-bold transition shadow-sm border border-slate-600 hover:shadow-[0_0_15px_rgba(197,157,95,0.4)]" title="Restart Session"><i className="fas fa-sync-alt"></i></button><button onClick={handleHeaderEnd} className="bg-transparent hover:bg-red-900/80 px-4 py-2 rounded text-sm font-bold transition shadow-sm border border-jpm-accent text-jpm-accent hover:text-red-100 hover:border-red-800 relative z-50 hover:shadow-[0_0_15px_rgba(239,68,68,0.4)]">End</button></div>)}
+                                    {mode !== 'menu' && mode !== 'ai_interview' && (<div className="flex gap-2"><button onClick={() => restartSession(mode, activeDeck.name)} className="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded text-sm font-bold transition shadow-sm border border-slate-600 hover:shadow-[0_0_15px_rgba(197,157,95,0.4)]" title="Restart Session"><i className="fas fa-sync-alt"></i></button><button onClick={handleHeaderEnd} className="bg-transparent hover:bg-red-900/80 px-4 py-2 rounded text-sm font-bold transition shadow-sm border border-jpm-accent text-jpm-accent hover:text-red-100 hover:border-red-800 relative z-50 hover:shadow-[0_0_15px_rgba(239,68,68,0.4)]">End</button></div>)}
+                                    {/* REQUIREMENT 12: End Session is the only active control in AI Mode */}
+                                    {mode === 'ai_interview' && (
+                                        <button onClick={handleHeaderEnd} className="bg-transparent border border-red-500 text-red-400 px-4 py-2 rounded text-sm font-bold hover:bg-red-900/20 transition">End Session</button>
+                                    )}
                                 </div>
                             </header>
                         )}
@@ -1857,8 +1829,22 @@
                 </GlobalErrorBoundary>
             );
         };
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        // FIX: Removed double root declaration to prevent syntax crash
+        const rootElement = document.getElementById('root');
+        try {
+            const root = ReactDOM.createRoot(rootElement);
+            root.render(<App />);
+            console.log("System Status: App Mounted Successfully.");
+        } catch (error) {
+            rootElement.innerHTML = `
+                <div style="padding: 40px; color: white; background: #020617; height: 100vh; font-family: sans-serif;">
+                    <h1 style="color: #C59D5F;">System Recovery Mode</h1>
+                    <p>${error.message}</p>
+                    <button onclick="localStorage.clear(); location.reload();" style="margin-top: 20px; padding: 10px; background: #C59D5F; color: black; border-radius: 8px;">Reset App Cache</button>
+                </div>
+            `;
+            console.error("Bootstrapping Failed:", error);
+        };
     </script>
 </body>
 
