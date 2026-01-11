@@ -1505,6 +1505,46 @@
             const [region, setRegion] = useState('en-GB');
             const [speed, setSpeed] = useState(1.0);
 
+            // 4. REQUIREMENT 14: CLOUD SYNC LOGIC
+            // INITIAL PULL: Mount iPad to Cloud
+            useEffect(() => {
+                const fetchGlobalProgress = async () => {
+                    const aiUrl = localStorage.getItem('jpm_ai_url');
+                    if (!aiUrl) return;
+                    try {
+                        const res = await fetch(aiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ data: { action: "fetchStats", userID: "satnam_default" } })
+                        });
+                        const result = await res.json();
+                        if (result.data?.stats) {
+                            setStats(result.data.stats);
+                            localStorage.setItem('jpm_stats', JSON.stringify(result.data.stats));
+                        }
+                    } catch (e) { console.warn("Cloud pull failed, using local."); }
+                };
+                fetchGlobalProgress();
+            }, []);
+
+            // DEBOUNCED PUSH: Sync progress change to Cloud
+            useEffect(() => {
+                const syncToCloud = async () => {
+                    const aiUrl = localStorage.getItem('jpm_ai_url');
+                    if (!aiUrl || Object.keys(stats).length === 0) return;
+                    setIsSyncing(true);
+                    try {
+                        await fetch(aiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ data: { action: "syncStats", userID: "satnam_default", stats: stats } })
+                        });
+                    } finally { setIsSyncing(false); }
+                };
+                const timer = setTimeout(syncToCloud, 3000);
+                return () => clearTimeout(timer);
+            }, [stats]);
+
             const quote = useMemo(() => {
                 const quotes = [
                     "\"The Secret Of Getting Ahead Is Getting Started.\" — Mark Twain",
@@ -1693,42 +1733,6 @@
             const handleExport = () => { const blob = new Blob([JSON.stringify(progress)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = "jpm_backup.json"; a.click(); };
             const handleImport = (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const p = JSON.parse(e.target.result); setProgress(p); if (p._settings) setPressureMode(p._settings.pressureMode || false); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(p)); alert("Import Successful!"); } catch (err) { alert("Invalid File"); } }; reader.readAsText(file); };
             const togglePressureMode = () => { const newVal = !pressureMode; setPressureMode(newVal); const newP = { ...progress, _settings: { ...(progress._settings || {}), pressureMode: newVal } }; setProgress(newP); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(newP)); };
-
-            /*Enterprise Auto-Sync. This monitors all application activity 
-            and automatically pushes a master backup to Firebase every 3 seconds 
-            after the last change to ensure iPad/Laptop parity. */
-            useEffect(() => {
-                localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(progress));
-                localStorage.setItem('jpm_custom_projects', JSON.stringify(customProjects));
-
-                const syncToCloud = async () => {
-                    const aiUrl = localStorage.getItem('jpm_ai_url');
-                    if (!aiUrl) return;
-
-                    setSyncStatus('saving');
-                    try {
-                        await fetch(aiUrl, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                data: {
-                                    action: "sync",
-                                    userID: "satnam_default",
-                                    payload: { progress, customProjects }
-                                }
-                            })
-                        });
-                        setSyncStatus('synced');
-                    } catch (e) {
-                        setSyncStatus('error');
-                        console.error("Cloud Sync Failed:", e);
-                    }
-                };
-
-                const timer = setTimeout(syncToCloud, 3000);
-                return () => clearTimeout(timer);
-            }, [progress, customProjects]);
-
             const startSession = (m, deckName, specificQueue = null) => {
 
                 // ---AI CLICK NOT WORKING FIX STARTS HERE 8th Jan 2025 12:30 AM---
@@ -1949,7 +1953,7 @@
                                 {(mode === 'flashcard' || mode === 'vocab') && activeDeck && (<ComponentSandbox> <FlashcardMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} pressureMode={pressureMode} toggleFocus={() => setFocusMode(!focusMode)} isFocusMode={focusMode} /> </ComponentSandbox>)}
                                 {(mode === 'type') && activeDeck && (<ComponentSandbox> <TypeMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} pressureMode={pressureMode} toggleFocus={() => setFocusMode(!focusMode)} isFocusMode={focusMode} /> </ComponentSandbox>)}
                                 {(mode === 'mcq') && activeDeck && (<ComponentSandbox> <MCQMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} pressureMode={pressureMode} toggleFocus={() => setFocusMode(!focusMode)} isFocusMode={focusMode} /> </ComponentSandbox>)}
-                                {(mode === 'ai_interview') && (<ComponentSandbox> <AIMode key={sessionKey} onEnd={endSession} toggleFocus={() => setFocusMode(!focusMode)} isFocusMode={focusMode} gender={gender} speed={speed} region={region} setGender={setGender} setSpeed={setSpeed} setRegion={setRegion} /> </ComponentSandbox>)}
+                                {(mode === 'ai_interview') && (<ComponentSandbox> <AIMode key={sessionKey} onEnd={endSession} onStatsUpdate={updateStats} toggleFocus={() => setFocusMode(!focusMode)} isFocusMode={focusMode} gender={gender} speed={speed} region={region} setGender={setGender} setSpeed={setSpeed} setRegion={setRegion} /> </ComponentSandbox>)}
                             </main>
                             {!focusMode && <MobileNavBar currentMode={mode} setMode={setMode} onPrompt={() => setShowPrompts(true)} onSettings={() => setShowSettings(true)} />}
                         </div>
