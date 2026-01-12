@@ -472,23 +472,29 @@
         const AchievementBadge = ({ icon, color, label, locked }) => (<div className={`flex flex-col items-center p-2 transition-all ${locked ? 'opacity-40 grayscale' : 'opacity-100 scale-105'}`}> <div className={`w-10 h-10 rounded-full flex items-center justify-center text-slate-900 mb-1 shadow-md ${locked ? 'bg-gray-700' : 'bg-jpm-accent'}`}><i className={`fas ${icon}`}></i></div> <span className="text-[10px] font-bold text-center leading-tight text-gray-300 font-mono">{label}</span> </div>);
 
         const DisclaimerModal = ({ onEnter }) => (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-95 backdrop-blur-md p-4">
-                <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8 max-w-lg w-full text-center shadow-2xl animate-slide-in relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-jpm-primary via-jpm-accent to-jpm-primary"></div>
-                    <div className="w-20 h-20 bg-jpm-primary text-jpm-accent border-2 border-jpm-accent rounded-full flex items-center justify-center mx-auto mb-6 text-3xl shadow-[0_0_15px_rgba(197,157,95,0.3)]"><i className="fas fa-university"></i></div>
-                    <h1 className="text-3xl font-bold text-white mb-2 font-quote tracking-wide">JP Morgan</h1>
-                    <h2 className="text-sm text-jpm-accent mb-6 font-mono tracking-[0.2em] uppercase">Interview Preparation Simulation</h2>
-                    <div className="text-left bg-slate-800/80 p-5 rounded-xl mb-8 text-xs text-gray-300 leading-relaxed border-l-4 border-jpm-accent font-mono shadow-inner">
-                        <p className="mb-3 flex items-start"><i className="fas fa-gavel mr-3 mt-1 text-jpm-accent"></i> <span>This application is a <strong>personal portfolio project</strong> developed solely for educational purposes.</span></p>
-                        <p className="flex items-start"><i className="fas fa-ban mr-3 mt-1 text-red-400"></i> <span>It is <strong>NOT</strong> affiliated with, endorsed by, or connected to JPMorgan Chase & Co. All data, transaction streams, and metrics shown are simulated.</span></p>
+            <div className="fixed inset-0 z-[300] bg-black flex items-center justify-center p-6 animate-fade-in">
+                <div className="max-w-md w-full bg-slate-900 border border-slate-700 p-8 rounded-2xl shadow-2xl text-center relative overflow-hidden">
+                    {/* Background Scanline Effect */}
+                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
+                    
+                    <div className="relative z-10">
+                        <i className="fas fa-shield-alt text-4xl text-slate-500 mb-4 animate-pulse-soft"></i>
+                        <h2 className="text-xl font-bold text-white font-quote mb-4 tracking-widest">CONFIDENTIAL</h2>
+                        <p className="text-sm text-slate-400 leading-relaxed mb-8 font-mono">
+                            This application is a <span className="text-white font-bold">personal portfolio project</span> developed by <span className="text-jpm-accent font-bold">Satnam Singh</span> solely for educational purposes.
+                            <br/><br/>
+                            <span className="text-xs opacity-70">It is not affiliated with, endorsed by, or connected to J.P. Morgan Chase & Co. All simulated data is for demonstration only.</span>
+                        </p>
+                        <button onClick={onEnter} className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition border border-slate-600 hover:border-jpm-accent shadow-lg active:scale-95">
+                            ACKNOWLEDGE & ENTER
+                        </button>
                     </div>
-                    <button onClick={onEnter} className="w-full bg-[#C59D5F] hover:bg-[#b08d55] text-slate-900 font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95 text-lg font-mono tracking-tighter">ENTER SIMULATION</button>
                 </div>
             </div>
         );
 
         // 2. Complex Visualizations
-// --- JPM EXECUTIVE CONSOLE (FinOps Edition) ---
+// --- JPM EXECUTIVE CONSOLE (STABLE FINOPS EDITION) ---
             const TechInsightsModal = ({ onClose }) => {
                 const [tick, setTick] = useState(0);
                 const [logs, setLogs] = useState([]);
@@ -501,8 +507,8 @@
                     failed: 0, cost: 42.50,
                     legacyLoad: 32.5, cloudLoad: 67.5,
                     liquidity: { gb: 1.2, us: 4.5, eu: 2.1 },
-                    // NEW: FinOps Metrics
-                    storage: { hot: 840, cold: 4200 }, // TB
+                    // FinOps Metrics (Initialized as Numbers)
+                    storage: { hot: 840, cold: 4200 }, 
                     costPerTx: 0.00042
                 });
 
@@ -529,6 +535,10 @@
                                 const newLegacy = Math.max(5, prev.legacyLoad - migrationStep);
                                 const newCloud = Math.min(95, prev.cloudLoad + migrationStep);
 
+                                // FIX: Parse numbers before adding to prevent "String" crash
+                                const currentHot = parseFloat(prev.storage.hot); 
+                                const newHot = (currentHot + (Math.random() * 0.5 - 0.25)).toFixed(1); // Fluctuate up/down
+
                                 return {
                                     tps: Math.floor(1400 + (sysState === "INCIDENT" ? -400 : Math.random() * 200)),
                                     stpRate: (98.0 + Math.random() * 1.5).toFixed(1),
@@ -544,8 +554,8 @@
                                         eu: (2.1 + Math.random() * 0.1).toFixed(2)
                                     },
                                     storage: {
-                                        hot: (prev.storage.hot + Math.random() * 0.5).toFixed(1),
-                                        cold: prev.storage.cold // Cold storage rarely changes
+                                        hot: newHot,
+                                        cold: prev.storage.cold
                                     },
                                     costPerTx: (0.00040 + Math.random() * 0.00005).toFixed(6)
                                 };
@@ -645,7 +655,7 @@
                                 </div>
                             </div>
 
-                            {/* SECTION B: STRATEGIC & FINOPS DASHBOARD (UPDATED 3-COLUMN) */}
+                            {/* SECTION B: STRATEGIC & FINOPS OVERVIEW */}
                             <div className="border-t border-slate-800 pt-6 mt-2">
                                 <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2 font-quote">
                                     <i className="fas fa-chess-knight text-jpm-accent"></i> STRATEGIC & FINOPS OVERVIEW
@@ -688,7 +698,7 @@
                                         </div>
                                     </div>
 
-                                    {/* 3. NEW: CLOUD UNIT ECONOMICS (STORAGE & COST) */}
+                                    {/* 3. CLOUD UNIT ECONOMICS */}
                                     <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg relative overflow-hidden">
                                         <div className="flex justify-between items-center mb-3">
                                             <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Unit Economics</h4>
@@ -1583,7 +1593,8 @@ const App = () => {
             const [data, setData] = useState({ flashcards: [], type: [], mcq: [], study: [], prompts: [], skills: [], vocab: [] });
             
             // --- 1. NEW: AUTHENTICATION STATE ---
-            const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem('jpm_vp_auth'));
+            // NEW (Locks on Refresh - "Bank Grade" Security):
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
             const [authInput, setAuthInput] = useState("");
             const [authError, setAuthError] = useState(false);
 
@@ -1622,7 +1633,9 @@ const App = () => {
                 e.preventDefault();
                 if (authInput === "2026") {
                     setIsAuthenticated(true);
-                    localStorage.setItem('jpm_vp_auth', 'true');
+                   // localStorage.setItem('jpm_vp_auth', 'true');
+                    // NEW:
+                    // We don't save anything. Authentication is ephemeral (RAM only).
                     setAuthError(false);
                 } else {
                     setAuthError(true);
