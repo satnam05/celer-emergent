@@ -6,7 +6,8 @@
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>JP Morgan Interview Preparation App V21.01</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏦</text></svg>">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏦</text></svg>">
 
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -476,13 +477,13 @@
                 <div className="max-w-md w-full bg-slate-900 border border-slate-700 p-8 rounded-2xl shadow-2xl text-center relative overflow-hidden">
                     {/* Background Scanline Effect */}
                     <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
-                    
+
                     <div className="relative z-10">
                         <i className="fas fa-shield-alt text-4xl text-slate-500 mb-4 animate-pulse-soft"></i>
                         <h2 className="text-xl font-bold text-white font-quote mb-4 tracking-widest">CONFIDENTIAL</h2>
                         <p className="text-sm text-slate-400 leading-relaxed mb-8 font-mono">
                             This application is a <span className="text-white font-bold">personal portfolio project</span> developed by <span className="text-jpm-accent font-bold">Satnam Singh</span> solely for educational purposes.
-                            <br/><br/>
+                            <br /><br />
                             <span className="text-xs opacity-70">It is not affiliated with, endorsed by, or connected to J.P. Morgan Chase & Co. All simulated data is for demonstration only.</span>
                         </p>
                         <button onClick={onEnter} className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition border border-slate-600 hover:border-jpm-accent shadow-lg active:scale-95">
@@ -494,242 +495,242 @@
         );
 
         // 2. Complex Visualizations
-// --- JPM EXECUTIVE CONSOLE (STABLE FINOPS EDITION) ---
-            const TechInsightsModal = ({ onClose }) => {
-                const [tick, setTick] = useState(0);
-                const [logs, setLogs] = useState([]);
-                const [sysState, setSysState] = useState("NORMAL"); 
-                
-                // METRICS
-                const [metrics, setMetrics] = useState({
-                    tps: 1450, stpRate: 98.2, dqScore: 99.8,
-                    partitions: [45, 42, 88, 43], 
-                    failed: 0, cost: 42.50,
-                    legacyLoad: 32.5, cloudLoad: 67.5,
-                    liquidity: { gb: 1.2, us: 4.5, eu: 2.1 },
-                    // FinOps Metrics (Initialized as Numbers)
-                    storage: { hot: 840, cold: 4200 }, 
-                    costPerTx: 0.00042
-                });
+        // --- JPM EXECUTIVE CONSOLE (STABLE FINOPS EDITION) ---
+        const TechInsightsModal = ({ onClose }) => {
+            const [tick, setTick] = useState(0);
+            const [logs, setLogs] = useState([]);
+            const [sysState, setSysState] = useState("NORMAL");
 
-                useEffect(() => {
-                    const interval = setInterval(() => {
-                        try {
-                            setTick(t => {
-                                const newTick = t + 1;
-                                const cycle = newTick % 20;
-                                let currentState = "NORMAL";
-                                if (cycle > 12 && cycle <= 16) currentState = "INCIDENT";
-                                else if (cycle > 16) currentState = "HEALING";
-                                setSysState(currentState);
-                                return newTick;
-                            });
+            // METRICS
+            const [metrics, setMetrics] = useState({
+                tps: 1450, stpRate: 98.2, dqScore: 99.8,
+                partitions: [45, 42, 88, 43],
+                failed: 0, cost: 42.50,
+                legacyLoad: 32.5, cloudLoad: 67.5,
+                liquidity: { gb: 1.2, us: 4.5, eu: 2.1 },
+                // FinOps Metrics (Initialized as Numbers)
+                storage: { hot: 840, cold: 4200 },
+                costPerTx: 0.00042
+            });
 
-                            setMetrics(prev => {
-                                let newParts = [...prev.partitions];
-                                if (sysState === "INCIDENT") newParts[2] = 100; 
-                                else if (sysState === "HEALING") newParts[2] = 60; 
-                                else newParts = prev.partitions.map(p => Math.max(20, Math.min(90, p + (Math.random() * 20 - 10))));
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    try {
+                        setTick(t => {
+                            const newTick = t + 1;
+                            const cycle = newTick % 20;
+                            let currentState = "NORMAL";
+                            if (cycle > 12 && cycle <= 16) currentState = "INCIDENT";
+                            else if (cycle > 16) currentState = "HEALING";
+                            setSysState(currentState);
+                            return newTick;
+                        });
 
-                                const migrationStep = 0.05;
-                                const newLegacy = Math.max(5, prev.legacyLoad - migrationStep);
-                                const newCloud = Math.min(95, prev.cloudLoad + migrationStep);
+                        setMetrics(prev => {
+                            let newParts = [...prev.partitions];
+                            if (sysState === "INCIDENT") newParts[2] = 100;
+                            else if (sysState === "HEALING") newParts[2] = 60;
+                            else newParts = prev.partitions.map(p => Math.max(20, Math.min(90, p + (Math.random() * 20 - 10))));
 
-                                // FIX: Parse numbers before adding to prevent "String" crash
-                                const currentHot = parseFloat(prev.storage.hot); 
-                                const newHot = (currentHot + (Math.random() * 0.5 - 0.25)).toFixed(1); // Fluctuate up/down
+                            const migrationStep = 0.05;
+                            const newLegacy = Math.max(5, prev.legacyLoad - migrationStep);
+                            const newCloud = Math.min(95, prev.cloudLoad + migrationStep);
 
-                                return {
-                                    tps: Math.floor(1400 + (sysState === "INCIDENT" ? -400 : Math.random() * 200)),
-                                    stpRate: (98.0 + Math.random() * 1.5).toFixed(1),
-                                    dqScore: (sysState === "INCIDENT" ? 85.4 : 99.5 + Math.random() * 0.4).toFixed(1),
-                                    partitions: newParts,
-                                    failed: prev.failed + (Math.random() > 0.9 ? 1 : 0),
-                                    cost: (40 + (newCloud / 100) * 10).toFixed(2), 
-                                    legacyLoad: newLegacy,
-                                    cloudLoad: newCloud,
-                                    liquidity: {
-                                        gb: (1.2 + Math.random() * 0.1).toFixed(2),
-                                        us: (4.5 + Math.random() * 0.2).toFixed(2),
-                                        eu: (2.1 + Math.random() * 0.1).toFixed(2)
-                                    },
-                                    storage: {
-                                        hot: newHot,
-                                        cold: prev.storage.cold
-                                    },
-                                    costPerTx: (0.00040 + Math.random() * 0.00005).toFixed(6)
-                                };
-                            });
+                            // FIX: Parse numbers before adding to prevent "String" crash
+                            const currentHot = parseFloat(prev.storage.hot);
+                            const newHot = (currentHot + (Math.random() * 0.5 - 0.25)).toFixed(1); // Fluctuate up/down
 
-                            if (Math.random() > 0.6 || sysState !== "NORMAL") {
-                                const types = ['pacs.008', 'pain.001', 'camt.053'];
-                                const status = sysState === "INCIDENT" ? 'CRITICAL' : sysState === "HEALING" ? 'SCALING' : 'OK';
-                                const newLog = { 
-                                    id: Date.now() + Math.random(), 
-                                    time: new Date().toLocaleTimeString().split(' ')[0], 
-                                    type: sysState === "INCIDENT" ? 'ALERT' : types[Math.floor(Math.random() * types.length)],
-                                    stage: sysState === "HEALING" ? 'K8S' : 'INGEST',
-                                    status: status,
-                                    latency: Math.floor(Math.random() * 80) + 'ms'
-                                };
-                                setLogs(prev => [newLog, ...prev].slice(0, 5)); 
-                            }
-                        } catch (e) { console.error(e); }
-                    }, 1000); 
-                    return () => clearInterval(interval);
-                }, [sysState]);
+                            return {
+                                tps: Math.floor(1400 + (sysState === "INCIDENT" ? -400 : Math.random() * 200)),
+                                stpRate: (98.0 + Math.random() * 1.5).toFixed(1),
+                                dqScore: (sysState === "INCIDENT" ? 85.4 : 99.5 + Math.random() * 0.4).toFixed(1),
+                                partitions: newParts,
+                                failed: prev.failed + (Math.random() > 0.9 ? 1 : 0),
+                                cost: (40 + (newCloud / 100) * 10).toFixed(2),
+                                legacyLoad: newLegacy,
+                                cloudLoad: newCloud,
+                                liquidity: {
+                                    gb: (1.2 + Math.random() * 0.1).toFixed(2),
+                                    us: (4.5 + Math.random() * 0.2).toFixed(2),
+                                    eu: (2.1 + Math.random() * 0.1).toFixed(2)
+                                },
+                                storage: {
+                                    hot: newHot,
+                                    cold: prev.storage.cold
+                                },
+                                costPerTx: (0.00040 + Math.random() * 0.00005).toFixed(6)
+                            };
+                        });
 
-                if (!metrics) return null;
+                        if (Math.random() > 0.6 || sysState !== "NORMAL") {
+                            const types = ['pacs.008', 'pain.001', 'camt.053'];
+                            const status = sysState === "INCIDENT" ? 'CRITICAL' : sysState === "HEALING" ? 'SCALING' : 'OK';
+                            const newLog = {
+                                id: Date.now() + Math.random(),
+                                time: new Date().toLocaleTimeString().split(' ')[0],
+                                type: sysState === "INCIDENT" ? 'ALERT' : types[Math.floor(Math.random() * types.length)],
+                                stage: sysState === "HEALING" ? 'K8S' : 'INGEST',
+                                status: status,
+                                latency: Math.floor(Math.random() * 80) + 'ms'
+                            };
+                            setLogs(prev => [newLog, ...prev].slice(0, 5));
+                        }
+                    } catch (e) { console.error(e); }
+                }, 1000);
+                return () => clearInterval(interval);
+            }, [sysState]);
 
-                const headerColor = sysState === "INCIDENT" ? "bg-red-900 border-red-500" : sysState === "HEALING" ? "bg-yellow-900 border-yellow-500" : "bg-slate-900 border-slate-800";
+            if (!metrics) return null;
 
-                return (
-                    <div className="fixed inset-0 z-[200] bg-slate-950 text-white font-sans flex flex-col animate-fade-in text-xs w-full h-full">
-                        
-                        {/* 1. HEADER */}
-                        <div className={`flex-none w-full p-4 pt-8 md:pt-4 border-b shadow-2xl transition-colors duration-500 flex justify-between items-center ${headerColor}`}>
-                            <div>
-                                <h2 className="text-lg md:text-xl font-bold text-white flex items-center gap-3">
-                                    <i className={`fas ${sysState === 'INCIDENT' ? 'fa-exclamation-triangle animate-pulse' : 'fa-network-wired'} `}></i> 
-                                    {sysState === "INCIDENT" ? "CRITICAL ALERT" : sysState === "HEALING" ? "AUTO-SCALING" : "SYSTEM HEALTHY"}
-                                </h2>
-                                <p className="text-[10px] text-gray-300 font-mono tracking-widest mt-1 uppercase">
-                                    Run Rate: <span className="font-bold text-white">${metrics.cost}/hr</span>
-                                </p>
-                            </div>
+            const headerColor = sysState === "INCIDENT" ? "bg-red-900 border-red-500" : sysState === "HEALING" ? "bg-yellow-900 border-yellow-500" : "bg-slate-900 border-slate-800";
 
-                            <button 
-                                onClick={onClose} 
-                                className="flex-none ml-4 px-6 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded shadow-lg border border-red-400 active:scale-95 transition-transform cursor-pointer pointer-events-auto z-50 flex items-center gap-2"
-                            >
-                                <i className="fas fa-power-off"></i> EXIT
-                            </button>
+            return (
+                <div className="fixed inset-0 z-[200] bg-slate-950 text-white font-sans flex flex-col animate-fade-in text-xs w-full h-full">
+
+                    {/* 1. HEADER */}
+                    <div className={`flex-none w-full p-4 pt-8 md:pt-4 border-b shadow-2xl transition-colors duration-500 flex justify-between items-center ${headerColor}`}>
+                        <div>
+                            <h2 className="text-lg md:text-xl font-bold text-white flex items-center gap-3">
+                                <i className={`fas ${sysState === 'INCIDENT' ? 'fa-exclamation-triangle animate-pulse' : 'fa-network-wired'} `}></i>
+                                {sysState === "INCIDENT" ? "CRITICAL ALERT" : sysState === "HEALING" ? "AUTO-SCALING" : "SYSTEM HEALTHY"}
+                            </h2>
+                            <p className="text-[10px] text-gray-300 font-mono tracking-widest mt-1 uppercase">
+                                Run Rate: <span className="font-bold text-white">${metrics.cost}/hr</span>
+                            </p>
                         </div>
 
-                        {/* 2. DASHBOARD CONTENT */}
-                        <div className="flex-grow overflow-y-auto p-4 pb-20 w-full">
-                            
-                            {/* SECTION A: OPS HEALTH */}
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                                <div className="md:col-span-1 space-y-4">
-                                    <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
-                                        <h3 className="text-gray-500 text-[10px] font-bold uppercase mb-1">Throughput</h3>
-                                        <div className="text-3xl font-mono font-bold text-white">{metrics.tps}</div>
-                                    </div>
-                                    <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
-                                        <h3 className="text-gray-500 text-[10px] font-bold uppercase mb-1">STP Rate</h3>
-                                        <div className={`text-3xl font-mono font-bold ${metrics.stpRate > 98 ? 'text-green-400' : 'text-yellow-400'}`}>{metrics.stpRate}%</div>
-                                    </div>
-                                    <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
-                                        <h3 className="text-gray-500 text-[10px] font-bold uppercase mb-1">Blocked</h3>
-                                        <div className="text-2xl font-mono font-bold text-red-500">{metrics.failed}</div>
-                                    </div>
-                                </div>
+                        <button
+                            onClick={onClose}
+                            className="flex-none ml-4 px-6 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded shadow-lg border border-red-400 active:scale-95 transition-transform cursor-pointer pointer-events-auto z-50 flex items-center gap-2"
+                        >
+                            <i className="fas fa-power-off"></i> EXIT
+                        </button>
+                    </div>
 
-                                <div className="md:col-span-3 flex flex-col gap-4">
-                                    <div className="bg-slate-900 rounded-xl border border-slate-800 p-6 flex-grow flex flex-col relative overflow-hidden shadow-inner min-h-[160px]">
-                                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
-                                        <div className="flex items-center justify-between h-full relative z-10 px-2">
-                                            <div className="text-center w-16"><div className="w-12 h-12 mx-auto rounded-full bg-slate-800 border-2 border-blue-500 flex items-center justify-center mb-2"><i className="fas fa-globe text-blue-400"></i></div><div className="text-[9px] uppercase text-blue-200">Gateway</div></div>
-                                            <div className="flex-grow h-0.5 bg-slate-700 mx-1"></div>
-                                            <div className="text-center w-20"><div className={`w-16 h-12 mx-auto rounded bg-slate-800 border ${sysState === 'INCIDENT' ? 'border-red-500' : 'border-orange-500'} flex items-end justify-center gap-0.5 p-1 mb-2`}>{metrics.partitions.map((h, i) => (<div key={i} className={`w-2 rounded-t-sm transition-all ${h > 90 ? 'bg-red-500' : 'bg-orange-400'}`} style={{ height: `${h}%` }}></div>))}</div><div className="text-[9px] uppercase text-orange-200">Kafka</div></div>
-                                            <div className="flex-grow h-0.5 bg-slate-700 mx-1"></div>
-                                            <div className="text-center w-16"><div className="w-12 h-12 mx-auto rounded-full bg-slate-800 border-2 border-purple-500 flex items-center justify-center mb-2 relative"><i className={`fas fa-cogs text-purple-400 ${sysState === 'INCIDENT' ? '' : 'animate-spin'}`}></i></div><div className="text-[9px] uppercase text-purple-200">Spark</div></div>
-                                            <div className="flex-grow h-0.5 bg-slate-700 mx-1"></div>
-                                            <div className="text-center w-16"><div className="w-12 h-12 mx-auto rounded bg-slate-800 border border-green-700 flex flex-col items-center justify-center mb-2"><i className="fas fa-database text-green-500"></i></div><div className="text-[9px] uppercase text-green-200">Lake</div></div>
-                                        </div>
-                                    </div>
-                                    <div className="bg-black/40 rounded-xl border border-slate-800 p-3 font-mono text-[9px] h-32 overflow-hidden flex flex-col">
-                                        <div className="space-y-1 overflow-y-auto">
-                                            {logs.map((log) => (
-                                                <div key={log.id} className="grid grid-cols-12 gap-2 animate-slide-in border-b border-slate-800/50 pb-1">
-                                                    <span className="col-span-2 text-gray-500">{log.time}</span>
-                                                    <span className="col-span-2 text-blue-400">{log.type}</span>
-                                                    <span className="col-span-2 text-gray-400">{log.stage}</span>
-                                                    <span className={`col-span-4 font-bold ${log.status === 'CRITICAL' ? 'text-red-500' : 'text-green-500'}`}>{log.status}</span>
-                                                    <span className="col-span-2 text-right text-gray-600">{log.latency}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
+                    {/* 2. DASHBOARD CONTENT */}
+                    <div className="flex-grow overflow-y-auto p-4 pb-20 w-full">
+
+                        {/* SECTION A: OPS HEALTH */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                            <div className="md:col-span-1 space-y-4">
+                                <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
+                                    <h3 className="text-gray-500 text-[10px] font-bold uppercase mb-1">Throughput</h3>
+                                    <div className="text-3xl font-mono font-bold text-white">{metrics.tps}</div>
+                                </div>
+                                <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
+                                    <h3 className="text-gray-500 text-[10px] font-bold uppercase mb-1">STP Rate</h3>
+                                    <div className={`text-3xl font-mono font-bold ${metrics.stpRate > 98 ? 'text-green-400' : 'text-yellow-400'}`}>{metrics.stpRate}%</div>
+                                </div>
+                                <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
+                                    <h3 className="text-gray-500 text-[10px] font-bold uppercase mb-1">Blocked</h3>
+                                    <div className="text-2xl font-mono font-bold text-red-500">{metrics.failed}</div>
                                 </div>
                             </div>
 
-                            {/* SECTION B: STRATEGIC & FINOPS OVERVIEW */}
-                            <div className="border-t border-slate-800 pt-6 mt-2">
-                                <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2 font-quote">
-                                    <i className="fas fa-chess-knight text-jpm-accent"></i> STRATEGIC & FINOPS OVERVIEW
-                                </h3>
-                                
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    
-                                    {/* 1. MIGRATION */}
-                                    <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg">
-                                        <div className="flex justify-between items-center mb-3">
-                                            <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Modernization</h4>
-                                            <span className="text-green-400 text-[9px] font-bold">ON TRACK</span>
-                                        </div>
-                                        <div className="mb-2">
-                                            <div className="flex justify-between text-[10px] mb-1">
-                                                <span className="text-white font-bold"><i className="fab fa-aws mr-1 text-orange-400"></i> Cloud</span>
-                                                <span className="text-orange-400 font-mono">{metrics.cloudLoad.toFixed(1)}%</span>
-                                            </div>
-                                            <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden"><div className="h-full bg-orange-500" style={{ width: `${metrics.cloudLoad}%` }}></div></div>
-                                        </div>
-                                        <div>
-                                            <div className="flex justify-between text-[10px] mb-1">
-                                                <span className="text-gray-400"><i className="fas fa-server mr-1"></i> Mainframe</span>
-                                                <span className="text-gray-500 font-mono">{metrics.legacyLoad.toFixed(1)}%</span>
-                                            </div>
-                                            <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden"><div className="h-full bg-gray-600" style={{ width: `${metrics.legacyLoad}%` }}></div></div>
-                                        </div>
+                            <div className="md:col-span-3 flex flex-col gap-4">
+                                <div className="bg-slate-900 rounded-xl border border-slate-800 p-6 flex-grow flex flex-col relative overflow-hidden shadow-inner min-h-[160px]">
+                                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
+                                    <div className="flex items-center justify-between h-full relative z-10 px-2">
+                                        <div className="text-center w-16"><div className="w-12 h-12 mx-auto rounded-full bg-slate-800 border-2 border-blue-500 flex items-center justify-center mb-2"><i className="fas fa-globe text-blue-400"></i></div><div className="text-[9px] uppercase text-blue-200">Gateway</div></div>
+                                        <div className="flex-grow h-0.5 bg-slate-700 mx-1"></div>
+                                        <div className="text-center w-20"><div className={`w-16 h-12 mx-auto rounded bg-slate-800 border ${sysState === 'INCIDENT' ? 'border-red-500' : 'border-orange-500'} flex items-end justify-center gap-0.5 p-1 mb-2`}>{metrics.partitions.map((h, i) => (<div key={i} className={`w-2 rounded-t-sm transition-all ${h > 90 ? 'bg-red-500' : 'bg-orange-400'}`} style={{ height: `${h}%` }}></div>))}</div><div className="text-[9px] uppercase text-orange-200">Kafka</div></div>
+                                        <div className="flex-grow h-0.5 bg-slate-700 mx-1"></div>
+                                        <div className="text-center w-16"><div className="w-12 h-12 mx-auto rounded-full bg-slate-800 border-2 border-purple-500 flex items-center justify-center mb-2 relative"><i className={`fas fa-cogs text-purple-400 ${sysState === 'INCIDENT' ? '' : 'animate-spin'}`}></i></div><div className="text-[9px] uppercase text-purple-200">Spark</div></div>
+                                        <div className="flex-grow h-0.5 bg-slate-700 mx-1"></div>
+                                        <div className="text-center w-16"><div className="w-12 h-12 mx-auto rounded bg-slate-800 border border-green-700 flex flex-col items-center justify-center mb-2"><i className="fas fa-database text-green-500"></i></div><div className="text-[9px] uppercase text-green-200">Lake</div></div>
                                     </div>
-
-                                    {/* 2. LIQUIDITY */}
-                                    <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg">
-                                        <div className="flex justify-between items-center mb-3">
-                                            <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Global Liquidity</h4>
-                                            <span className="text-[9px] text-blue-300 font-mono">LIVE FX</span>
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-2 text-center">
-                                            <div className="bg-slate-800/50 rounded p-1"><div className="text-[9px] text-gray-500">GBP</div><div className="font-mono text-white">£{metrics.liquidity.gb}T</div></div>
-                                            <div className="bg-slate-800/50 rounded p-1"><div className="text-[9px] text-gray-500">USD</div><div className="font-mono text-white">${metrics.liquidity.us}T</div></div>
-                                            <div className="bg-slate-800/50 rounded p-1"><div className="text-[9px] text-gray-500">EUR</div><div className="font-mono text-white">€{metrics.liquidity.eu}T</div></div>
-                                        </div>
-                                    </div>
-
-                                    {/* 3. CLOUD UNIT ECONOMICS */}
-                                    <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg relative overflow-hidden">
-                                        <div className="flex justify-between items-center mb-3">
-                                            <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Unit Economics</h4>
-                                            <span className="text-[9px] text-jpm-accent font-mono"><i className="fas fa-chart-line mr-1"></i>FINOPS</span>
-                                        </div>
-                                        <div className="flex items-end justify-between mb-3 border-b border-slate-800 pb-2">
-                                            <div>
-                                                <div className="text-[9px] text-gray-500 uppercase">Cost Per Tx</div>
-                                                <div className="text-lg font-mono font-bold text-white">${metrics.costPerTx}</div>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="text-[9px] text-gray-500 uppercase">Storage (S3)</div>
-                                                <div className="text-lg font-mono font-bold text-blue-400">{metrics.storage.hot} <span className="text-xs text-gray-500">TB</span></div>
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-1 h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                                            <div className="bg-blue-500 w-[20%]" title="Hot (SSD)"></div>
-                                            <div className="bg-blue-800 w-[80%]" title="Cold (Glacier)"></div>
-                                        </div>
-                                        <div className="flex justify-between text-[8px] text-gray-500 mt-1 font-mono">
-                                            <span>HOT (SSD)</span>
-                                            <span>COLD (GLACIER): {metrics.storage.cold} TB</span>
-                                        </div>
-                                    </div>
-
                                 </div>
+                                <div className="bg-black/40 rounded-xl border border-slate-800 p-3 font-mono text-[9px] h-32 overflow-hidden flex flex-col">
+                                    <div className="space-y-1 overflow-y-auto">
+                                        {logs.map((log) => (
+                                            <div key={log.id} className="grid grid-cols-12 gap-2 animate-slide-in border-b border-slate-800/50 pb-1">
+                                                <span className="col-span-2 text-gray-500">{log.time}</span>
+                                                <span className="col-span-2 text-blue-400">{log.type}</span>
+                                                <span className="col-span-2 text-gray-400">{log.stage}</span>
+                                                <span className={`col-span-4 font-bold ${log.status === 'CRITICAL' ? 'text-red-500' : 'text-green-500'}`}>{log.status}</span>
+                                                <span className="col-span-2 text-right text-gray-600">{log.latency}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* SECTION B: STRATEGIC & FINOPS OVERVIEW */}
+                        <div className="border-t border-slate-800 pt-6 mt-2">
+                            <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2 font-quote">
+                                <i className="fas fa-chess-knight text-jpm-accent"></i> STRATEGIC & FINOPS OVERVIEW
+                            </h3>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                                {/* 1. MIGRATION */}
+                                <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Modernization</h4>
+                                        <span className="text-green-400 text-[9px] font-bold">ON TRACK</span>
+                                    </div>
+                                    <div className="mb-2">
+                                        <div className="flex justify-between text-[10px] mb-1">
+                                            <span className="text-white font-bold"><i className="fab fa-aws mr-1 text-orange-400"></i> Cloud</span>
+                                            <span className="text-orange-400 font-mono">{metrics.cloudLoad.toFixed(1)}%</span>
+                                        </div>
+                                        <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden"><div className="h-full bg-orange-500" style={{ width: `${metrics.cloudLoad}%` }}></div></div>
+                                    </div>
+                                    <div>
+                                        <div className="flex justify-between text-[10px] mb-1">
+                                            <span className="text-gray-400"><i className="fas fa-server mr-1"></i> Mainframe</span>
+                                            <span className="text-gray-500 font-mono">{metrics.legacyLoad.toFixed(1)}%</span>
+                                        </div>
+                                        <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden"><div className="h-full bg-gray-600" style={{ width: `${metrics.legacyLoad}%` }}></div></div>
+                                    </div>
+                                </div>
+
+                                {/* 2. LIQUIDITY */}
+                                <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Global Liquidity</h4>
+                                        <span className="text-[9px] text-blue-300 font-mono">LIVE FX</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2 text-center">
+                                        <div className="bg-slate-800/50 rounded p-1"><div className="text-[9px] text-gray-500">GBP</div><div className="font-mono text-white">£{metrics.liquidity.gb}T</div></div>
+                                        <div className="bg-slate-800/50 rounded p-1"><div className="text-[9px] text-gray-500">USD</div><div className="font-mono text-white">${metrics.liquidity.us}T</div></div>
+                                        <div className="bg-slate-800/50 rounded p-1"><div className="text-[9px] text-gray-500">EUR</div><div className="font-mono text-white">€{metrics.liquidity.eu}T</div></div>
+                                    </div>
+                                </div>
+
+                                {/* 3. CLOUD UNIT ECONOMICS */}
+                                <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg relative overflow-hidden">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Unit Economics</h4>
+                                        <span className="text-[9px] text-jpm-accent font-mono"><i className="fas fa-chart-line mr-1"></i>FINOPS</span>
+                                    </div>
+                                    <div className="flex items-end justify-between mb-3 border-b border-slate-800 pb-2">
+                                        <div>
+                                            <div className="text-[9px] text-gray-500 uppercase">Cost Per Tx</div>
+                                            <div className="text-lg font-mono font-bold text-white">${metrics.costPerTx}</div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-[9px] text-gray-500 uppercase">Storage (S3)</div>
+                                            <div className="text-lg font-mono font-bold text-blue-400">{metrics.storage.hot} <span className="text-xs text-gray-500">TB</span></div>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-1 h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                                        <div className="bg-blue-500 w-[20%]" title="Hot (SSD)"></div>
+                                        <div className="bg-blue-800 w-[80%]" title="Cold (Glacier)"></div>
+                                    </div>
+                                    <div className="flex justify-between text-[8px] text-gray-500 mt-1 font-mono">
+                                        <span>HOT (SSD)</span>
+                                        <span>COLD (GLACIER): {metrics.storage.cold} TB</span>
+                                    </div>
+                                </div>
+
                             </div>
                         </div>
                     </div>
-                );
-            };
+                </div>
+            );
+        };
 
 
         // 3. Layout Components
@@ -816,27 +817,27 @@
 
             useEffect(() => { const handleEndSignal = () => { const remaining = deckData.slice(currentIndex); const hardCards = deckData.filter(item => results[item.id] === 'hard'); let queueToSave = [...remaining]; hardCards.forEach(c => { if (!queueToSave.find(q => q.id === c.id)) queueToSave.push(c); }); const score = queueToSave.length === 0 ? 100 : 50; onEnd(score, queueToSave); }; window.addEventListener('jpm-trigger-end', handleEndSignal); return () => window.removeEventListener('jpm-trigger-end', handleEndSignal); }, [currentIndex, results, deckData, onEnd]);
 
-            const handleRate = (rating) => { 
+            const handleRate = (rating) => {
                 // 1. Calculate new state immediately
                 const newResults = { ...results, [current.id]: rating };
-                setResults(newResults); 
-                
+                setResults(newResults);
+
                 // 2. Force Stat Update Immediately (Fixes 50% Stuck Bug)
                 const done = Object.keys(newResults).length;
                 const correct = Object.values(newResults).filter(r => r === 'easy').length;
                 onStatsUpdate({ completed: done, correct });
 
-                setFlipped(false); 
-                
-                if (currentIndex < deckData.length - 1) { 
-                    const next = currentIndex + 1; 
-                    setCurrentIndex(next); 
-                    if (next > maxIndex) setMaxIndex(next); 
-                } else { 
+                setFlipped(false);
+
+                if (currentIndex < deckData.length - 1) {
+                    const next = currentIndex + 1;
+                    setCurrentIndex(next);
+                    if (next > maxIndex) setMaxIndex(next);
+                } else {
                     // Session Complete
-                    const hardCards = deckData.filter(item => newResults[item.id] === 'hard'); 
-                    onEnd(hardCards.length === 0 ? 100 : 50, hardCards); 
-                } 
+                    const hardCards = deckData.filter(item => newResults[item.id] === 'hard');
+                    onEnd(hardCards.length === 0 ? 100 : 50, hardCards);
+                }
             };
 
             const getBtnStyle = (type) => {
@@ -1615,9 +1616,8 @@
 
 const App = () => {
             const [data, setData] = useState({ flashcards: [], type: [], mcq: [], study: [], prompts: [], skills: [], vocab: [] });
-            
-            // --- 1. NEW: AUTHENTICATION STATE ---
-            // NEW (Locks on Refresh - "Bank Grade" Security):
+
+            // --- 1. AUTHENTICATION STATE (Security) ---
             const [isAuthenticated, setIsAuthenticated] = useState(false);
             const [authInput, setAuthInput] = useState("");
             const [authError, setAuthError] = useState(false);
@@ -1652,14 +1652,11 @@ const App = () => {
             const [speed, setSpeed] = useState(1.0);
             const [apiUrl, setApiUrl] = useState(localStorage.getItem('jpm_ai_url') || '');
 
-            // --- 2. NEW: LOGIN HANDLER ---
+            // --- 2. LOGIN HANDLER ---
             const handleLogin = (e) => {
                 e.preventDefault();
                 if (authInput === "2026") {
                     setIsAuthenticated(true);
-                   // localStorage.setItem('jpm_vp_auth', 'true');
-                    // NEW:
-                    // We don't save anything. Authentication is ephemeral (RAM only).
                     setAuthError(false);
                 } else {
                     setAuthError(true);
@@ -1667,22 +1664,23 @@ const App = () => {
                 }
             };
 
-            // --- 3. NEW: HOME BUTTON FIX (HARD RESET) ---
+            // --- 3. HOME / RESET ---
             const goHome = () => {
                 setMode('menu');
                 setActiveDeck(null);
                 setFocusMode(false);
-                // Close all modals
                 setShowSettings(false);
                 setShowTechModal(false);
                 setShowPrompts(false);
                 setModalDeck(null);
             };
 
-            // INITIAL PULL: Mount iPad to Cloud (With Intelligent Merge Fix)
+            // --- 4. CLOUD SYNC: INITIAL PULL (Preserved Logic) ---
             useEffect(() => {
                 const fetchGlobalProgress = async () => {
                     const aiUrl = localStorage.getItem('jpm_ai_url');
+                    
+                    // 1. Local Load
                     const savedLocal = localStorage.getItem('jpm_prep_progress_v20');
                     if (savedLocal) {
                         try {
@@ -1697,11 +1695,12 @@ const App = () => {
 
                     if (!aiUrl) return;
 
+                    // 2. Cloud Merge
                     try {
                         const res = await fetch(aiUrl, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ data: { action: "fetch", userID: "satnam_default" } }) 
+                            body: JSON.stringify({ data: { action: "fetch", userID: "satnam_default" } })
                         });
                         const result = await res.json();
 
@@ -1715,20 +1714,14 @@ const App = () => {
 
                             if (cloudP) {
                                 setProgress(prevLocal => {
-                                    const merged = { ...prevLocal }; 
+                                    const merged = { ...prevLocal };
                                     Object.keys(cloudP).forEach(key => {
                                         const localItem = merged[key];
                                         const cloudItem = cloudP[key];
-                                        if (!localItem) {
-                                            merged[key] = cloudItem;
-                                        }
-                                        else if (localItem.status === 'Completed' && cloudItem.status !== 'Completed') {
-                                           // Keep local
-                                        }
+                                        if (!localItem) merged[key] = cloudItem;
+                                        else if (localItem.status === 'Completed' && cloudItem.status !== 'Completed') { /* Keep local */ }
                                         else {
-                                            if (cloudItem.status === 'Completed') {
-                                                merged[key] = cloudItem;
-                                            }
+                                            if (cloudItem.status === 'Completed') merged[key] = cloudItem;
                                         }
                                     });
                                     localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(merged));
@@ -1743,107 +1736,49 @@ const App = () => {
                         console.warn("Cloud pull failed, relying on local data.", e);
                     }
                 };
-                if (isAuthenticated) fetchGlobalProgress(); // Only fetch if authenticated
+                if (isAuthenticated) fetchGlobalProgress();
             }, [isAuthenticated]);
 
-            // DEBOUNCED PUSH: Sync ALL data (Stats + Progress) to Cloud
+            // --- 5. CLOUD SYNC: PUSH (Debounced) ---
             useEffect(() => {
                 const syncToCloud = async () => {
                     const aiUrl = localStorage.getItem('jpm_ai_url');
                     if (!aiUrl || Object.keys(progress).length === 0) return;
-
                     setSyncStatus('syncing');
-
                     try {
-                        const payload = {
-                            stats: stats,
-                            progress: progress,
-                            customProjects: customProjects,
-                            _settings: { pressureMode } 
-                        };
-
+                        const payload = { stats, progress, customProjects, _settings: { pressureMode } };
                         await fetch(aiUrl, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                data: {
-                                    action: "sync", 
-                                    userID: "satnam_default",
-                                    payload: payload 
-                                }
-                            })
+                            body: JSON.stringify({ data: { action: "sync", userID: "satnam_default", payload } })
                         });
-
                         setSyncStatus('synced');
-                    } catch (e) {
-                        console.warn("Sync failed", e);
-                        setSyncStatus('error');
-                    }
+                    } catch (e) { console.warn("Sync failed", e); setSyncStatus('error'); }
                 };
-
                 const timer = setTimeout(syncToCloud, 3000);
                 return () => clearTimeout(timer);
+            }, [stats, progress, customProjects, pressureMode]);
 
-            }, [stats, progress, customProjects, pressureMode]); 
-
-            // MANUAL CLOUD SYNC FUNCTIONS
+            // --- 6. MANUAL SYNC ---
             const forceCloudUpload = async () => {
                 setSyncStatus("⏳ Uploading...");
                 const aiUrl = localStorage.getItem('jpm_ai_url');
                 if (!aiUrl) return setSyncStatus("❌ No API URL");
-
                 try {
-                    const payload = {
-                        stats,
-                        progress,
-                        customProjects,
-                        _settings: { pressureMode, leitnerConfig }
-                    };
-
-                    const res = await fetch(aiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            data: {
-                                action: "sync",
-                                userID: "satnam_default",
-                                payload
-                            }
-                        })
-                    });
-
-                    if (res.ok) {
-                        setSyncStatus("✅ Uploaded!");
-                        setTimeout(() => setSyncStatus('synced'), 2000);
-                    } else {
-                        throw new Error("Server rejected");
-                    }
-                } catch (e) {
-                    console.error(e);
-                    setSyncStatus("❌ Failed");
-                }
+                    const payload = { stats, progress, customProjects, _settings: { pressureMode, leitnerConfig } };
+                    const res = await fetch(aiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: { action: "sync", userID: "satnam_default", payload } }) });
+                    if (res.ok) { setSyncStatus("✅ Uploaded!"); setTimeout(() => setSyncStatus('synced'), 2000); } else throw new Error("Server rejected");
+                } catch (e) { console.error(e); setSyncStatus("❌ Failed"); }
             };
 
             const forceCloudDownload = async () => {
                 setSyncStatus("⏳ Downloading...");
                 const aiUrl = localStorage.getItem('jpm_ai_url');
                 if (!aiUrl) return setSyncStatus("❌ No API URL");
-
                 try {
-                    const res = await fetch(aiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            data: {
-                                action: "fetch",
-                                userID: "satnam_default"
-                            }
-                        })
-                    });
-
+                    const res = await fetch(aiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: { action: "fetch", userID: "satnam_default" } }) });
                     const json = await res.json();
                     const cloudData = json.data?.payload;
-
                     if (cloudData && cloudData.progress) {
                         setProgress(cloudData.progress);
                         if (cloudData.stats) setStats(cloudData.stats);
@@ -1852,18 +1787,11 @@ const App = () => {
                             setPressureMode(cloudData._settings.pressureMode);
                             if (cloudData._settings.leitnerConfig) setLeitnerConfig(cloudData._settings.leitnerConfig);
                         }
-
                         localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(cloudData.progress));
-
                         setSyncStatus("✅ Downloaded!");
                         setTimeout(() => setSyncStatus('synced'), 2000);
-                    } else {
-                        setSyncStatus("⚠️ Cloud Empty");
-                    }
-                } catch (e) {
-                    console.error(e);
-                    setSyncStatus("❌ Failed");
-                }
+                    } else setSyncStatus("⚠️ Cloud Empty");
+                } catch (e) { console.error(e); setSyncStatus("❌ Failed"); }
             };
 
             const quote = useMemo(() => {
@@ -1883,6 +1811,7 @@ const App = () => {
                 return quotes[dayOfYear % quotes.length];
             }, []);
 
+            // --- 7. TESTS ---
             const runTests = () => {
                 const results = [];
                 const csv1 = 'Deck,H2\nTest,"V, 2"';
@@ -1980,23 +1909,12 @@ const App = () => {
                 setTestResults(results);
             };
 
-// --- DATA LOADING (CONNECTED TO GITHUB) ---
+            // --- 8. DATA LOADING (GitHub) ---
             useEffect(() => {
-                /* Cloud Boot Protocol. 
-                   1. Tries to fetch "Fresh" Data from GitHub first.
-                   2. Checks Cloud Sync for progress.
-                   3. Falls back to LocalStorage if offline. */
-                
                 const load = async () => {
                     try {
-                        // *** CONFIGURATION: UPDATE THIS URL ***
-                        // Go to your GitHub Repo -> Click 'flashcards.csv' -> Click 'Raw' -> Copy that URL prefix.
-                        // It should look like: "https://raw.githubusercontent.com/<USER>/<REPO>/main/"
                         const GITHUB_BASE = "https://raw.githubusercontent.com/satnam05/JPM-Interview-App/master/";
-                        
-                        const ts = Date.now(); // Cache busting
-
-                        // Fetch all CSVs from GitHub directly
+                        const ts = Date.now();
                         const [f, t, m, s, p, sk, v] = await Promise.all([
                             fetch(`${GITHUB_BASE}flashcards.csv?t=${ts}`).then(r => r.ok ? r.text() : ""),
                             fetch(`${GITHUB_BASE}type_answer.csv?t=${ts}`).then(r => r.ok ? r.text() : ""),
@@ -2006,8 +1924,6 @@ const App = () => {
                             fetch(`${GITHUB_BASE}skill.csv?t=${ts}`).then(r => r.ok ? r.text() : ""),
                             fetch(`${GITHUB_BASE}vocab.csv?t=${ts}`).then(r => r.ok ? r.text() : "")
                         ]);
-
-                        // Load data into App State
                         setData({ 
                             flashcards: f ? parseCSV(f) : [], 
                             type: t ? parseCSV(t) : [], 
@@ -2017,216 +1933,82 @@ const App = () => {
                             skills: sk ? parseCSV(sk) : [], 
                             vocab: v ? parseCSV(v) : [] 
                         });
-
-                    } catch (e) { 
-                        console.error("GitHub Load Error - Check your URL:", e); 
-                    }
-
-                    // --- EXISTING CLOUD SYNC LOGIC (PRESERVED) ---
-                    const aiUrl = localStorage.getItem('jpm_ai_url');
-                    if (aiUrl) {
-                        try {
-                            const cloudRes = await fetch(aiUrl, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ data: { action: "fetch", userID: "satnam_default" } })
-                            });
-                            const cloudData = await cloudRes.json();
-                            if (cloudData.data?.payload) {
-                                const { progress: cloudP, customProjects: cloudCP } = cloudData.data.payload;
-                                if (cloudP) setProgress(cloudP);
-                                if (cloudCP) setCustomProjects(cloudCP);
-                                if (cloudP?._settings) {
-                                    setPressureMode(cloudP._settings.pressureMode || false);
-                                    if (cloudP._settings.leitnerConfig) {
-                                        setLeitnerConfig(cloudP._settings.leitnerConfig);
-                                    }
-                                };
-                                return;
-                            }
-                        } catch (e) { console.warn("Cloud fetch failed, using local."); }
-                    }
-
-                    const saved = localStorage.getItem('jpm_prep_progress_v20');
-                    if (saved) {
-                        const parsed = JSON.parse(saved);
-                        setProgress(parsed);
-                        if (parsed._settings) setPressureMode(parsed._settings.pressureMode || false);
-                    }
+                    } catch (e) { console.error("GitHub Load Error:", e); }
                 };
-                
-                load();
-            }, []);
+                if (isAuthenticated) load();
+            }, [isAuthenticated]);
 
             useEffect(() => { let interval; if (isAuthenticated && mode !== 'menu') interval = setInterval(() => setTimer(t => t + 1), 1000); else setTimer(0); return () => clearInterval(interval); }, [mode, isAuthenticated]);
-
-            // Forced Dark Mode
             useEffect(() => { document.documentElement.classList.add('dark'); document.documentElement.classList.remove('light'); }, []);
 
             const handleDeckClick = (m, deckName) => {
-                if (m === 'ai_interview') {
-                    startSession(m, deckName);
-                    return;
-                }
-
+                if (m === 'ai_interview') { startSession(m, deckName); return; }
                 const p = progress[`${m}-${deckName}`];
-                
-                // FIX: Check if Review is Due. If yes, restart session immediately.
                 const isReviewDue = p && p.status === 'Completed' && p.nextReview && p.nextReview < Date.now();
-
-                if (isReviewDue) {
-                    startSession(m, deckName);
-                } 
-                else if (p && p.status === 'Completed') {
-                    setModalDeck({ mode: m, name: deckName, stats: p });
-                } 
-                else if (p && p.status === 'In Progress' && p.queue && p.queue.length > 0) {
-                    startSession(m, deckName, p.queue);
-                } 
-                else {
-                    startSession(m, deckName);
-                }
+                if (isReviewDue) startSession(m, deckName);
+                else if (p && p.status === 'Completed') setModalDeck({ mode: m, name: deckName, stats: p });
+                else if (p && p.status === 'In Progress' && p.queue && p.queue.length > 0) startSession(m, deckName, p.queue);
+                else startSession(m, deckName);
             };
 
             const handleExport = () => { const blob = new Blob([JSON.stringify(progress)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = "jpm_backup.json"; a.click(); };
             const handleImport = (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const p = JSON.parse(e.target.result); setProgress(p); if (p._settings) setPressureMode(p._settings.pressureMode || false); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(p)); alert("Import Successful!"); } catch (err) { alert("Invalid File"); } }; reader.readAsText(file); };
             const togglePressureMode = () => { const newVal = !pressureMode; setPressureMode(newVal); const newP = { ...progress, _settings: { ...(progress._settings || {}), pressureMode: newVal } }; setProgress(newP); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(newP)); };
+            
             const startSession = (m, deckName, specificQueue = null) => {
-                if (m === 'ai_interview') {
-                    setActiveDeck({ name: deckName, items: [] });
-                    setMode(m);
-                    setSessionKey(prev => prev + 1);
-                    setFocusMode(false);
-                    return;
-                }
+                if (m === 'ai_interview') { setActiveDeck({ name: deckName, items: [] }); setMode(m); setSessionKey(p => p + 1); setFocusMode(false); return; }
                 const map = { 'flashcard': 'flashcards', 'type': 'type', 'mcq': 'mcq', 'study': 'study', 'skill': 'skills', 'vocab': 'vocab', 'ai_interview': 'prompts' };
                 let deck = specificQueue || data[map[m]].filter(d => d.Deck === deckName);
                 if (deck.length === 0) return;
-                if (m === 'study' || m === 'skill') {
-                    const link = deck[0].Link || deck[0].Links;
-                    if (link) window.open(link, '_blank');
-                    saveProgress(m, deckName, 'In Progress', 0);
-                    setModalDeck(null); return;
-                }
+                if (m === 'study' || m === 'skill') { const link = deck[0].Link || deck[0].Links; if (link) window.open(link, '_blank'); saveProgress(m, deckName, 'In Progress', 0); setModalDeck(null); return; }
                 if (m === 'vocab') deck = deck.map(item => ({ ...item, Question: item.Word, Answer: item.Meaning, ModeTitle: 'Vocabulary' }));
-                setActiveDeck({ name: deckName, items: deck });
-                setMode(m);
-                setStats({ correct: 0, completed: 0, total: deck.length });
-                setModalDeck(null);
-                setSessionKey(prev => prev + 1);
-                setFocusMode(false);
+                setActiveDeck({ name: deckName, items: deck }); setMode(m); setStats({ correct: 0, completed: 0, total: deck.length }); setModalDeck(null); setSessionKey(p => p + 1); setFocusMode(false);
                 if (!progress[`${m}-${deckName}`]) saveProgress(m, deckName, 'In Progress', 0);
             };
 
             const restartSession = (m, deckName) => {
-                if (m === 'ai_interview') {
-                    setSessionKey(prev => prev + 1);
-                    return;
-                }
+                if (m === 'ai_interview') { setSessionKey(p => p + 1); return; }
                 const map = { 'flashcard': 'flashcards', 'type': 'type', 'mcq': 'mcq', 'study': 'study', 'skill': 'skills', 'vocab': 'vocab' };
                 if (!map[m] || !data[map[m]]) return;
                 let fullDeck = data[map[m]].filter(d => d.Deck === deckName);
                 if (fullDeck.length === 0) return;
                 if (m === 'vocab') fullDeck = fullDeck.map(item => ({ ...item, Question: item.Word, Answer: item.Meaning, ModeTitle: 'Vocabulary' }));
-                saveProgress(m, deckName, 'In Progress', 0, null);
-                setActiveDeck({ name: deckName, items: fullDeck });
-                setMode(m);
-                setStats({ correct: 0, completed: 0, total: fullDeck.length });
-                setModalDeck(null);
-                setSessionKey(prev => prev + 1);
-                setFocusMode(false);
+                saveProgress(m, deckName, 'In Progress', 0, null); setActiveDeck({ name: deckName, items: fullDeck }); setMode(m); setStats({ correct: 0, completed: 0, total: fullDeck.length }); setModalDeck(null); setSessionKey(p => p + 1); setFocusMode(false);
             };
 
             const handleHeaderEnd = () => { window.dispatchEvent(new CustomEvent('jpm-trigger-end')); };
             const endSession = useCallback((finalScore = 0, remainingItems = []) => { let status = 'In Progress'; let queueToSave = null; if (mode === 'flashcard' || mode === 'vocab') { if (finalScore === 100 && remainingItems.length === 0) status = 'Completed'; else { status = 'In Progress'; queueToSave = remainingItems; } } else { status = finalScore >= 50 && remainingItems.length === 0 ? 'Completed' : 'In Progress'; if (status === 'In Progress') queueToSave = remainingItems; } saveProgress(mode, activeDeck.name, status, finalScore, queueToSave); setMode('menu'); setActiveDeck(null); setFocusMode(false); }, [mode, activeDeck, progress]);
-            
+
             const saveProgress = (m, d, status, score, queue = null) => {
-                let nextReview = null;
-                let leitnerLevel = progress[`${m}-${d}`]?.leitnerLevel || 0;
-
+                let nextReview = null; let leitnerLevel = progress[`${m}-${d}`]?.leitnerLevel || 0;
                 if (status === 'Completed') {
-                    if (score >= 80) {
-                        leitnerLevel = Math.min(leitnerLevel + 1, 4);
-                        const days = leitnerLevel === 1 ? leitnerConfig.l1 :
-                            leitnerLevel === 2 ? leitnerConfig.l2 :
-                                leitnerLevel === 3 ? leitnerConfig.l3 : leitnerConfig.l4;
-                        nextReview = Date.now() + (days * 24 * 60 * 60 * 1000);
-                    } else if (score < 50) {
-                        leitnerLevel = 0;
-                        nextReview = Date.now() + ((leitnerConfig.l1 * 0.5) * 24 * 60 * 60 * 1000);
-                    } else {
-                        nextReview = Date.now() + (leitnerConfig.l1 * 24 * 60 * 60 * 1000);
-                    }
+                    if (score >= 80) { leitnerLevel = Math.min(leitnerLevel + 1, 4); const days = leitnerLevel === 1 ? leitnerConfig.l1 : leitnerLevel === 2 ? leitnerConfig.l2 : leitnerLevel === 3 ? leitnerConfig.l3 : leitnerConfig.l4; nextReview = Date.now() + (days * 24 * 60 * 60 * 1000); }
+                    else if (score < 50) { leitnerLevel = 0; nextReview = Date.now() + ((leitnerConfig.l1 * 0.5) * 24 * 60 * 60 * 1000); }
+                    else { nextReview = Date.now() + (leitnerConfig.l1 * 24 * 60 * 60 * 1000); }
                 }
-
-                const newP = {
-                    ...progress,
-                    [`${m}-${d}`]: { status, score, date: new Date().toLocaleString(), queue, nextReview, leitnerLevel },
-                    _settings: { pressureMode, leitnerConfig }
-                };
-
-                setProgress(newP);
-                localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(newP));
+                const newP = { ...progress, [`${m}-${d}`]: { status, score, date: new Date().toLocaleString(), queue, nextReview, leitnerLevel }, _settings: { pressureMode, leitnerConfig } };
+                setProgress(newP); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(newP));
             };
             const markStudyComplete = (mId, deckName) => { saveProgress(mId, deckName, 'Completed', 100); };
-
-            // FIX: Removed dependency on 'activeDeck' to prevent closure staleness
-            const updateStats = useCallback(({ completed, correct }) => {
-                setStats(prev => {
-                    // Safety check
-                    if (completed === undefined || correct === undefined) return prev;
-                    // Optimization: Don't update if numbers haven't changed
-                    if (prev.completed === completed && prev.correct === correct) return prev;
-                    
-                    // Keep 'total' from the previous state (set during startSession), only update progress
-                    return { ...prev, completed, correct };
-                });
-            }, []);
-
+            const updateStats = useCallback(({ completed, correct }) => { setStats(prev => { if (completed === undefined || correct === undefined) return prev; if (prev.completed === completed && prev.correct === correct) return prev; return { ...prev, completed, correct }; }); }, []);
+            
             const getDecks = (items) => [...new Set(items.map(i => i.Deck))].filter(Boolean);
-
             const RenderDeckList = ({ items, mId }) => {
                 const decks = getDecks(items);
-                const progressItems = decks.map(d => {
-                    const p = progress[`${mId}-${d}`];
-                    if (!p) return null;
-                    const isDone = p.status === 'Completed';
-                    const isReviewDue = isDone && p.nextReview && p.nextReview < Date.now();
-                    let priority = 3;
-                    if (isReviewDue) priority = 1;
-                    else if (!isDone) priority = 2;
-                    else priority = 3;
-                    return { deck: d, p, isDone, isReviewDue, priority };
-                }).filter(Boolean);
-
+                const progressItems = decks.map(d => { const p = progress[`${mId}-${d}`]; if (!p) return null; const isDone = p.status === 'Completed'; const isReviewDue = isDone && p.nextReview && p.nextReview < Date.now(); let priority = 3; if (isReviewDue) priority = 1; else if (!isDone) priority = 2; else priority = 3; return { deck: d, p, isDone, isReviewDue, priority }; }).filter(Boolean);
                 progressItems.sort((a, b) => a.priority - b.priority);
-
                 const newDecks = decks.filter(d => !progress[`${mId}-${d}`]);
                 const isLinkMode = mId === 'study' || mId === 'skill';
                 let iconColor = 'text-jpm-accent';
-
                 return (<div className="h-48 overflow-y-auto bg-slate-900/50 p-4 border-t border-slate-800">
                     {progressItems.length > 0 && <h4 className="text-xs font-bold text-gray-500 uppercase mb-2 font-mono">My Progress</h4>}
-
                     {progressItems.map(({ deck, p, isDone, isReviewDue }) => (
                         <div key={deck} className={`w-full text-left p-2 mb-2 border rounded-xl flex justify-between items-center transition-transform active:scale-95 hover:shadow-[0_0_15px_rgba(197,157,95,0.2)] ${isReviewDue ? 'bg-slate-800 border-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : isDone ? 'bg-green-900/10 border-green-800 opacity-70 hover:opacity-100' : 'bg-slate-800 border-jpm-accent/30'}`}>
-                            <button onClick={() => handleDeckClick(mId, deck)} className="font-semibold text-sm text-gray-200 flex-grow text-left hover:underline flex items-center gap-2">
-                                {isReviewDue && <i className="fas fa-exclamation-circle text-red-500 animate-pulse"></i>}
-                                {deck}
-                            </button>
-
+                            <button onClick={() => handleDeckClick(mId, deck)} className="font-semibold text-sm text-gray-200 flex-grow text-left hover:underline flex items-center gap-2">{isReviewDue && <i className="fas fa-exclamation-circle text-red-500 animate-pulse"></i>}{deck}</button>
                             {isLinkMode && !isDone && <button onClick={() => markStudyComplete(mId, deck)} className="bg-jpm-accent text-slate-900 font-bold text-[10px] px-2 py-1 rounded hover:bg-yellow-600 ml-2">Mark Done</button>}
-
-                            {isDone ? (
-                                isReviewDue ?
-                                    <span className="text-[9px] font-bold text-red-400 bg-red-900/20 px-2 py-1 rounded border border-red-900">REVIEW NOW</span> :
-                                    <div className="flex items-center text-green-500 text-[9px] font-bold uppercase tracking-wider"><i className="fas fa-check-circle mr-1"></i> DONE</div>
-                            ) : (
-                                !isLinkMode && <div className="flex items-center text-jpm-accent text-[9px] font-bold ml-2 bg-yellow-900/20 px-2 py-1 rounded border border-yellow-900/50"><i className="fas fa-play mr-1"></i> {p.score || 0}%</div>
-                            )}
+                            {isDone ? (isReviewDue ? <span className="text-[9px] font-bold text-red-400 bg-red-900/20 px-2 py-1 rounded border border-red-900">REVIEW NOW</span> : <div className="flex items-center text-green-500 text-[9px] font-bold uppercase tracking-wider"><i className="fas fa-check-circle mr-1"></i> DONE</div>) : (!isLinkMode && <div className="flex items-center text-jpm-accent text-[9px] font-bold ml-2 bg-yellow-900/20 px-2 py-1 rounded border border-yellow-900/50"><i className="fas fa-play mr-1"></i> {p.score || 0}%</div>)}
                         </div>
                     ))}
-
                     {newDecks.length > 0 && <h4 className="text-xs font-bold text-gray-500 uppercase mb-2 mt-4 font-mono">New Decks</h4>}
                     {newDecks.map(d => (<div key={d} className="w-full text-left p-2 mb-2 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-slate-800 via-slate-900 to-black border-t border-t-white/10 border-b border-b-black/50 border-x border-slate-800 rounded-xl hover:border-jpm-accent transition flex justify-between items-center group cursor-pointer shadow-lg hover:shadow-[0_0_15px_rgba(197,157,95,0.2)]"> <button onClick={() => startSession(mId, d)} className="font-semibold text-sm flex-grow text-left text-gray-200">{d}</button> <i className={`fas fa-play opacity-0 group-hover:opacity-100 ${iconColor} transition-opacity`}></i> </div>))}
                 </div>);
@@ -2244,7 +2026,6 @@ const App = () => {
                 { id: 'vocab', title: 'Industry Terms', icon: 'fa-language', items: data.vocab }
             ];
 
-            // 4. NEW: RETURN LOGIN SCREEN IF NOT AUTHENTICATED
             if (!isAuthenticated) {
                 return (
                     <div className="fixed inset-0 bg-slate-950 flex items-center justify-center p-6 z-[200]">
@@ -2254,24 +2035,11 @@ const App = () => {
                             </div>
                             <h2 className="text-xl font-bold text-white font-quote mb-1">JP Morgan Prep</h2>
                             <p className="text-xs text-slate-500 font-mono uppercase tracking-widest mb-8">Restricted Access // VP Level</p>
-                            
                             <form onSubmit={handleLogin} className="w-full">
-                                <input 
-                                    type="password" 
-                                    value={authInput}
-                                    onChange={(e) => setAuthInput(e.target.value)}
-                                    placeholder="Enter Access Code"
-                                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-center text-white tracking-[0.5em] font-mono text-lg focus:outline-none focus:border-jpm-accent transition-colors mb-4 placeholder:tracking-normal placeholder:text-sm placeholder:text-slate-600"
-                                    autoFocus
-                                />
-                                <button type="submit" className="w-full bg-jpm-accent text-slate-900 font-bold py-3 rounded-xl hover:bg-[#b08d55] transition shadow-lg active:scale-95">
-                                    AUTHENTICATE
-                                </button>
+                                <input type="password" value={authInput} onChange={(e) => setAuthInput(e.target.value)} placeholder="Enter Access Code" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-center text-white tracking-[0.5em] font-mono text-lg focus:outline-none focus:border-jpm-accent transition-colors mb-4 placeholder:tracking-normal placeholder:text-sm placeholder:text-slate-600" autoFocus />
+                                <button type="submit" className="w-full bg-jpm-accent text-slate-900 font-bold py-3 rounded-xl hover:bg-[#b08d55] transition shadow-lg active:scale-95">AUTHENTICATE</button>
                             </form>
-                            <div className="mt-6 text-[10px] text-slate-600 font-mono">
-                                SYSTEM ID: {Math.floor(Math.random() * 1000000)}<br/>
-                                ENCRYPTION: AES-256 (SIMULATED)
-                            </div>
+                            <div className="mt-6 text-[10px] text-slate-600 font-mono">SYSTEM ID: {Math.floor(Math.random() * 1000000)}<br/>ENCRYPTION: AES-256 (SIMULATED)</div>
                         </div>
                     </div>
                 );
@@ -2292,8 +2060,18 @@ const App = () => {
                                 <div className="flex items-center gap-4">
                                     <button onClick={() => setShowTechModal(true)} className="p-2 rounded hover:bg-white/10 text-jpm-accent transition-colors animate-pulse-soft hover:shadow-[0_0_15px_rgba(197,157,95,0.4)]" title="Tech Insights"><i className="fas fa-globe-americas"></i></button>
                                     <UKClock />
-                                    {/* 5. NEW: DESKTOP MENU BUTTON USES goHome */}
-                                    {mode !== 'menu' && (<div className="flex gap-2"><button onClick={goHome} className="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded text-sm font-bold transition shadow-sm border border-slate-600 hover:shadow-[0_0_15px_rgba(197,157,95,0.4)]">Menu</button></div>)}
+                                    {mode !== 'menu' && (
+                                        <div className="flex gap-2">
+                                            {mode !== 'ai_interview' && (
+                                                <button onClick={() => restartSession(mode, activeDeck.name)} className="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded text-sm font-bold transition shadow-sm border border-slate-600 hover:shadow-[0_0_15px_rgba(197,157,95,0.4)]" title="Restart Session">
+                                                    <i className="fas fa-sync-alt mr-1"></i> Reset
+                                                </button>
+                                            )}
+                                            <button onClick={handleHeaderEnd} className="bg-transparent hover:bg-red-900/80 px-4 py-2 rounded text-sm font-bold transition shadow-sm border border-jpm-accent text-jpm-accent hover:text-red-100 hover:border-red-800 relative z-50 hover:shadow-[0_0_15px_rgba(239,68,68,0.4)]">
+                                                End
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </header>
                         )}
@@ -2304,9 +2082,7 @@ const App = () => {
                                 <span>{stats.completed}/{stats.total} Done</span>
                                 <div className="flex items-center gap-2">
                                     <span>{stats.completed > 0 ? Math.round((stats.correct / stats.completed) * 100) : 0}% Acc</span>
-                                    <button onClick={togglePressureMode} className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${pressureMode ? 'bg-red-500 text-white' : 'bg-gray-700 text-gray-400'}`}>
-                                        <i className="fas fa-stopwatch text-[10px]"></i>
-                                    </button>
+                                    <button onClick={togglePressureMode} className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${pressureMode ? 'bg-red-500 text-white' : 'bg-gray-700 text-gray-400'}`}><i className="fas fa-stopwatch text-[10px]"></i></button>
                                 </div>
                             </div>
                         )}
@@ -2349,10 +2125,9 @@ const App = () => {
                                 {(mode === 'ai_interview') && (<ComponentSandbox> <AIMode key={sessionKey} onEnd={endSession} onStatsUpdate={updateStats} toggleFocus={() => setFocusMode(!focusMode)} isFocusMode={focusMode} gender={gender} speed={speed} region={region} setGender={setGender} setSpeed={setSpeed} setRegion={setRegion} /> </ComponentSandbox>)}
                             </main>
 
-                            {/* 6. NEW: MOBILE NAVBAR USES goHome & AUTH STATE */}
                             {!focusMode && (
                                 <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-slate-900 border-t border-slate-800 flex justify-around items-center px-2 z-50 shadow-lg">
-                                    <button onClick={goHome} className={`flex flex-col items-center w-16 ${mode === 'menu' ? 'text-jpm-accent' : 'text-gray-500'}`}> 
+                                    <button onClick={handleHeaderEnd} className={`flex flex-col items-center w-16 ${mode === 'menu' ? 'text-jpm-accent' : 'text-gray-500'}`}> 
                                         <i className="fas fa-home text-xl mb-1"></i><span className="text-[10px] font-bold">Home</span> 
                                     </button>
                                     <button onClick={() => setShowPrompts(true)} className="flex flex-col items-center w-16 text-gray-400 hover:text-jpm-accent"> 
@@ -2391,7 +2166,6 @@ const App = () => {
                                             <h4 className="text-xs font-bold text-jpm-accent uppercase mb-3 font-mono"><i className="fas fa-stopwatch mr-1"></i>Review Schedule</h4>
                                             <div className="grid grid-cols-2 gap-2">{[1, 2, 3, 4].map(lvl => (<div key={lvl} className="flex flex-col"><label className="text-[10px] text-gray-500 font-bold mb-1">Level {lvl}</label><input type="number" value={leitnerConfig[`l${lvl}`] * 24} onChange={(e) => { const hours = parseFloat(e.target.value) || 0; const newConfig = { ...leitnerConfig, [`l${lvl}`]: hours / 24 }; setLeitnerConfig(newConfig); const newP = { ...progress, _settings: { pressureMode, leitnerConfig: newConfig } }; setProgress(newP); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(newP)); }} className="bg-slate-900 border border-slate-600 rounded p-2 text-white text-xs font-mono focus:border-jpm-accent focus:outline-none" /></div>))}</div>
                                         </div>
-                                        {/* 7. NEW: LOGOUT BUTTON IN SETTINGS */}
                                         <div className="text-center"><button onClick={() => { setIsAuthenticated(false); localStorage.removeItem('jpm_vp_auth'); }} className="text-red-500 text-xs font-bold underline cursor-pointer">Logout VP Console</button></div>
                                     </div>
                                     <div className="p-6 pt-4 border-t border-slate-800 flex-shrink-0 bg-slate-900 rounded-b-2xl"><button onClick={() => setShowSettings(false)} className="w-full bg-slate-700 border border-slate-600 text-white py-3 rounded-xl font-bold hover:bg-slate-600">Close Panel</button></div>
@@ -2415,7 +2189,7 @@ const App = () => {
                                             <span className="font-bold text-white">{modalDeck.stats.score}%</span>
                                         </div>
                                         
-                                        {/* NEW: VISIBLE REVIEW TIMER */}
+                                        {/* VISIBLE REVIEW TIMER */}
                                         <div className="border-t border-slate-700 pt-2 mt-2">
                                             <span className="text-xs text-gray-500 block uppercase tracking-wide font-bold mb-1">Next Review Due</span>
                                             <span className="font-mono text-sm text-jpm-accent">
