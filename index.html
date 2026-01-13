@@ -811,10 +811,34 @@
             const startAudioRec = async (e) => { e.stopPropagation(); try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); mediaRecorderRef.current = new MediaRecorder(stream); audioChunksRef.current = []; mediaRecorderRef.current.ondataavailable = (event) => { if (event.data.size > 0) audioChunksRef.current.push(event.data); }; mediaRecorderRef.current.onstop = () => { const type = mediaRecorderRef.current.mimeType || 'audio/webm'; const audioBlob = new Blob(audioChunksRef.current, { type }); const url = URL.createObjectURL(audioBlob); setAudioUrl(url); stream.getTracks().forEach(track => track.stop()); }; mediaRecorderRef.current.start(); setIsRecording(true); } catch (err) { console.warn("Audio denied", err); alert("Microphone access denied"); } };
             const stopAudioRec = (e) => { e.stopPropagation(); if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") { mediaRecorderRef.current.stop(); setIsRecording(false); } };
 
-            useEffect(() => { const done = Object.keys(results).length; const correct = Object.values(results).filter(r => r === 'easy').length; onStatsUpdate({ completed: done, correct }); }, [results, onStatsUpdate]);
+            // FIX: Removed the useEffect hook for stats to prevent lag. 
+            // Stats are now calculated explicitly in handleRate.
+
             useEffect(() => { const handleEndSignal = () => { const remaining = deckData.slice(currentIndex); const hardCards = deckData.filter(item => results[item.id] === 'hard'); let queueToSave = [...remaining]; hardCards.forEach(c => { if (!queueToSave.find(q => q.id === c.id)) queueToSave.push(c); }); const score = queueToSave.length === 0 ? 100 : 50; onEnd(score, queueToSave); }; window.addEventListener('jpm-trigger-end', handleEndSignal); return () => window.removeEventListener('jpm-trigger-end', handleEndSignal); }, [currentIndex, results, deckData, onEnd]);
 
-            const handleRate = (rating) => { setResults(prev => ({ ...prev, [current.id]: rating })); setFlipped(false); if (currentIndex < deckData.length - 1) { const next = currentIndex + 1; setCurrentIndex(next); if (next > maxIndex) setMaxIndex(next); } else { const finalResults = { ...results, [current.id]: rating }; const hardCards = deckData.filter(item => finalResults[item.id] === 'hard'); onEnd(hardCards.length === 0 ? 100 : 50, hardCards); } };
+            const handleRate = (rating) => { 
+                // 1. Calculate new state immediately
+                const newResults = { ...results, [current.id]: rating };
+                setResults(newResults); 
+                
+                // 2. Force Stat Update Immediately (Fixes 50% Stuck Bug)
+                const done = Object.keys(newResults).length;
+                const correct = Object.values(newResults).filter(r => r === 'easy').length;
+                onStatsUpdate({ completed: done, correct });
+
+                setFlipped(false); 
+                
+                if (currentIndex < deckData.length - 1) { 
+                    const next = currentIndex + 1; 
+                    setCurrentIndex(next); 
+                    if (next > maxIndex) setMaxIndex(next); 
+                } else { 
+                    // Session Complete
+                    const hardCards = deckData.filter(item => newResults[item.id] === 'hard'); 
+                    onEnd(hardCards.length === 0 ? 100 : 50, hardCards); 
+                } 
+            };
+
             const getBtnStyle = (type) => {
                 const isActive = currentRating === type;
                 const base = "flex-1 py-4 rounded-xl font-bold shadow-md transition-all duration-200 border border-[#C59D5F]/30 bg-[#C59D5F]/10 text-white";
@@ -2146,13 +2170,18 @@ const App = () => {
             };
             const markStudyComplete = (mId, deckName) => { saveProgress(mId, deckName, 'Completed', 100); };
 
+            // FIX: Removed dependency on 'activeDeck' to prevent closure staleness
             const updateStats = useCallback(({ completed, correct }) => {
                 setStats(prev => {
+                    // Safety check
+                    if (completed === undefined || correct === undefined) return prev;
+                    // Optimization: Don't update if numbers haven't changed
                     if (prev.completed === completed && prev.correct === correct) return prev;
-                    if (!activeDeck) return prev;
-                    return { total: activeDeck.items.length, completed, correct };
+                    
+                    // Keep 'total' from the previous state (set during startSession), only update progress
+                    return { ...prev, completed, correct };
                 });
-            }, [activeDeck]);
+            }, []);
 
             const getDecks = (items) => [...new Set(items.map(i => i.Deck))].filter(Boolean);
 
