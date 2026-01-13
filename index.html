@@ -2046,11 +2046,20 @@ const App = () => {
                 }
 
                 const p = progress[`${m}-${deckName}`];
-                if (p && p.status === 'Completed') {
+                
+                // FIX: Check if Review is Due. If yes, restart session immediately.
+                const isReviewDue = p && p.status === 'Completed' && p.nextReview && p.nextReview < Date.now();
+
+                if (isReviewDue) {
+                    startSession(m, deckName);
+                } 
+                else if (p && p.status === 'Completed') {
                     setModalDeck({ mode: m, name: deckName, stats: p });
-                } else if (p && p.status === 'In Progress' && p.queue && p.queue.length > 0) {
+                } 
+                else if (p && p.status === 'In Progress' && p.queue && p.queue.length > 0) {
                     startSession(m, deckName, p.queue);
-                } else {
+                } 
+                else {
                     startSession(m, deckName);
                 }
             };
@@ -2362,7 +2371,46 @@ const App = () => {
                         )}
                         {showPrompts && (<div className="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm z-[100] flex items-center justify-center p-4"> <div className="bg-slate-900 rounded-2xl shadow-2xl p-6 max-w-lg w-full animate-slide-in border border-slate-700"> <h3 className="text-2xl font-bold mb-4 text-white font-quote"><i className="fas fa-robot mr-2 text-jpm-accent"></i>AI Prompts</h3> <div className="space-y-3 mb-6"> {data.prompts.map((p, i) => (<a key={i} href={p.Link || p.Links} target="_blank" className="flex items-center p-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition group hover:shadow-[0_0_15px_rgba(197,157,95,0.2)]"> <i className="fas fa-file-alt text-jpm-accent mr-3"></i> <span className="font-semibold text-gray-200 group-hover:text-white">{p.Deck}</span> <i className="fas fa-external-link-alt ml-auto text-gray-500 group-hover:text-jpm-accent"></i> </a>))} </div> <button onClick={() => setShowPrompts(false)} className="w-full bg-slate-800 text-gray-400 py-3 rounded-xl font-bold hover:bg-slate-700 border border-slate-700">Close</button> </div> </div>)}
                         {testResults && (<div className="fixed inset-0 bg-black bg-opacity-80 z-[10000] flex items-center justify-center p-4"> <div className="bg-slate-900 rounded-xl shadow-2xl p-6 max-w-lg w-full animate-slide-in border border-slate-700"> <h3 className="text-2xl font-bold mb-4 text-white font-quote">Regression Suite ({testResults.length} Tests)</h3> <div className="space-y-2 mb-6 max-h-96 overflow-y-auto"> {testResults.map(r => (<div key={r.id} className="flex justify-between items-center p-2 border-b dark:border-slate-700"> <span className="text-sm font-medium dark:text-gray-300"><span className="font-mono text-xs opacity-50 mr-2">#{r.id}</span>{r.name}</span> <span className={`font-bold text-xs px-2 py-1 rounded ${r.pass ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{r.pass ? 'PASS' : 'FAIL'}</span> </div>))} </div> <button onClick={() => setTestResults(null)} className="w-full bg-blue-600 text-white py-2 rounded font-bold">Close</button> </div> </div>)}
-                        {modalDeck && (<div className="fixed inset-0 bg-black bg-opacity-80 z-[100] flex items-center justify-center p-4"> <div className="bg-slate-900 rounded-2xl shadow-2xl p-8 max-w-md w-full animate-slide-in border border-slate-700"> <h3 className="text-2xl font-bold text-white mb-2 font-quote">{modalDeck.name}</h3> <div className="bg-slate-800 p-4 rounded-xl mb-6 border border-slate-700"> <p className="text-sm text-gray-400">Status: <span className="font-bold text-green-400">Completed</span></p> {(modalDeck.mode !== 'study' && modalDeck.mode !== 'skill') && <p className="text-sm text-gray-400">Last Score: <span className="font-bold text-white">{modalDeck.stats.score}%</span></p>} <p className="text-sm text-gray-400">Completed On: <span className="font-mono text-xs text-slate-500">{modalDeck.stats.date}</span></p> </div> <div className="flex gap-4"> <button onClick={() => setModalDeck(null)} className="flex-1 bg-slate-800 border border-slate-700 text-gray-300 py-3 rounded-xl font-bold hover:bg-slate-700">Close</button> <button onClick={() => restartSession(modalDeck.mode, modalDeck.name)} className="flex-1 bg-jpm-primary text-white py-3 rounded-xl font-bold hover:bg-jpm-dark shadow-lg shadow-blue-900/20 border border-jpm-primary"> {(modalDeck.mode === 'study' || modalDeck.mode === 'skill') ? 'Re-Open' : 'Restart'} </button> </div> </div> </div>)}
+                        {modalDeck && (
+                            <div className="fixed inset-0 bg-black bg-opacity-80 z-[100] flex items-center justify-center p-4">
+                                <div className="bg-slate-900 rounded-2xl shadow-2xl p-8 max-w-md w-full animate-slide-in border border-slate-700">
+                                    <h3 className="text-2xl font-bold text-white mb-2 font-quote">{modalDeck.name}</h3>
+                                    
+                                    <div className="bg-slate-800 p-4 rounded-xl mb-6 border border-slate-700 space-y-2">
+                                        <div className="flex justify-between">
+                                            <span className="text-sm text-gray-400">Status</span>
+                                            <span className="font-bold text-green-400">Completed</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-sm text-gray-400">Last Score</span>
+                                            <span className="font-bold text-white">{modalDeck.stats.score}%</span>
+                                        </div>
+                                        
+                                        {/* NEW: VISIBLE REVIEW TIMER */}
+                                        <div className="border-t border-slate-700 pt-2 mt-2">
+                                            <span className="text-xs text-gray-500 block uppercase tracking-wide font-bold mb-1">Next Review Due</span>
+                                            <span className="font-mono text-sm text-jpm-accent">
+                                                {modalDeck.stats.nextReview 
+                                                    ? new Date(modalDeck.stats.nextReview).toLocaleString() 
+                                                    : "Not Scheduled"}
+                                            </span>
+                                            {modalDeck.stats.nextReview && (
+                                                <div className="text-[10px] text-gray-500 mt-1">
+                                                    (Wait time: {((modalDeck.stats.nextReview - Date.now()) / 3600000).toFixed(1)} hours remaining)
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-4">
+                                        <button onClick={() => setModalDeck(null)} className="flex-1 bg-slate-800 border border-slate-700 text-gray-300 py-3 rounded-xl font-bold hover:bg-slate-700">Close</button>
+                                        <button onClick={() => restartSession(modalDeck.mode, modalDeck.name)} className="flex-1 bg-jpm-primary text-white py-3 rounded-xl font-bold hover:bg-jpm-dark shadow-lg shadow-blue-900/20 border border-jpm-primary">
+                                            Force Review
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </GlobalErrorBoundary>
             );
