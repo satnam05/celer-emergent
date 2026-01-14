@@ -1118,12 +1118,15 @@
             const [url, setUrl] = useState(localStorage.getItem('jpm_ai_url') || "");
             const [showConfig, setShowConfig] = useState(!localStorage.getItem('jpm_ai_url'));
 
+            // --- NEW: INTERVIEW MODE STATE ---
+            const [interviewMode, setInterviewMode] = useState('technical');
+
             // --- INPUT MODAL STATES ---
             const [isComposerOpen, setIsComposerOpen] = useState(false);
             const [reviewMode, setReviewMode] = useState(false);
             const [inputValue, setInputValue] = useState("");
             const [inputAudioUrl, setInputAudioUrl] = useState(null);
-            const [isFixing, setIsFixing] = useState(false); // NEW: Loading state for Magic Fix
+            const [isFixing, setIsFixing] = useState(false);
 
             // --- RECORDING & WPM STATES ---
             const [isRecording, setIsRecording] = useState(false);
@@ -1295,7 +1298,6 @@
                 setReviewMode(true);
             };
 
-            // NEW: MAGIC FIX HANDLER
             const handleMagicFix = async () => {
                 const textToFix = (inputValue + " " + interimText).trim();
                 if (!textToFix) return;
@@ -1311,7 +1313,7 @@
                     const data = await response.json();
                     if (data.data?.text) {
                         setInputValue(data.data.text);
-                        setInterimText(""); // Clear any lingering interim text
+                        setInterimText("");
                     }
                 } catch (e) {
                     console.error("Magic Fix Failed", e);
@@ -1410,7 +1412,8 @@
                             message: text,
                             sessionID: "voice-session-satnam",
                             history: updatedHistory.map(m => ({ role: m.role === 'model' ? 'ai' : 'user', text: m.text })),
-                            thinking_level: thinkingMode
+                            thinking_level: thinkingMode,
+                            interviewMode: interviewMode // <--- NEW: SEND MODE TO BACKEND
                         }
                     };
                     const response = await fetch(url, {
@@ -1466,7 +1469,7 @@
                                                 )}
                                             </div>
 
-                                            {/* MAGIC FIX BUTTON (Floating in Review Mode) */}
+                                            {/* MAGIC FIX BUTTON */}
                                             {!isFixing && (
                                                 <button
                                                     onClick={handleMagicFix}
@@ -1554,6 +1557,16 @@
                             <button onClick={() => setShowConfig(!showConfig)} className="text-[10px] text-slate-500 hover:text-jpm-accent transition-colors font-mono mt-2 self-center"><i className="fas fa-cog mr-2"></i>Neural Link</button>
                         </div>
                         <div className="bg-slate-800/40 p-5 rounded-3xl border border-slate-700 shadow-inner w-full space-y-5 mt-4 relative z-10">
+
+                            {/* NEW: INTERVIEW MODE TOGGLE */}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-gray-500 uppercase font-mono tracking-widest block text-left">Interview Mode</label>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setInterviewMode('technical')} className={`flex-1 text-[10px] py-2 rounded-lg font-mono border transition-all ${interviewMode === 'technical' ? 'bg-blue-600 text-white border-blue-500 shadow-lg' : 'bg-slate-700 text-gray-400 border-slate-600 opacity-60'}`}>TECHNICAL</button>
+                                    <button onClick={() => setInterviewMode('behavioral')} className={`flex-1 text-[10px] py-2 rounded-lg font-mono border transition-all ${interviewMode === 'behavioral' ? 'bg-purple-600 text-white border-purple-500 shadow-lg' : 'bg-slate-700 text-gray-400 border-slate-600 opacity-60'}`}>BEHAVIORAL</button>
+                                </div>
+                            </div>
+
                             <div className="space-y-2">
                                 <label className="text-[10px] font-bold text-gray-500 uppercase font-mono tracking-widest block text-left">Panel Region</label>
                                 <div className="flex gap-2">
