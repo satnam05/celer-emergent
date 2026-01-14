@@ -1,5 +1,5 @@
 # Ignore all CSV files (Data is fetched from Raw Git URL now)
-*.csv
+
 
 # Ignore hidden system files
 .git
