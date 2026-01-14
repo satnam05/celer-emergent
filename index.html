@@ -812,17 +812,32 @@
             const startAudioRec = async (e) => { e.stopPropagation(); try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); mediaRecorderRef.current = new MediaRecorder(stream); audioChunksRef.current = []; mediaRecorderRef.current.ondataavailable = (event) => { if (event.data.size > 0) audioChunksRef.current.push(event.data); }; mediaRecorderRef.current.onstop = () => { const type = mediaRecorderRef.current.mimeType || 'audio/webm'; const audioBlob = new Blob(audioChunksRef.current, { type }); const url = URL.createObjectURL(audioBlob); setAudioUrl(url); stream.getTracks().forEach(track => track.stop()); }; mediaRecorderRef.current.start(); setIsRecording(true); } catch (err) { console.warn("Audio denied", err); alert("Microphone access denied"); } };
             const stopAudioRec = (e) => { e.stopPropagation(); if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") { mediaRecorderRef.current.stop(); setIsRecording(false); } };
 
-            // FIX: Removed the useEffect hook for stats to prevent lag. 
-            // Stats are now calculated explicitly in handleRate.
+            // --- FIX: EXACT SCORE CALCULATION ON EXIT ---
+            useEffect(() => {
+                const handleEndSignal = () => {
+                    const remaining = deckData.slice(currentIndex);
+                    const hardCards = deckData.filter(item => results[item.id] === 'hard');
 
-            useEffect(() => { const handleEndSignal = () => { const remaining = deckData.slice(currentIndex); const hardCards = deckData.filter(item => results[item.id] === 'hard'); let queueToSave = [...remaining]; hardCards.forEach(c => { if (!queueToSave.find(q => q.id === c.id)) queueToSave.push(c); }); const score = queueToSave.length === 0 ? 100 : 50; onEnd(score, queueToSave); }; window.addEventListener('jpm-trigger-end', handleEndSignal); return () => window.removeEventListener('jpm-trigger-end', handleEndSignal); }, [currentIndex, results, deckData, onEnd]);
+                    let queueToSave = [...remaining];
+                    hardCards.forEach(c => {
+                        if (!queueToSave.find(q => q.id === c.id)) queueToSave.push(c);
+                    });
+
+                    // NEW MATH: Calculate percentage based on progress, not hardcoded 50
+                    const progressPercent = Math.round((currentIndex / deckData.length) * 100);
+                    // If queue is empty (Mastered), give 100. Else give the progress %
+                    const score = queueToSave.length === 0 ? 100 : progressPercent;
+
+                    onEnd(score, queueToSave);
+                };
+                window.addEventListener('jpm-trigger-end', handleEndSignal);
+                return () => window.removeEventListener('jpm-trigger-end', handleEndSignal);
+            }, [currentIndex, results, deckData, onEnd]);
 
             const handleRate = (rating) => {
-                // 1. Calculate new state immediately
                 const newResults = { ...results, [current.id]: rating };
                 setResults(newResults);
 
-                // 2. Force Stat Update Immediately (Fixes 50% Stuck Bug)
                 const done = Object.keys(newResults).length;
                 const correct = Object.values(newResults).filter(r => r === 'easy').length;
                 onStatsUpdate({ completed: done, correct });
@@ -836,7 +851,12 @@
                 } else {
                     // Session Complete
                     const hardCards = deckData.filter(item => newResults[item.id] === 'hard');
-                    onEnd(hardCards.length === 0 ? 100 : 50, hardCards);
+
+                    // NEW MATH: If finished, base score on Accuracy (Easy vs Hard)
+                    const accuracy = Math.round((correct / deckData.length) * 100);
+                    const finalScore = hardCards.length === 0 ? 100 : accuracy;
+
+                    onEnd(finalScore, hardCards);
                 }
             };
 
@@ -1614,7 +1634,7 @@
 
         //END AI MODE
 
-const App = () => {
+        const App = () => {
             const [data, setData] = useState({ flashcards: [], type: [], mcq: [], study: [], prompts: [], skills: [], vocab: [] });
 
             // --- 1. AUTHENTICATION STATE (Security) ---
@@ -1679,7 +1699,7 @@ const App = () => {
             useEffect(() => {
                 const fetchGlobalProgress = async () => {
                     const aiUrl = localStorage.getItem('jpm_ai_url');
-                    
+
                     // 1. Local Load
                     const savedLocal = localStorage.getItem('jpm_prep_progress_v20');
                     if (savedLocal) {
@@ -1924,14 +1944,14 @@ const App = () => {
                             fetch(`${GITHUB_BASE}skill.csv?t=${ts}`).then(r => r.ok ? r.text() : ""),
                             fetch(`${GITHUB_BASE}vocab.csv?t=${ts}`).then(r => r.ok ? r.text() : "")
                         ]);
-                        setData({ 
-                            flashcards: f ? parseCSV(f) : [], 
-                            type: t ? parseCSV(t) : [], 
-                            mcq: m ? parseCSV(m) : [], 
-                            study: s ? parseCSV(s) : [], 
-                            prompts: p ? parseCSV(p) : [], 
-                            skills: sk ? parseCSV(sk) : [], 
-                            vocab: v ? parseCSV(v) : [] 
+                        setData({
+                            flashcards: f ? parseCSV(f) : [],
+                            type: t ? parseCSV(t) : [],
+                            mcq: m ? parseCSV(m) : [],
+                            study: s ? parseCSV(s) : [],
+                            prompts: p ? parseCSV(p) : [],
+                            skills: sk ? parseCSV(sk) : [],
+                            vocab: v ? parseCSV(v) : []
                         });
                     } catch (e) { console.error("GitHub Load Error:", e); }
                 };
@@ -1954,7 +1974,7 @@ const App = () => {
             const handleExport = () => { const blob = new Blob([JSON.stringify(progress)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = "jpm_backup.json"; a.click(); };
             const handleImport = (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const p = JSON.parse(e.target.result); setProgress(p); if (p._settings) setPressureMode(p._settings.pressureMode || false); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(p)); alert("Import Successful!"); } catch (err) { alert("Invalid File"); } }; reader.readAsText(file); };
             const togglePressureMode = () => { const newVal = !pressureMode; setPressureMode(newVal); const newP = { ...progress, _settings: { ...(progress._settings || {}), pressureMode: newVal } }; setProgress(newP); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(newP)); };
-            
+
             const startSession = (m, deckName, specificQueue = null) => {
                 if (m === 'ai_interview') { setActiveDeck({ name: deckName, items: [] }); setMode(m); setSessionKey(p => p + 1); setFocusMode(false); return; }
                 const map = { 'flashcard': 'flashcards', 'type': 'type', 'mcq': 'mcq', 'study': 'study', 'skill': 'skills', 'vocab': 'vocab', 'ai_interview': 'prompts' };
@@ -1977,27 +1997,27 @@ const App = () => {
             };
 
             const handleHeaderEnd = () => { window.dispatchEvent(new CustomEvent('jpm-trigger-end')); };
-            
+
             // --- FIX: EXACT PROGRESS CALCULATION (10% instead of 50%) ---
-            const endSession = useCallback((finalScore = 0, remainingItems = []) => { 
-                let status = 'In Progress'; 
-                let queueToSave = null; 
-                
-                if (mode === 'flashcard' || mode === 'vocab') { 
-                    if (finalScore === 100 && remainingItems.length === 0) status = 'Completed'; 
-                    else { 
-                        status = 'In Progress'; 
-                        queueToSave = remainingItems; 
-                    } 
-                } else { 
-                    status = finalScore >= 50 && remainingItems.length === 0 ? 'Completed' : 'In Progress'; 
-                    if (status === 'In Progress') queueToSave = remainingItems; 
-                } 
-                
-                saveProgress(mode, activeDeck.name, status, finalScore, queueToSave); 
-                setMode('menu'); 
-                setActiveDeck(null); 
-                setFocusMode(false); 
+            const endSession = useCallback((finalScore = 0, remainingItems = []) => {
+                let status = 'In Progress';
+                let queueToSave = null;
+
+                if (mode === 'flashcard' || mode === 'vocab') {
+                    if (finalScore === 100 && remainingItems.length === 0) status = 'Completed';
+                    else {
+                        status = 'In Progress';
+                        queueToSave = remainingItems;
+                    }
+                } else {
+                    status = finalScore >= 50 && remainingItems.length === 0 ? 'Completed' : 'In Progress';
+                    if (status === 'In Progress') queueToSave = remainingItems;
+                }
+
+                saveProgress(mode, activeDeck.name, status, finalScore, queueToSave);
+                setMode('menu');
+                setActiveDeck(null);
+                setFocusMode(false);
             }, [mode, activeDeck, progress]);
 
             const saveProgress = (m, d, status, score, queue = null) => {
@@ -2012,7 +2032,7 @@ const App = () => {
             };
             const markStudyComplete = (mId, deckName) => { saveProgress(mId, deckName, 'Completed', 100); };
             const updateStats = useCallback(({ completed, correct }) => { setStats(prev => { if (completed === undefined || correct === undefined) return prev; if (prev.completed === completed && prev.correct === correct) return prev; return { ...prev, completed, correct }; }); }, []);
-            
+
             const getDecks = (items) => [...new Set(items.map(i => i.Deck))].filter(Boolean);
             const RenderDeckList = ({ items, mId }) => {
                 const decks = getDecks(items);
@@ -2060,7 +2080,7 @@ const App = () => {
                                 <input type="password" value={authInput} onChange={(e) => setAuthInput(e.target.value)} placeholder="Enter Access Code" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-center text-white tracking-[0.5em] font-mono text-lg focus:outline-none focus:border-jpm-accent transition-colors mb-4 placeholder:tracking-normal placeholder:text-sm placeholder:text-slate-600" autoFocus />
                                 <button type="submit" className="w-full bg-jpm-accent text-slate-900 font-bold py-3 rounded-xl hover:bg-[#b08d55] transition shadow-lg active:scale-95">AUTHENTICATE</button>
                             </form>
-                            <div className="mt-6 text-[10px] text-slate-600 font-mono">SYSTEM ID: {Math.floor(Math.random() * 1000000)}<br/>ENCRYPTION: AES-256 (SIMULATED)</div>
+                            <div className="mt-6 text-[10px] text-slate-600 font-mono">SYSTEM ID: {Math.floor(Math.random() * 1000000)}<br />ENCRYPTION: AES-256 (SIMULATED)</div>
                         </div>
                     </div>
                 );
@@ -2096,7 +2116,7 @@ const App = () => {
                                 </div>
                             </header>
                         )}
-                        
+
                         {mode !== 'menu' && !focusMode && (
                             <div className="md:hidden bg-slate-900 p-2 flex justify-between items-center text-xs font-bold text-gray-300 px-4 border-b border-slate-800">
                                 <span>{Math.floor(timer / 60).toString().padStart(2, '0')}:{(timer % 60).toString().padStart(2, '0')}</span>
@@ -2149,14 +2169,14 @@ const App = () => {
 
                             {!focusMode && (
                                 <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-slate-900 border-t border-slate-800 flex justify-around items-center px-2 z-50 shadow-lg">
-                                    <button onClick={handleHeaderEnd} className={`flex flex-col items-center w-16 ${mode === 'menu' ? 'text-jpm-accent' : 'text-gray-500'}`}> 
-                                        <i className="fas fa-home text-xl mb-1"></i><span className="text-[10px] font-bold">Home</span> 
+                                    <button onClick={handleHeaderEnd} className={`flex flex-col items-center w-16 ${mode === 'menu' ? 'text-jpm-accent' : 'text-gray-500'}`}>
+                                        <i className="fas fa-home text-xl mb-1"></i><span className="text-[10px] font-bold">Home</span>
                                     </button>
-                                    <button onClick={() => setShowPrompts(true)} className="flex flex-col items-center w-16 text-gray-400 hover:text-jpm-accent"> 
-                                        <i className="fas fa-robot text-xl mb-1"></i><span className="text-[10px] font-bold">AI</span> 
+                                    <button onClick={() => setShowPrompts(true)} className="flex flex-col items-center w-16 text-gray-400 hover:text-jpm-accent">
+                                        <i className="fas fa-robot text-xl mb-1"></i><span className="text-[10px] font-bold">AI</span>
                                     </button>
-                                    <button onClick={() => setShowSettings(true)} className="flex flex-col items-center w-16 text-gray-400 hover:text-jpm-accent"> 
-                                        <i className="fas fa-cog text-xl mb-1"></i><span className="text-[10px] font-bold">Config</span> 
+                                    <button onClick={() => setShowSettings(true)} className="flex flex-col items-center w-16 text-gray-400 hover:text-jpm-accent">
+                                        <i className="fas fa-cog text-xl mb-1"></i><span className="text-[10px] font-bold">Config</span>
                                     </button>
                                 </div>
                             )}
@@ -2200,7 +2220,7 @@ const App = () => {
                             <div className="fixed inset-0 bg-black bg-opacity-80 z-[100] flex items-center justify-center p-4">
                                 <div className="bg-slate-900 rounded-2xl shadow-2xl p-8 max-w-md w-full animate-slide-in border border-slate-700">
                                     <h3 className="text-2xl font-bold text-white mb-2 font-quote">{modalDeck.name}</h3>
-                                    
+
                                     <div className="bg-slate-800 p-4 rounded-xl mb-6 border border-slate-700 space-y-2">
                                         <div className="flex justify-between">
                                             <span className="text-sm text-gray-400">Status</span>
@@ -2210,13 +2230,13 @@ const App = () => {
                                             <span className="text-sm text-gray-400">Last Score</span>
                                             <span className="font-bold text-white">{modalDeck.stats.score}%</span>
                                         </div>
-                                        
+
                                         {/* VISIBLE REVIEW TIMER */}
                                         <div className="border-t border-slate-700 pt-2 mt-2">
                                             <span className="text-xs text-gray-500 block uppercase tracking-wide font-bold mb-1">Next Review Due</span>
                                             <span className="font-mono text-sm text-jpm-accent">
-                                                {modalDeck.stats.nextReview 
-                                                    ? new Date(modalDeck.stats.nextReview).toLocaleString() 
+                                                {modalDeck.stats.nextReview
+                                                    ? new Date(modalDeck.stats.nextReview).toLocaleString()
                                                     : "Not Scheduled"}
                                             </span>
                                             {modalDeck.stats.nextReview && (
