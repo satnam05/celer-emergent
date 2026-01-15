@@ -1030,7 +1030,13 @@
                 const correctVal = current.Correct.trim(); let isMatch = false;
                 if (selectedText === null) { setHistory(prev => ({ ...prev, [current.id]: { ...currentRec, selected: "TIMEOUT", isCorrect: false } })); return; }
                 const selectedOptObj = currentRec.shuffledOpts.find(o => o.text === selectedText);
-                if (correctVal.length === 1 && ['A', 'B', 'C', 'D'].includes(correctVal.toUpperCase())) { if (selectedOptObj && selectedOptObj.id === correctVal.toUpperCase()) isMatch = true; } else { if (selectedText.trim() === correctVal) isMatch = true; }
+                // FIX: Regex checks for "B", "OptionB" (Case Insensitive) OR Full Text
+                const letterMatch = correctVal.match(/^(?:Option)?\s*([A-D])$/i);
+                if (letterMatch) {
+                    if (selectedOptObj && selectedOptObj.id === letterMatch[1].toUpperCase()) isMatch = true;
+                } else {
+                    if (selectedText.trim() === correctVal) isMatch = true;
+                }
                 setHistory(prev => ({ ...prev, [current.id]: { ...currentRec, selected: selectedText, isCorrect: isMatch } }));
             }, [current, currentRec]);
 
@@ -1074,7 +1080,13 @@
             const getOptionStyle = (optText) => {
                 if (!currentRec.selected) return "bg-slate-800 border-slate-700 hover:border-blue-500/50 hover:bg-slate-700 hover:shadow-[0_0_15px_rgba(197,157,95,0.2)]";
                 const correctVal = current.Correct.trim(); const optObj = currentRec.shuffledOpts.find(o => o.text === optText); let isThisCorrect = false;
-                if (correctVal.length === 1) { if (optObj && optObj.id === correctVal.toUpperCase()) isThisCorrect = true; } else { if (optText === correctVal) isThisCorrect = true; }
+                // FIX: Regex to highlight correct answer even if format is "OptionB"
+                const letterMatch = correctVal.match(/^(?:Option)?\s*([A-D])$/i);
+                if (letterMatch) {
+                    if (optObj && optObj.id === letterMatch[1].toUpperCase()) isThisCorrect = true;
+                } else {
+                    if (optText === correctVal) isThisCorrect = true;
+                }
                 if (isThisCorrect) return "bg-green-900/30 border-green-500 text-green-300 font-bold shadow-md shadow-green-900/20";
                 if (currentRec.selected === optText) return "bg-red-900/30 border-red-500 text-red-300 font-bold";
                 return "bg-slate-800 border-slate-700 text-gray-500 opacity-50";
