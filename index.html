@@ -953,7 +953,8 @@
             const handleNext = () => { if (currentIndex < deckData.length - 1) { setCurrentIndex(prev => prev + 1); } else { const avg = Object.values(history).reduce((a, b) => a + b.score, 0) / deckData.length; const wrongItems = deckData.filter(d => (history[d.id]?.score || 0) < 50); onEnd(avg, wrongItems); } };
 
             return (
-                <div className="max-w-4xl mx-auto w-full pt-4 px-4 h-full flex flex-col pb-0 md:pb-safe scroll-touch stable-scroll">
+                /* FIX: Changed pb-0 to pb-24 on mobile to lift buttons above iOS Home Bar */
+                <div className="max-w-4xl mx-auto w-full pt-4 px-4 h-full flex flex-col pb-24 md:pb-safe scroll-touch stable-scroll">
                     <div className="glass-panel rounded-3xl shadow-xl p-4 md:p-8 flex-grow flex flex-col min-h-0 mb-4">
                         <div className="flex justify-between items-center mb-4 flex-shrink-0">
                             <span className="text-jpm-accent font-bold text-xs uppercase tracking-widest block font-mono">Q{currentIndex + 1}/{deckData.length}</span>
@@ -1008,8 +1009,9 @@
                         <button onClick={() => { setCurrentIndex(c => Math.max(0, c - 1)); setTimeLeft(60); }} disabled={currentIndex === 0} className="px-6 py-3 bg-slate-800 backdrop-blur text-white rounded-xl font-bold shadow-sm hover:bg-slate-700 disabled:opacity-50 border border-slate-700 transition-colors hover:shadow-[0_0_15px_rgba(197,157,95,0.3)]"><i className="fas fa-arrow-left"></i></button>
                         {!currentRec.submitted ? (<button onClick={() => isStarMode ? handleStarSubmit() : finalizeSubmission(currentRec.input)} className="flex-grow bg-jpm-accent text-slate-900 py-3 rounded-xl font-bold hover:bg-[#b08d55] shadow-lg shadow-[#C59D5F]/50 transition-all active:scale-95">Submit Answer</button>) : (
                             <>
-                                <button onClick={() => setHistory(h => ({ ...h, [current.id]: { ...currentRec, submitted: false } }))} className="bg-yellow-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-yellow-700 shadow-md transition-colors hover:shadow-[0_0_15px_rgba(197,157,95,0.4)]">Edit</button>
-                                <button onClick={handleNext} className="flex-grow bg-slate-700 text-white py-3 rounded-xl font-bold hover:bg-slate-600 shadow-lg transition-colors hover:shadow-[0_0_15px_rgba(197,157,95,0.4)]">{currentIndex === deckData.length - 1 ? 'Finish' : 'Next'}</button>
+                                {/* FIX: Added flex-1 so Edit button shares space properly on mobile */}
+                                <button onClick={() => setHistory(h => ({ ...h, [current.id]: { ...currentRec, submitted: false } }))} className="flex-1 bg-yellow-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-yellow-700 shadow-md transition-colors hover:shadow-[0_0_15px_rgba(197,157,95,0.4)]">Edit</button>
+                                <button onClick={handleNext} className="flex-[2] bg-slate-700 text-white py-3 rounded-xl font-bold hover:bg-slate-600 shadow-lg transition-colors hover:shadow-[0_0_15px_rgba(197,157,95,0.4)]">{currentIndex === deckData.length - 1 ? 'Finish' : 'Next'}</button>
                             </>
                         )}
                     </div>
