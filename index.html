@@ -817,45 +817,38 @@
                 const handleEndSignal = () => {
                     const remaining = deckData.slice(currentIndex);
                     const hardCards = deckData.filter(item => results[item.id] === 'hard');
-
                     let queueToSave = [...remaining];
-                    hardCards.forEach(c => {
-                        if (!queueToSave.find(q => q.id === c.id)) queueToSave.push(c);
-                    });
-
-                    // NEW MATH: Calculate percentage based on progress, not hardcoded 50
+                    hardCards.forEach(c => { if (!queueToSave.find(q => q.id === c.id)) queueToSave.push(c); });
                     const progressPercent = Math.round((currentIndex / deckData.length) * 100);
-                    // If queue is empty (Mastered), give 100. Else give the progress %
                     const score = queueToSave.length === 0 ? 100 : progressPercent;
-
                     onEnd(score, queueToSave);
                 };
                 window.addEventListener('jpm-trigger-end', handleEndSignal);
                 return () => window.removeEventListener('jpm-trigger-end', handleEndSignal);
             }, [currentIndex, results, deckData, onEnd]);
 
+            // --- NEW: MARK DONE HANDLER ---
+            const handleMarkDone = () => {
+                if (window.confirm("Are you sure? This will mark the deck as 100% Completed.")) {
+                    onEnd(100, []); // Force 100% score, 0 items remaining
+                }
+            };
+
             const handleRate = (rating) => {
                 const newResults = { ...results, [current.id]: rating };
                 setResults(newResults);
-
                 const done = Object.keys(newResults).length;
                 const correct = Object.values(newResults).filter(r => r === 'easy').length;
                 onStatsUpdate({ completed: done, correct });
-
                 setFlipped(false);
-
                 if (currentIndex < deckData.length - 1) {
                     const next = currentIndex + 1;
                     setCurrentIndex(next);
                     if (next > maxIndex) setMaxIndex(next);
                 } else {
-                    // Session Complete
                     const hardCards = deckData.filter(item => newResults[item.id] === 'hard');
-
-                    // NEW MATH: If finished, base score on Accuracy (Easy vs Hard)
                     const accuracy = Math.round((correct / deckData.length) * 100);
                     const finalScore = hardCards.length === 0 ? 100 : accuracy;
-
                     onEnd(finalScore, hardCards);
                 }
             };
@@ -876,6 +869,8 @@
                         <div className="flex items-center gap-4">
                             {pressureMode && !flipped && <span className={`font-mono ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-blue-500'}`}>⏳ 00:{timeLeft.toString().padStart(2, '0')}</span>}
                             <span className="font-mono">{currentIndex + 1} / {deckData.length}</span>
+                            {/* MARK DONE BUTTON */}
+                            <button onClick={handleMarkDone} className="text-[10px] font-bold px-3 py-1 rounded border border-green-600 text-green-400 hover:bg-green-900/30 transition uppercase">Mark Done</button>
                             <button onClick={toggleFocus} className="p-2 hover:bg-slate-700 rounded-full transition"><i className={isFocusMode ? "fas fa-compress" : "fas fa-expand"}></i></button>
                         </div>
                     </div>
@@ -948,12 +943,19 @@
             const finalizeSubmission = useCallback((finalInput) => { const score = calculateSmartScore(finalInput, current.ModelAnswer); setHistory(prev => ({ ...prev, [current.id]: { ...prev[current.id], input: finalInput, score, submitted: true } })); if (isListening) toggleListening(); }, [current, isListening]);
             const handleStarSubmit = () => { finalizeSubmission(`Situation: ${starData.s}\nTask: ${starData.t}\nAction: ${starData.a}\nResult: ${starData.r}`); };
             useEffect(() => { if (!pressureMode || currentRec.submitted) return; const timer = setInterval(() => setTimeLeft(prev => { if (prev <= 1) { if (!isListening) { clearInterval(timer); if (isStarMode) handleStarSubmit(); else finalizeSubmission(inputRef.current); } return 0; } return prev - 1; }), 1000); return () => clearInterval(timer); }, [pressureMode, currentRec.submitted, finalizeSubmission, isStarMode, starData, isListening]);
+
+            // --- NEW: MARK DONE HANDLER ---
+            const handleMarkDone = () => {
+                if (window.confirm("Mark deck as 100% Completed?")) {
+                    onEnd(100, []);
+                }
+            };
+
             useEffect(() => { const handleEndSignal = () => { const avg = Object.values(history).reduce((a, b) => a + b.score, 0) / deckData.length; const wrongItems = deckData.filter(d => (history[d.id]?.score || 0) < 50); onEnd(Math.round(avg || 0), wrongItems); }; window.addEventListener('jpm-trigger-end', handleEndSignal); return () => window.removeEventListener('jpm-trigger-end', handleEndSignal); }, [history, deckData, onEnd]);
             useEffect(() => { const done = Object.keys(history).filter(k => history[k].submitted).length; const correct = Object.values(history).filter(rec => rec.score >= 50).length; onStatsUpdate({ completed: done, correct }); }, [history, onStatsUpdate]);
             const handleNext = () => { if (currentIndex < deckData.length - 1) { setCurrentIndex(prev => prev + 1); } else { const avg = Object.values(history).reduce((a, b) => a + b.score, 0) / deckData.length; const wrongItems = deckData.filter(d => (history[d.id]?.score || 0) < 50); onEnd(avg, wrongItems); } };
 
             return (
-                /* FIX: Changed pb-0 to pb-24 on mobile to lift buttons above iOS Home Bar */
                 <div className="max-w-4xl mx-auto w-full pt-4 px-4 h-full flex flex-col pb-24 md:pb-safe scroll-touch stable-scroll">
                     <div className="glass-panel rounded-3xl shadow-xl p-4 md:p-8 flex-grow flex flex-col min-h-0 mb-4">
                         <div className="flex justify-between items-center mb-4 flex-shrink-0">
@@ -962,6 +964,8 @@
                                 {!currentRec.submitted && (<button onClick={() => setShowModel(!showModel)} className={`text-xs font-bold px-3 py-1.5 rounded-full border transition hover:shadow-[0_0_15px_rgba(197,157,95,0.4)] ${showModel ? 'bg-yellow-900/50 text-yellow-300 border-yellow-500' : 'bg-slate-700 text-gray-400 border-slate-600'}`} title="Show Answer"><i className={`fas ${showModel ? 'fa-eye-slash' : 'fa-eye'} mr-1`}></i>Peek</button>)}
                                 {!currentRec.submitted && <button onClick={() => setIsStarMode(!isStarMode)} className={`text-xs font-bold px-3 py-1.5 rounded-full border transition hover:shadow-[0_0_15px_rgba(197,157,95,0.4)] ${isStarMode ? 'bg-purple-900/50 text-purple-300 border-purple-500' : 'bg-slate-700 text-gray-400 border-slate-600'}`}>✨ S.T.A.R.</button>}
                                 {pressureMode && !currentRec.submitted && <span className={`font-mono text-sm font-bold ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-blue-500'}`}>⏳ 00:{timeLeft.toString().padStart(2, '0')}</span>}
+                                {/* MARK DONE BUTTON */}
+                                <button onClick={handleMarkDone} className="text-[10px] font-bold px-3 py-1 rounded border border-green-600 text-green-400 hover:bg-green-900/30 transition uppercase">Mark Done</button>
                                 <button onClick={toggleFocus} className="p-2 hover:bg-slate-700 rounded-full transition text-gray-400"><i className={isFocusMode ? "fas fa-compress" : "fas fa-expand"}></i></button>
                             </div>
                         </div>
@@ -1009,7 +1013,6 @@
                         <button onClick={() => { setCurrentIndex(c => Math.max(0, c - 1)); setTimeLeft(60); }} disabled={currentIndex === 0} className="px-6 py-3 bg-slate-800 backdrop-blur text-white rounded-xl font-bold shadow-sm hover:bg-slate-700 disabled:opacity-50 border border-slate-700 transition-colors hover:shadow-[0_0_15px_rgba(197,157,95,0.3)]"><i className="fas fa-arrow-left"></i></button>
                         {!currentRec.submitted ? (<button onClick={() => isStarMode ? handleStarSubmit() : finalizeSubmission(currentRec.input)} className="flex-grow bg-jpm-accent text-slate-900 py-3 rounded-xl font-bold hover:bg-[#b08d55] shadow-lg shadow-[#C59D5F]/50 transition-all active:scale-95">Submit Answer</button>) : (
                             <>
-                                {/* FIX: Added flex-1 so Edit button shares space properly on mobile */}
                                 <button onClick={() => setHistory(h => ({ ...h, [current.id]: { ...currentRec, submitted: false } }))} className="flex-1 bg-yellow-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-yellow-700 shadow-md transition-colors hover:shadow-[0_0_15px_rgba(197,157,95,0.4)]">Edit</button>
                                 <button onClick={handleNext} className="flex-[2] bg-slate-700 text-white py-3 rounded-xl font-bold hover:bg-slate-600 shadow-lg transition-colors hover:shadow-[0_0_15px_rgba(197,157,95,0.4)]">{currentIndex === deckData.length - 1 ? 'Finish' : 'Next'}</button>
                             </>
@@ -1028,17 +1031,32 @@
             const current = deckData[currentIndex];
             const currentRec = history[current.id] || { selected: null, isCorrect: false, shuffledOpts: [] };
 
+            // --- NEW: MARK DONE HANDLER ---
+            const handleMarkDone = () => {
+                if (window.confirm("Mark deck as 100% Completed?")) {
+                    onEnd(100, []);
+                }
+            };
+
+            // --- FIX: Enhanced Answer Matching (Supports "B", "OptionB", and "Text") ---
             const checkAnswer = useCallback((selectedText) => {
-                const correctVal = current.Correct.trim(); let isMatch = false;
-                if (selectedText === null) { setHistory(prev => ({ ...prev, [current.id]: { ...currentRec, selected: "TIMEOUT", isCorrect: false } })); return; }
+                const correctVal = current.Correct.trim();
+                let isMatch = false;
+
+                if (selectedText === null) {
+                    setHistory(prev => ({ ...prev, [current.id]: { ...currentRec, selected: "TIMEOUT", isCorrect: false } }));
+                    return;
+                }
+
                 const selectedOptObj = currentRec.shuffledOpts.find(o => o.text === selectedText);
-                // FIX: Regex checks for "B", "OptionB" (Case Insensitive) OR Full Text
                 const letterMatch = correctVal.match(/^(?:Option)?\s*([A-D])$/i);
+
                 if (letterMatch) {
                     if (selectedOptObj && selectedOptObj.id === letterMatch[1].toUpperCase()) isMatch = true;
                 } else {
                     if (selectedText.trim() === correctVal) isMatch = true;
                 }
+
                 setHistory(prev => ({ ...prev, [current.id]: { ...currentRec, selected: selectedText, isCorrect: isMatch } }));
             }, [current, currentRec]);
 
@@ -1049,7 +1067,6 @@
                 return () => clearInterval(timer);
             }, [pressureMode, currentRec.selected, checkAnswer]);
 
-            // Stats Update for MCQ
             useEffect(() => {
                 const done = Object.values(history).filter(v => v.selected !== null).length;
                 const correct = Object.values(history).filter(v => v.isCorrect).length;
@@ -1081,8 +1098,9 @@
 
             const getOptionStyle = (optText) => {
                 if (!currentRec.selected) return "bg-slate-800 border-slate-700 hover:border-blue-500/50 hover:bg-slate-700 hover:shadow-[0_0_15px_rgba(197,157,95,0.2)]";
-                const correctVal = current.Correct.trim(); const optObj = currentRec.shuffledOpts.find(o => o.text === optText); let isThisCorrect = false;
-                // FIX: Regex to highlight correct answer even if format is "OptionB"
+                const correctVal = current.Correct.trim();
+                const optObj = currentRec.shuffledOpts.find(o => o.text === optText);
+                let isThisCorrect = false;
                 const letterMatch = correctVal.match(/^(?:Option)?\s*([A-D])$/i);
                 if (letterMatch) {
                     if (optObj && optObj.id === letterMatch[1].toUpperCase()) isThisCorrect = true;
@@ -1104,6 +1122,8 @@
                                     <span className="text-sm font-bold text-gray-400 block font-mono">{currentIndex + 1}/{deckData.length}</span>
                                     {pressureMode && !currentRec.selected && <span className={`font-mono text-xs font-bold ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-blue-500'}`}>⏳ 00:{timeLeft.toString().padStart(2, '0')}</span>}
                                 </div>
+                                {/* MARK DONE BUTTON */}
+                                <button onClick={handleMarkDone} className="text-[10px] font-bold px-3 py-1 rounded border border-green-600 text-green-400 hover:bg-green-900/30 transition uppercase">Mark Done</button>
                                 <button onClick={toggleFocus} className="p-2 hover:bg-slate-700 rounded-full transition text-gray-400"><i className={isFocusMode ? "fas fa-compress" : "fas fa-expand"}></i></button>
                             </div>
                         </div>
@@ -1131,15 +1151,15 @@
             const [messages, setMessages] = useState([]);
             const [url, setUrl] = useState(localStorage.getItem('jpm_ai_url') || "");
             const [showConfig, setShowConfig] = useState(!localStorage.getItem('jpm_ai_url'));
-            
-            const [interviewMode, setInterviewMode] = useState('technical'); 
+
+            const [interviewMode, setInterviewMode] = useState('technical');
 
             // --- INPUT MODAL STATES ---
             const [isComposerOpen, setIsComposerOpen] = useState(false);
             const [reviewMode, setReviewMode] = useState(false);
             const [inputValue, setInputValue] = useState("");
             const [inputAudioUrl, setInputAudioUrl] = useState(null);
-            const [isFixing, setIsFixing] = useState(false); 
+            const [isFixing, setIsFixing] = useState(false);
 
             // --- RECORDING & WPM STATES ---
             const [isRecording, setIsRecording] = useState(false);
@@ -1337,7 +1357,7 @@
                     const data = await response.json();
                     if (data.data?.text) {
                         setInputValue(data.data.text);
-                        setInterimText(""); 
+                        setInterimText("");
                     }
                 } catch (e) {
                     console.error("Magic Fix Failed", e);
@@ -1355,7 +1375,7 @@
             const handleSubmit = () => {
                 // FIX 2: Unlock iOS Audio IMMEDIATELY on click
                 unlockIOSAudio();
-                
+
                 setIsComposerOpen(false);
                 const finalMsg = (inputValue + " " + interimText).trim();
                 if (!finalMsg) return;
@@ -1411,7 +1431,7 @@
                     if (blob.size < 500) return setStatus("IDLE");
 
                     const audioUrl = URL.createObjectURL(blob);
-                    
+
                     // iOS Fix: Ensure any previous audio is cleared
                     if (currentAudioRef.current) {
                         currentAudioRef.current.pause();
@@ -1419,7 +1439,7 @@
                     }
 
                     const audio = new Audio(audioUrl);
-                    
+
                     // Important for iOS: 
                     // We can't force .play() here if the "chain" is broken, 
                     // but the unlockIOSAudio() called in handleSubmit should have kept the session alive.
@@ -1596,7 +1616,7 @@
                             <button onClick={() => setShowConfig(!showConfig)} className="text-[10px] text-slate-500 hover:text-jpm-accent transition-colors font-mono mt-2 self-center"><i className="fas fa-cog mr-2"></i>Neural Link</button>
                         </div>
                         <div className="bg-slate-800/40 p-5 rounded-3xl border border-slate-700 shadow-inner w-full space-y-5 mt-4 relative z-10">
-                            
+
                             {/* --- NEW: INTERVIEW MODE TOGGLE (ADDED HERE) --- */}
                             <div className="space-y-2">
                                 <label className="text-[10px] font-bold text-gray-500 uppercase font-mono tracking-widest block text-left">Interview Mode</label>
