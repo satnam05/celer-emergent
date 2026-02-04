@@ -2336,6 +2336,7 @@
             const handleCustomCardClick = (card) => {
                 if (card.type === 'ai') {
                     setActiveDeck({ name: card.name, items: [] });
+                    setActiveAiCard(card);
                     setMode('ai_interview');
                     setSessionKey(p => p + 1);
                     setFocusMode(false);
