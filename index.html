@@ -2133,7 +2133,7 @@
             useEffect(() => {
                 const load = async () => {
                     try {
-                        const GITHUB_BASE = csvBaseUrl;
+                        const GITHUB_BASE = normalizedCsvBase;
                         const ts = Date.now();
                         const [f, t, m, s, p, sk, v] = await Promise.all([
                             fetch(`${GITHUB_BASE}flashcards.csv?t=${ts}`).then(r => r.ok ? r.text() : ""),
