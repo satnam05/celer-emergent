@@ -1951,7 +1951,7 @@
             }, [archivedTiles]);
 
             useEffect(() => {
-                localStorage.setItem('celer_csv_base', csvBaseUrl);
+                localStorage.setItem('celer_csv_base', normalizedCsvBase);
             }, [normalizedCsvBase]);
 
             // --- 5. CLOUD SYNC: PUSH (Debounced) ---
