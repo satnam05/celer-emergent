@@ -2590,8 +2590,9 @@
                                         <div className="flex-grow overflow-y-auto pt-4"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-7xl mx-auto pb-24">
                                             {menuTiles.map(m => {
                                                 // Calculate state for the button icon
-                                                const total = m.items.length;
-                                                const completed = m.items.filter(i => progress[`${m.id}-${i.Deck}`]?.status === 'Completed').length;
+                                                const defaultItems = m.items || [];
+                                                const total = defaultItems.length;
+                                                const completed = defaultItems.filter(i => progress[`${m.id}-${i.Deck}`]?.status === 'Completed').length;
                                                 const isAllDone = total > 0 && completed === total;
 
                                                 return (
