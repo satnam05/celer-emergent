@@ -2492,15 +2492,27 @@
 
             const getTotalDecks = () => { return (getDecks(data.flashcards).length + getDecks(data.type).length + getDecks(data.mcq).length + getDecks(data.study).length + getDecks(data.skills).length + getDecks(data.vocab).length); };
 
-            const menuTiles = [
-                { id: 'ai_interview', title: 'Innovation Lab', icon: 'fa-microchip', items: [{ Deck: 'Agentic Interview Coach' }] },
-                { id: 'study', title: 'Knowledge Base', icon: 'fa-book-open', items: data.study },
-                { id: 'flashcard', title: 'Concept Drill', icon: 'fa-layer-group', items: data.flashcards },
-                { id: 'type', title: 'Mock Interview', icon: 'fa-keyboard', items: data.type },
-                { id: 'mcq', title: 'Technical Quiz', icon: 'fa-tasks', items: data.mcq },
-                { id: 'skill', title: 'Skill Development', icon: 'fa-laptop-code', items: data.skills },
-                { id: 'vocab', title: 'Industry Terms', icon: 'fa-language', items: data.vocab }
-            ];
+            const defaultTiles = defaultTileMeta.map(tile => ({
+                ...tile,
+                items: tile.id === 'ai_interview' ? [{ Deck: 'Agentic Interview Coach' }] : (data[tile.dataKey] || [])
+            }));
+
+            const visibleDefaultTiles = defaultTiles.filter(tile => !archivedTiles.includes(tile.id)).map(tile => ({
+                ...tile,
+                isCustom: false,
+                cards: customCardsByTile[tile.id] || []
+            }));
+
+            const visibleCustomTiles = customTiles.filter(tile => !archivedTiles.includes(tile.id)).map(tile => ({
+                id: tile.id,
+                title: tile.title,
+                icon: tile.icon || 'fa-layer-group',
+                cards: tile.cards || [],
+                defaultType: tile.defaultType || 'flashcard',
+                isCustom: true
+            }));
+
+            const menuTiles = [...visibleDefaultTiles, ...visibleCustomTiles];
 
             if (!isAuthenticated) {
                 return (
