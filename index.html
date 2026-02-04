@@ -1923,6 +1923,10 @@
 
                             if (cloudCP) setCustomProjects(cloudCP);
                             if (cloudSettings) setPressureMode(cloudSettings.pressureMode || false);
+                            if (cloudTiles) { setCustomTiles(cloudTiles); localStorage.setItem('celer_custom_tiles_v1', JSON.stringify(cloudTiles)); }
+                            if (cloudCardsByTile) { setCustomCardsByTile(cloudCardsByTile); localStorage.setItem('celer_custom_cards_v1', JSON.stringify(cloudCardsByTile)); }
+                            if (cloudArchivedTiles) { setArchivedTiles(cloudArchivedTiles); localStorage.setItem('celer_archived_tiles_v1', JSON.stringify(cloudArchivedTiles)); }
+                            if (cloudCsvBase) { setCsvBaseUrl(cloudCsvBase); localStorage.setItem('celer_csv_base', cloudCsvBase); }
                         }
                     } catch (e) {
                         console.warn("Cloud pull failed, relying on local data.", e);
