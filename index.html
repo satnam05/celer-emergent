@@ -2707,8 +2707,17 @@
                                     <div className="overflow-y-auto p-6 space-y-4 scroll-touch">
                                         <div className="bg-slate-800 p-3 rounded-xl border border-slate-700">
                                             <h4 className="text-xs font-bold text-jpm-accent uppercase mb-2 font-mono">Server Connection (Neural Link)</h4>
-                                            <input type="text" value={apiUrl} onChange={(e) => { setApiUrl(e.target.value); localStorage.setItem('jpm_ai_url', e.target.value); }} placeholder="Paste Firebase URL..." className="w-full bg-black/40 border border-slate-600 rounded p-2 text-[10px] text-white font-mono mb-2 focus:border-jpm-accent focus:outline-none" />
+                                            <input type="text" value={apiUrl} onChange={(e) => { setApiUrl(e.target.value); localStorage.setItem('jpm_ai_url', e.target.value); }} placeholder="Paste Backend URL..." className="w-full bg-black/40 border border-slate-600 rounded p-2 text-[10px] text-white font-mono mb-2 focus:border-jpm-accent focus:outline-none" />
                                             <p className="text-[9px] text-gray-500 italic">Required for Cloud Sync & AI.</p>
+                                        </div>
+                                        <div className="bg-slate-800 p-3 rounded-xl border border-slate-700">
+                                            <h4 className="text-xs font-bold text-blue-300 uppercase mb-2 font-mono">CSV Data Source</h4>
+                                            <input data-testid="csv-base-url-input" type="text" value={csvBaseUrl} onChange={(e) => setCsvBaseUrl(e.target.value)} placeholder="https://raw.githubusercontent.com/.../" className="w-full bg-black/40 border border-slate-600 rounded p-2 text-[10px] text-white font-mono mb-2 focus:border-jpm-accent focus:outline-none" />
+                                            <p className="text-[9px] text-gray-500 italic">Used for loading card CSVs.</p>
+                                        </div>
+                                        <div className="bg-slate-800 p-3 rounded-xl border border-slate-700">
+                                            <h4 className="text-xs font-bold text-gray-300 uppercase mb-2 font-mono">Tile Manager</h4>
+                                            <button data-testid="settings-manage-tiles-button" onClick={() => { setShowTileManager(true); setShowSettings(false); }} className="w-full bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-[10px] font-bold border border-slate-600 py-2">Manage Tiles</button>
                                         </div>
                                         <div className="bg-slate-800 p-3 rounded-xl border border-slate-700">
                                             <h4 className="text-xs font-bold text-blue-400 uppercase mb-3 font-mono flex justify-between"><span>Sync Doctor</span><span className="text-gray-500">{lastSyncTime || ''}</span></h4>
