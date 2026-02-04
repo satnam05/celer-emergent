@@ -2658,6 +2658,14 @@
                                                     </div>
                                                 );
                                             })}
+                                            <button
+                                                data-testid="add-tile-button"
+                                                onClick={() => setShowTileCreator(true)}
+                                                className="bg-slate-900/60 border-2 border-dashed border-slate-700 rounded-xl shadow-lg transition-all hover:-translate-y-1 hover:border-jpm-accent/60 hover:shadow-[0_0_20px_rgba(197,157,95,0.15)] flex flex-col items-center justify-center gap-2 p-6 text-gray-400 hover:text-jpm-accent"
+                                            >
+                                                <i className="fas fa-plus text-2xl"></i>
+                                                <span className="text-sm font-bold uppercase tracking-wider">Add Tile</span>
+                                            </button>
                                         </div></div>
                                         <div className="hidden md:flex fixed bottom-6 right-6 flex-col gap-3 z-50 items-end">
                                             <button onClick={() => setShowPrompts(true)} className="bg-slate-800 text-white p-3 rounded-full shadow-lg hover:bg-slate-700 transition flex items-center gap-2 group border border-slate-700 hover:shadow-[0_0_15px_rgba(197,157,95,0.4)]"><i className="fas fa-robot text-jpm-accent"></i> <span className="hidden group-hover:inline text-sm font-bold">Prompts</span></button>
