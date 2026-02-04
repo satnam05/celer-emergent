@@ -2133,6 +2133,7 @@
             useEffect(() => {
                 const load = async () => {
                     try {
+                        if (!normalizedCsvBase) return;
                         const GITHUB_BASE = normalizedCsvBase;
                         const ts = Date.now();
                         const [f, t, m, s, p, sk, v] = await Promise.all([
