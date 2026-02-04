@@ -1,4 +1,4 @@
-# JP Morgan Interview Preparation App (v20.59)
+# Celer | AI Career Companion (v20.59)
 
 ## 📌 Overview
 The **JP Morgan Interview Preparation App** is a robust, single-page application (SPA) designed to simulate the rigorous technical and behavioral interview process at J.P. Morgan. Built as a zero-dependency, single-file HTML solution, it leverages React and Tailwind CSS via CDN for instant deployment and high portability.
