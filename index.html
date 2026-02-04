@@ -1977,7 +1977,7 @@
                 const aiUrl = localStorage.getItem('jpm_ai_url');
                 if (!aiUrl) return setSyncStatus("❌ No API URL");
                 try {
-                    const payload = { stats, progress, customProjects, _settings: { pressureMode, leitnerConfig } };
+                    const payload = { stats, progress, customProjects, customTiles, customCardsByTile, archivedTiles, csvBaseUrl, _settings: { pressureMode, leitnerConfig } };
                     const res = await fetch(aiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: { action: "sync", userID: "satnam_default", payload } }) });
                     if (res.ok) { setSyncStatus("✅ Uploaded!"); setTimeout(() => setSyncStatus('synced'), 2000); } else throw new Error("Server rejected");
                 } catch (e) { console.error(e); setSyncStatus("❌ Failed"); }
