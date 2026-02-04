@@ -1935,6 +1935,22 @@
                 if (isAuthenticated) fetchGlobalProgress();
             }, [isAuthenticated]);
 
+            useEffect(() => {
+                localStorage.setItem('celer_custom_tiles_v1', JSON.stringify(customTiles));
+            }, [customTiles]);
+
+            useEffect(() => {
+                localStorage.setItem('celer_custom_cards_v1', JSON.stringify(customCardsByTile));
+            }, [customCardsByTile]);
+
+            useEffect(() => {
+                localStorage.setItem('celer_archived_tiles_v1', JSON.stringify(archivedTiles));
+            }, [archivedTiles]);
+
+            useEffect(() => {
+                localStorage.setItem('celer_csv_base', csvBaseUrl);
+            }, [csvBaseUrl]);
+
             // --- 5. CLOUD SYNC: PUSH (Debounced) ---
             useEffect(() => {
                 const syncToCloud = async () => {
