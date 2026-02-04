@@ -1957,7 +1957,8 @@
             useEffect(() => {
                 const syncToCloud = async () => {
                     const aiUrl = localStorage.getItem('jpm_ai_url');
-                    if (!aiUrl || Object.keys(progress).length === 0) return;
+                    const hasCustomData = customTiles.length > 0 || Object.keys(customCardsByTile).length > 0 || archivedTiles.length > 0;
+                    if (!aiUrl || (!hasCustomData && Object.keys(progress).length === 0)) return;
                     setSyncStatus('syncing');
                     try {
                         const payload = { stats, progress, customProjects, customTiles, customCardsByTile, archivedTiles, csvBaseUrl, _settings: { pressureMode } };
