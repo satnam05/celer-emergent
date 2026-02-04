@@ -1100,7 +1100,7 @@
         // ---START AI MODE ---
 
         // --- GEMINI LIVE VOICE MODE (ENHANCED: MAGIC FIX AUTOCORRECT) ---
-        const AIMode = ({ onEnd, toggleFocus, isFocusMode, gender, speed, region, setGender, setSpeed, setRegion }) => {
+        const AIMode = ({ onEnd, toggleFocus, isFocusMode, activeAiCard, gender, speed, region, setGender, setSpeed, setRegion }) => {
             const [status, setStatus] = useState("IDLE");
             const [thinkingMode, setThinkingMode] = useState("low");
             const [messages, setMessages] = useState([]);
