@@ -1834,6 +1834,16 @@
             const [isInstructionGenerating, setIsInstructionGenerating] = useState(false);
             const [customCardData, setCustomCardData] = useState({});
 
+            const defaultTileMeta = useMemo(() => ([
+                { id: 'ai_interview', title: 'Innovation Lab', icon: 'fa-microchip', defaultType: 'ai' },
+                { id: 'study', title: 'Knowledge Base', icon: 'fa-book-open', defaultType: 'link', dataKey: 'study' },
+                { id: 'flashcard', title: 'Concept Drill', icon: 'fa-layer-group', defaultType: 'flashcard', dataKey: 'flashcards' },
+                { id: 'type', title: 'Mock Interview', icon: 'fa-keyboard', defaultType: 'type', dataKey: 'type' },
+                { id: 'mcq', title: 'Technical Quiz', icon: 'fa-tasks', defaultType: 'mcq', dataKey: 'mcq' },
+                { id: 'skill', title: 'Skill Development', icon: 'fa-laptop-code', defaultType: 'link', dataKey: 'skills' },
+                { id: 'vocab', title: 'Industry Terms', icon: 'fa-language', defaultType: 'flashcard', dataKey: 'vocab' }
+            ]), []);
+
             // --- 2. LOGIN HANDLER ---
             const handleLogin = (e) => {
                 e.preventDefault();
