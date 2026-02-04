@@ -2385,7 +2385,7 @@
             }, [allCustomCards, loadCsvForCard, customCardData]);
 
             const startSession = (m, deckName, specificQueue = null) => {
-                if (m === 'ai_interview') { setActiveDeck({ name: deckName, items: [] }); setMode(m); setSessionKey(p => p + 1); setFocusMode(false); return; }
+                if (m === 'ai_interview') { setActiveDeck({ name: deckName, items: [] }); setActiveAiCard(null); setMode(m); setSessionKey(p => p + 1); setFocusMode(false); return; }
                 const map = { 'flashcard': 'flashcards', 'type': 'type', 'mcq': 'mcq', 'study': 'study', 'skill': 'skills', 'vocab': 'vocab', 'ai_interview': 'prompts' };
                 let deck = specificQueue || data[map[m]].filter(d => d.Deck === deckName);
                 if (deck.length === 0) return;
