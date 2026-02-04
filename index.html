@@ -1106,6 +1106,7 @@
             const [messages, setMessages] = useState([]);
             const [url, setUrl] = useState(localStorage.getItem('jpm_ai_url') || "");
             const [showConfig, setShowConfig] = useState(!localStorage.getItem('jpm_ai_url'));
+            const sessionId = useMemo(() => (activeAiCard?.id ? `ai-card-${activeAiCard.id}` : "voice-session-satnam"), [activeAiCard]);
 
             const [interviewMode, setInterviewMode] = useState('technical');
 
