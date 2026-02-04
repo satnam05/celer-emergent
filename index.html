@@ -1897,7 +1897,7 @@
                         const result = await res.json();
 
                         if (result.data?.payload) {
-                            const { progress: cloudP, customProjects: cloudCP, stats: cloudStats, _settings: cloudSettings } = result.data.payload;
+                            const { progress: cloudP, customProjects: cloudCP, stats: cloudStats, _settings: cloudSettings, customTiles: cloudTiles, customCardsByTile: cloudCardsByTile, archivedTiles: cloudArchivedTiles, csvBaseUrl: cloudCsvBase } = result.data.payload;
 
                             if (cloudStats) {
                                 setStats(cloudStats);
