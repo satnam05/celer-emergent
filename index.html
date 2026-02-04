@@ -1426,10 +1426,12 @@
                     const payload = {
                         data: {
                             message: text,
-                            sessionID: "voice-session-satnam",
+                            sessionID: sessionId,
                             history: updatedHistory.map(m => ({ role: m.role === 'model' ? 'ai' : 'user', text: m.text })),
                             thinking_level: thinkingMode,
-                            interviewMode: interviewMode // <--- NEW: SEND MODE TO BACKEND
+                            interviewMode: interviewMode,
+                            systemInstruction: activeAiCard?.systemInstruction || null,
+                            questionSet: activeAiCard?.questionSet || null
                         }
                     };
                     const response = await fetch(url, {
