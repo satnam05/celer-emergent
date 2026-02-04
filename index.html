@@ -1973,7 +1973,7 @@
                 };
                 const timer = setTimeout(syncToCloud, 3000);
                 return () => clearTimeout(timer);
-            }, [stats, progress, customProjects, customTiles, customCardsByTile, archivedTiles, csvBaseUrl, pressureMode]);
+            }, [stats, progress, customProjects, customTiles, customCardsByTile, archivedTiles, normalizedCsvBase, pressureMode]);
 
             // --- 6. MANUAL SYNC ---
             const forceCloudUpload = async () => {
