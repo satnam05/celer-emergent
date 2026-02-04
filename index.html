@@ -1799,6 +1799,40 @@
             const [region, setRegion] = useState('en-GB');
             const [speed, setSpeed] = useState(1.0);
             const [apiUrl, setApiUrl] = useState(localStorage.getItem('jpm_ai_url') || '');
+            const [csvBaseUrl, setCsvBaseUrl] = useState(localStorage.getItem('celer_csv_base') || "https://raw.githubusercontent.com/satnam05/celer-emergent/main/");
+            const [customTiles, setCustomTiles] = useState(() => {
+                const saved = localStorage.getItem('celer_custom_tiles_v1');
+                return saved ? JSON.parse(saved) : [];
+            });
+            const [customCardsByTile, setCustomCardsByTile] = useState(() => {
+                const saved = localStorage.getItem('celer_custom_cards_v1');
+                return saved ? JSON.parse(saved) : {};
+            });
+            const [archivedTiles, setArchivedTiles] = useState(() => {
+                const saved = localStorage.getItem('celer_archived_tiles_v1');
+                return saved ? JSON.parse(saved) : [];
+            });
+            const [showTileCreator, setShowTileCreator] = useState(false);
+            const [showTileManager, setShowTileManager] = useState(false);
+            const [showCardCreator, setShowCardCreator] = useState(false);
+            const [activeTileForCard, setActiveTileForCard] = useState(null);
+            const [newTileName, setNewTileName] = useState("");
+            const [cardForm, setCardForm] = useState({
+                name: "",
+                type: "flashcard",
+                csvFile: "",
+                description: "",
+                companyName: "",
+                companySummary: "",
+                cvText: "",
+                jobDescription: "",
+                contextText: "",
+                systemInstruction: "",
+                questionSet: ""
+            });
+            const [isCompanyFetching, setIsCompanyFetching] = useState(false);
+            const [isInstructionGenerating, setIsInstructionGenerating] = useState(false);
+            const [customCardData, setCustomCardData] = useState({});
 
             // --- 2. LOGIN HANDLER ---
             const handleLogin = (e) => {
