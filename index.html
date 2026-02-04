@@ -1995,6 +1995,10 @@
                         setProgress(cloudData.progress);
                         if (cloudData.stats) setStats(cloudData.stats);
                         if (cloudData.customProjects) setCustomProjects(cloudData.customProjects);
+                        if (cloudData.customTiles) { setCustomTiles(cloudData.customTiles); localStorage.setItem('celer_custom_tiles_v1', JSON.stringify(cloudData.customTiles)); }
+                        if (cloudData.customCardsByTile) { setCustomCardsByTile(cloudData.customCardsByTile); localStorage.setItem('celer_custom_cards_v1', JSON.stringify(cloudData.customCardsByTile)); }
+                        if (cloudData.archivedTiles) { setArchivedTiles(cloudData.archivedTiles); localStorage.setItem('celer_archived_tiles_v1', JSON.stringify(cloudData.archivedTiles)); }
+                        if (cloudData.csvBaseUrl) { setCsvBaseUrl(cloudData.csvBaseUrl); localStorage.setItem('celer_csv_base', cloudData.csvBaseUrl); }
                         if (cloudData._settings) {
                             setPressureMode(cloudData._settings.pressureMode);
                             if (cloudData._settings.leitnerConfig) setLeitnerConfig(cloudData._settings.leitnerConfig);
