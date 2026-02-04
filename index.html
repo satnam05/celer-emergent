@@ -1801,6 +1801,7 @@
             const [speed, setSpeed] = useState(1.0);
             const [apiUrl, setApiUrl] = useState(localStorage.getItem('jpm_ai_url') || '');
             const [csvBaseUrl, setCsvBaseUrl] = useState(localStorage.getItem('celer_csv_base') || "https://raw.githubusercontent.com/satnam05/celer-emergent/master/");
+            const [csvFallbackTried, setCsvFallbackTried] = useState(false);
             const [customTiles, setCustomTiles] = useState(() => {
                 const saved = localStorage.getItem('celer_custom_tiles_v1');
                 return saved ? JSON.parse(saved) : [];
