@@ -2221,7 +2221,7 @@
             const loadCsvForCard = useCallback(async (card) => {
                 if (!card.csvFile) return;
                 try {
-                    const res = await fetch(`${csvBaseUrl}${card.csvFile}?t=${Date.now()}`);
+                    const res = await fetch(`${normalizedCsvBase}${card.csvFile}?t=${Date.now()}`);
                     if (!res.ok) throw new Error("CSV not found");
                     const text = await res.text();
                     const parsed = parseCSV(text);
