@@ -2637,14 +2637,24 @@
                                                             </div>
                                                         </div>
 
-                                                        <RenderDeckList
-                                                            items={m.items}
-                                                            mId={m.id}
-                                                            progress={progress}
-                                                            onDeckClick={handleDeckClick}
-                                                            onMarkComplete={markStudyComplete}
-                                                            onStartSession={startSession}
-                                                        />
+                                                        {!m.isCustom && (
+                                                            <RenderDeckList
+                                                                items={m.items}
+                                                                mId={m.id}
+                                                                progress={progress}
+                                                                onDeckClick={handleDeckClick}
+                                                                onMarkComplete={markStudyComplete}
+                                                                onStartSession={startSession}
+                                                            />
+                                                        )}
+                                                        {(m.isCustom || m.cards.length > 0) && (
+                                                            <RenderCustomCardList
+                                                                cards={m.cards}
+                                                                progress={progress}
+                                                                onCardClick={handleCustomCardClick}
+                                                                onMarkComplete={handleCustomCardMarkDone}
+                                                            />
+                                                        )}
                                                     </div>
                                                 );
                                             })}
