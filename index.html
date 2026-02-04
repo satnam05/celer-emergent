@@ -1186,7 +1186,7 @@
                         const res = await fetch(aiUrl, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ data: { action: "fetchHistory", userID: "satnam_default", sessionID: "voice-session-satnam" } })
+                            body: JSON.stringify({ data: { action: "fetchHistory", userID: "satnam_default", sessionID: sessionId } })
                         });
                         const result = await res.json();
                         if (result.data?.history) {
@@ -1199,8 +1199,9 @@
                         }
                     } catch (e) { console.error("History fetch failed:", e); }
                 };
+                setMessages([]);
                 fetchCloudHistory();
-            }, []);
+            }, [sessionId]);
 
             // --- 2. RECORDING LOGIC ---
             const countW = (s) => s && s.trim() ? s.trim().split(/\s+/).length : 0;
