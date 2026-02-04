@@ -1958,7 +1958,7 @@
                     if (!aiUrl || Object.keys(progress).length === 0) return;
                     setSyncStatus('syncing');
                     try {
-                        const payload = { stats, progress, customProjects, _settings: { pressureMode } };
+                        const payload = { stats, progress, customProjects, customTiles, customCardsByTile, archivedTiles, csvBaseUrl, _settings: { pressureMode } };
                         await fetch(aiUrl, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
