@@ -1952,7 +1952,7 @@
 
             useEffect(() => {
                 localStorage.setItem('celer_csv_base', csvBaseUrl);
-            }, [csvBaseUrl]);
+            }, [normalizedCsvBase]);
 
             // --- 5. CLOUD SYNC: PUSH (Debounced) ---
             useEffect(() => {
@@ -2230,7 +2230,7 @@
                 } catch (e) {
                     console.warn("Custom card CSV load failed", e);
                 }
-            }, [csvBaseUrl]);
+            }, [normalizedCsvBase]);
 
             const fetchCompanySummary = async () => {
                 const name = cardForm.companyName.trim();
