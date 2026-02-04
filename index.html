@@ -2146,6 +2146,17 @@
                             fetch(`${GITHUB_BASE}skill.csv?t=${ts}`).then(r => r.ok ? r.text() : ""),
                             fetch(`${GITHUB_BASE}vocab.csv?t=${ts}`).then(r => r.ok ? r.text() : "")
                         ]);
+                        const isAllEmpty = !f && !t && !m && !s && !p && !sk && !v;
+                        if (isAllEmpty && !csvFallbackTried) {
+                            let fallbackBase = null;
+                            if (normalizedCsvBase.includes('/main/')) fallbackBase = normalizedCsvBase.replace('/main/', '/master/');
+                            if (normalizedCsvBase.includes('/master/')) fallbackBase = normalizedCsvBase.replace('/master/', '/main/');
+                            if (fallbackBase && fallbackBase !== normalizedCsvBase) {
+                                setCsvFallbackTried(true);
+                                setCsvBaseUrl(fallbackBase);
+                                return;
+                            }
+                        }
                         setData({
                             flashcards: f ? parseCSV(f) : [],
                             type: t ? parseCSV(t) : [],
