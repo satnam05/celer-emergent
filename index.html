@@ -1936,7 +1936,7 @@
                     }
                 };
                 if (isAuthenticated) fetchGlobalProgress();
-            }, [isAuthenticated, csvBaseUrl]);
+            }, [isAuthenticated, normalizedCsvBase]);
 
             useEffect(() => {
                 localStorage.setItem('celer_custom_tiles_v1', JSON.stringify(customTiles));
@@ -2156,7 +2156,7 @@
                     } catch (e) { console.error("GitHub Load Error:", e); }
                 };
                 if (isAuthenticated) load();
-            }, [isAuthenticated, csvBaseUrl]);
+            }, [isAuthenticated, normalizedCsvBase]);
 
             useEffect(() => { let interval; if (isAuthenticated && mode !== 'menu') interval = setInterval(() => setTimer(t => t + 1), 1000); else setTimer(0); return () => clearInterval(interval); }, [mode, isAuthenticated]);
             useEffect(() => { document.documentElement.classList.add('dark'); document.documentElement.classList.remove('light'); }, []);
