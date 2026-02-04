@@ -1,7 +1,7 @@
 # Celer | AI Career Companion (v20.59)
 
 ## 📌 Overview
-The **JP Morgan Interview Preparation App** is a robust, single-page application (SPA) designed to simulate the rigorous technical and behavioral interview process at J.P. Morgan. Built as a zero-dependency, single-file HTML solution, it leverages React and Tailwind CSS via CDN for instant deployment and high portability.
+The **Celer | AI Career Companion** is a robust, single-page application (SPA) designed to simulate rigorous technical and behavioral interview practice for modern engineering roles. Built as a zero-dependency, single-file HTML solution, it leverages React and Tailwind CSS via CDN for instant deployment and high portability.
 
 This application provides a comprehensive suite of tools ranging from technical quizzes to voice-enabled mock interviews, specifically tailored for Full-Stack and Engineering roles.
 
