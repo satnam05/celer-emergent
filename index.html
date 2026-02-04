@@ -1699,6 +1699,68 @@
                 </div>
             );
         });
+        const RenderCustomCardList = React.memo(({ cards, progress, onCardClick, onMarkComplete }) => {
+            const progressCards = useMemo(() => {
+                return cards.map(card => {
+                    const p = progress[`${card.type}-${card.name}`];
+                    if (!p) return null;
+                    const isDone = p.status === 'Completed';
+                    const isReviewDue = isDone && p.nextReview && p.nextReview < Date.now();
+                    let priority = 3;
+                    if (isReviewDue) priority = 1; else if (!isDone) priority = 2;
+                    return { card, p, isDone, isReviewDue, priority };
+                }).filter(Boolean).sort((a, b) => a.priority - b.priority);
+            }, [cards, progress]);
+
+            const newCards = useMemo(() => cards.filter(card => !progress[`${card.type}-${card.name}`]), [cards, progress]);
+
+            const getTypeLabel = (type) => {
+                const map = { ai: 'AI', flashcard: 'Flashcard', mcq: 'MCQ', type: 'TypeAnswer', link: 'Link' };
+                return map[type] || type;
+            };
+
+            if (!cards || cards.length === 0) {
+                return (
+                    <div className="h-48 overflow-y-auto bg-slate-900/50 p-4 border-t border-slate-800 flex items-center justify-center text-xs text-slate-500 font-mono">
+                        No cards yet. Use the + button to add one.
+                    </div>
+                );
+            }
+
+            return (
+                <div className="h-48 overflow-y-auto bg-slate-900/50 p-4 border-t border-slate-800">
+                    {progressCards.length > 0 && <h4 className="text-xs font-bold text-gray-500 uppercase mb-2 font-mono">My Progress</h4>}
+                    {progressCards.map(({ card, p, isDone, isReviewDue }) => {
+                        const isLinkMode = card.type === 'link';
+                        return (
+                            <div key={card.id} className={`w-full text-left p-2 mb-2 border rounded-xl flex justify-between items-center transition-transform active:scale-95 ${isReviewDue ? 'bg-slate-800 border-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : isDone ? 'bg-green-900/10 border-green-800 opacity-70 hover:opacity-100' : 'bg-slate-800 border-jpm-accent/30'}`}>
+                                <button data-testid={`custom-card-${card.id}-open`} onClick={() => onCardClick(card)} className="font-semibold text-sm text-gray-200 flex-grow text-left hover:underline flex items-center gap-2">
+                                    {isReviewDue && <i className="fas fa-exclamation-circle text-red-500 animate-pulse"></i>}
+                                    {card.name}
+                                </button>
+                                <span className="text-[9px] font-bold text-gray-400 uppercase mr-2">{getTypeLabel(card.type)}</span>
+                                {isLinkMode && !isDone && (
+                                    <button data-testid={`custom-card-${card.id}-mark-done`} onClick={() => onMarkComplete(card)} className="bg-jpm-accent text-slate-900 font-bold text-[10px] px-2 py-1 rounded hover:bg-yellow-600 ml-2">Mark Done</button>
+                                )}
+                                {isDone ? (
+                                    isReviewDue ? <span className="text-[9px] font-bold text-red-400 bg-red-900/20 px-2 py-1 rounded border border-red-900">REVIEW NOW</span> : <div className="flex items-center text-green-500 text-[9px] font-bold uppercase tracking-wider"><i className="fas fa-check-circle mr-1"></i> DONE</div>
+                                ) : (
+                                    !isLinkMode && <div className="flex items-center text-jpm-accent text-[9px] font-bold ml-2 bg-yellow-900/20 px-2 py-1 rounded border border-yellow-900/50"><i className="fas fa-play mr-1"></i> {p.score || 0}%</div>
+                                )}
+                            </div>
+                        );
+                    })}
+                    {newCards.length > 0 && <h4 className="text-xs font-bold text-gray-500 uppercase mb-2 mt-4 font-mono">New Cards</h4>}
+                    {newCards.map(card => (
+                        <div key={card.id} className="w-full text-left p-2 mb-2 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-slate-800 via-slate-900 to-black border-t border-t-white/10 border-b border-b-black/50 border-x border-slate-800 rounded-xl hover:border-jpm-accent transition flex justify-between items-center group cursor-pointer shadow-lg">
+                            <button data-testid={`custom-card-${card.id}-open`} onClick={() => onCardClick(card)} className="font-semibold text-sm flex-grow text-left text-gray-200">{card.name}</button>
+                            <span className="text-[9px] font-bold text-gray-500 uppercase mr-2">{getTypeLabel(card.type)}</span>
+                            <i className={`fas ${card.type === 'ai' ? 'fa-robot' : card.type === 'link' ? 'fa-link' : 'fa-play'} opacity-0 group-hover:opacity-100 text-jpm-accent transition-opacity`}></i>
+                        </div>
+                    ))}
+                </div>
+            );
+        });
 
         const App = () => {
             const [data, setData] = useState({ flashcards: [], type: [], mcq: [], study: [], prompts: [], skills: [], vocab: [] });
