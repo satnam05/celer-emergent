@@ -1834,6 +1834,7 @@
             const [isCompanyFetching, setIsCompanyFetching] = useState(false);
             const [isInstructionGenerating, setIsInstructionGenerating] = useState(false);
             const [customCardData, setCustomCardData] = useState({});
+            const normalizedCsvBase = useMemo(() => (csvBaseUrl.endsWith('/') ? csvBaseUrl : `${csvBaseUrl}/`), [csvBaseUrl]);
 
             const defaultTileMeta = useMemo(() => ([
                 { id: 'ai_interview', title: 'Innovation Lab', icon: 'fa-microchip', defaultType: 'ai' },
