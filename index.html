@@ -2345,6 +2345,7 @@
                     setFocusMode(false);
                     return;
                 }
+                setActiveAiCard(null);
                 const items = customCardData[card.id] || [];
                 if (card.type === 'link') {
                     const link = items[0]?.Link || items[0]?.Links;
