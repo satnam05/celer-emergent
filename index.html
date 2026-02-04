@@ -2147,6 +2147,213 @@
             const handleImport = (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const p = JSON.parse(e.target.result); setProgress(p); if (p._settings) setPressureMode(p._settings.pressureMode || false); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(p)); alert("Import Successful!"); } catch (err) { alert("Invalid File"); } }; reader.readAsText(file); };
             const togglePressureMode = () => { const newVal = !pressureMode; setPressureMode(newVal); const newP = { ...progress, _settings: { ...(progress._settings || {}), pressureMode: newVal } }; setProgress(newP); localStorage.setItem('jpm_prep_progress_v20', JSON.stringify(newP)); };
 
+            const resetCardForm = (presetType = 'flashcard') => {
+                setCardForm({
+                    name: "",
+                    type: presetType,
+                    csvFile: "",
+                    description: "",
+                    companyName: "",
+                    companySummary: "",
+                    cvText: "",
+                    jobDescription: "",
+                    contextText: "",
+                    systemInstruction: "",
+                    questionSet: ""
+                });
+            };
+
+            const openCardCreator = (tile) => {
+                const presetType = tile?.defaultType || 'flashcard';
+                resetCardForm(presetType);
+                setActiveTileForCard(tile);
+                setShowCardCreator(true);
+            };
+
+            const handleCreateTile = () => {
+                const trimmed = newTileName.trim();
+                if (!trimmed) return;
+                const newTile = { id: `tile-${Date.now()}`, title: trimmed, icon: 'fa-layer-group', cards: [] };
+                setCustomTiles(prev => [...prev, newTile]);
+                setNewTileName("");
+                setShowTileCreator(false);
+            };
+
+            const archiveTile = (tileId) => {
+                if (archivedTiles.includes(tileId)) return;
+                const confirmArchive = window.confirm("Archive this tile? You can restore it later.");
+                if (!confirmArchive) return;
+                setArchivedTiles(prev => [...prev, tileId]);
+            };
+
+            const restoreTile = (tileId) => {
+                setArchivedTiles(prev => prev.filter(id => id !== tileId));
+            };
+
+            const loadCsvForCard = useCallback(async (card) => {
+                if (!card.csvFile) return;
+                try {
+                    const res = await fetch(`${csvBaseUrl}${card.csvFile}?t=${Date.now()}`);
+                    if (!res.ok) throw new Error("CSV not found");
+                    const text = await res.text();
+                    const parsed = parseCSV(text);
+                    const mapped = parsed.map(row => ({ ...row, Deck: card.name }));
+                    setCustomCardData(prev => ({ ...prev, [card.id]: mapped }));
+                } catch (e) {
+                    console.warn("Custom card CSV load failed", e);
+                }
+            }, [csvBaseUrl]);
+
+            const fetchCompanySummary = async () => {
+                const name = cardForm.companyName.trim();
+                if (!name) return;
+                setIsCompanyFetching(true);
+                try {
+                    const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`);
+                    if (!res.ok) throw new Error('Company not found');
+                    const json = await res.json();
+                    setCardForm(prev => ({ ...prev, companySummary: json.extract || '' }));
+                } catch (e) {
+                    console.warn("Company fetch failed", e);
+                    alert("Company data not found on Wikipedia.");
+                } finally {
+                    setIsCompanyFetching(false);
+                }
+            };
+
+            const generateSystemInstruction = async () => {
+                if (!apiUrl) return alert("Please configure the backend URL in Settings.");
+                setIsInstructionGenerating(true);
+                try {
+                    const res = await fetch(`${apiUrl}/api/ai/generate`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            name: cardForm.name,
+                            description: cardForm.description,
+                            companyName: cardForm.companyName,
+                            companySummary: cardForm.companySummary,
+                            cvText: cardForm.cvText,
+                            jobDescription: cardForm.jobDescription,
+                            contextText: cardForm.contextText
+                        })
+                    });
+                    const json = await res.json();
+                    if (json.system_instruction) {
+                        setCardForm(prev => ({ ...prev, systemInstruction: json.system_instruction, questionSet: json.question_set || prev.questionSet }));
+                    }
+                } catch (e) {
+                    console.warn("AI generation failed", e);
+                    alert("AI generation failed. Please try again once the backend is ready.");
+                } finally {
+                    setIsInstructionGenerating(false);
+                }
+            };
+
+            const refineSystemInstruction = async () => {
+                if (!apiUrl) return alert("Please configure the backend URL in Settings.");
+                setIsInstructionGenerating(true);
+                try {
+                    const res = await fetch(`${apiUrl}/api/ai/refine`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ systemInstruction: cardForm.systemInstruction })
+                    });
+                    const json = await res.json();
+                    if (json.system_instruction) {
+                        setCardForm(prev => ({ ...prev, systemInstruction: json.system_instruction }));
+                    }
+                } catch (e) {
+                    console.warn("AI refinement failed", e);
+                    alert("Refinement failed. Please try again once the backend is ready.");
+                } finally {
+                    setIsInstructionGenerating(false);
+                }
+            };
+
+            const handleCreateCard = () => {
+                if (!activeTileForCard) return;
+                const trimmedName = cardForm.name.trim();
+                if (!trimmedName) return;
+                if (['flashcard', 'mcq', 'type', 'link'].includes(cardForm.type) && !cardForm.csvFile.trim()) {
+                    return alert("CSV file name is required for this card type.");
+                }
+                const newCard = {
+                    id: `card-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                    name: trimmedName,
+                    type: cardForm.type,
+                    csvFile: cardForm.csvFile.trim(),
+                    description: cardForm.description.trim(),
+                    companyName: cardForm.companyName.trim(),
+                    companySummary: cardForm.companySummary,
+                    cvText: cardForm.cvText,
+                    jobDescription: cardForm.jobDescription,
+                    contextText: cardForm.contextText,
+                    systemInstruction: cardForm.systemInstruction,
+                    questionSet: cardForm.questionSet
+                };
+
+                if (activeTileForCard.isCustom) {
+                    setCustomTiles(prev => prev.map(tile => tile.id === activeTileForCard.id ? { ...tile, cards: [...(tile.cards || []), newCard] } : tile));
+                } else {
+                    setCustomCardsByTile(prev => ({ ...prev, [activeTileForCard.id]: [...(prev[activeTileForCard.id] || []), newCard] }));
+                }
+
+                if (['flashcard', 'mcq', 'type', 'link'].includes(newCard.type)) {
+                    loadCsvForCard(newCard);
+                }
+
+                setShowCardCreator(false);
+                setActiveTileForCard(null);
+                resetCardForm(activeTileForCard.defaultType || 'flashcard');
+            };
+
+            const handleCustomCardClick = (card) => {
+                if (card.type === 'ai') {
+                    setActiveDeck({ name: card.name, items: [] });
+                    setMode('ai_interview');
+                    setSessionKey(p => p + 1);
+                    setFocusMode(false);
+                    return;
+                }
+                const items = customCardData[card.id] || [];
+                if (card.type === 'link') {
+                    const link = items[0]?.Link || items[0]?.Links;
+                    if (link) window.open(link, '_blank');
+                    saveProgress('link', card.name, 'In Progress', 0);
+                    setModalDeck(null);
+                    return;
+                }
+                const modeMap = { flashcard: 'flashcard', mcq: 'mcq', type: 'type' };
+                const modeKey = modeMap[card.type];
+                if (!modeKey || items.length === 0) return;
+                setActiveDeck({ name: card.name, items });
+                setMode(modeKey);
+                setStats({ correct: 0, completed: 0, total: items.length });
+                setModalDeck(null);
+                setSessionKey(p => p + 1);
+                setFocusMode(false);
+                if (!progress[`${modeKey}-${card.name}`]) saveProgress(modeKey, card.name, 'In Progress', 0);
+            };
+
+            const handleCustomCardMarkDone = (card) => {
+                saveProgress(card.type, card.name, 'Completed', 100);
+            };
+
+            const allCustomCards = useMemo(() => {
+                const defaultTileCards = Object.values(customCardsByTile).flat();
+                const customTileCards = customTiles.flatMap(tile => tile.cards || []);
+                return [...defaultTileCards, ...customTileCards];
+            }, [customCardsByTile, customTiles]);
+
+            useEffect(() => {
+                allCustomCards.forEach(card => {
+                    if (['flashcard', 'mcq', 'type', 'link'].includes(card.type) && card.csvFile && !customCardData[card.id]) {
+                        loadCsvForCard(card);
+                    }
+                });
+            }, [allCustomCards, loadCsvForCard, customCardData]);
+
             const startSession = (m, deckName, specificQueue = null) => {
                 if (m === 'ai_interview') { setActiveDeck({ name: deckName, items: [] }); setMode(m); setSessionKey(p => p + 1); setFocusMode(false); return; }
                 const map = { 'flashcard': 'flashcards', 'type': 'type', 'mcq': 'mcq', 'study': 'study', 'skill': 'skills', 'vocab': 'vocab', 'ai_interview': 'prompts' };
