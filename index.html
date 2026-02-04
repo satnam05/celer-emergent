@@ -2169,7 +2169,7 @@
                     } catch (e) { console.error("GitHub Load Error:", e); }
                 };
                 if (isAuthenticated) load();
-            }, [isAuthenticated, normalizedCsvBase]);
+            }, [isAuthenticated, normalizedCsvBase, csvFallbackTried]);
 
             useEffect(() => { let interval; if (isAuthenticated && mode !== 'menu') interval = setInterval(() => setTimer(t => t + 1), 1000); else setTimer(0); return () => clearInterval(interval); }, [mode, isAuthenticated]);
             useEffect(() => { document.documentElement.classList.add('dark'); document.documentElement.classList.remove('light'); }, []);
