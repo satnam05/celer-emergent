@@ -2513,6 +2513,8 @@
             }));
 
             const menuTiles = [...visibleDefaultTiles, ...visibleCustomTiles];
+            const archivedDefaultTiles = defaultTileMeta.filter(tile => archivedTiles.includes(tile.id));
+            const archivedCustomTiles = customTiles.filter(tile => archivedTiles.includes(tile.id));
 
             if (!isAuthenticated) {
                 return (
