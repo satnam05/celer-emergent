@@ -2867,7 +2867,7 @@
                                         )}
                                     </div>
                                     <div className="p-6 pt-0 flex gap-2">
-                                        <button data-testid="create-card-cancel" onClick={() => { setShowCardCreator(false); setActiveTileForCard(null); }} className="flex-1 bg-slate-800 text-gray-300 py-3 rounded-xl font-bold hover:bg-slate-700 border border-slate-700">Cancel</button>
+                                        <button data-testid="create-card-cancel" onClick={() => { setShowCardCreator(false); setActiveTileForCard(null); resetCardForm(); }} className="flex-1 bg-slate-800 text-gray-300 py-3 rounded-xl font-bold hover:bg-slate-700 border border-slate-700">Cancel</button>
                                         <button data-testid="create-card-submit" onClick={handleCreateCard} className="flex-1 bg-jpm-accent text-slate-900 py-3 rounded-xl font-bold hover:bg-[#b08d55]">Save Card</button>
                                     </div>
                                 </div>
