@@ -457,6 +457,90 @@
 
         const shuffleArray = (array) => { let arr = [...array]; for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
 
+        // --- 2. FIREBASE INITIALIZATION & SUB-COLLECTION HELPERS ---
+        const FIREBASE_CONFIG = {
+            apiKey: "AIzaSyBXxVFElVBLz_R_8cQh4x8JiX8wOvnYGLs",
+            authDomain: "celer-ai-companion.firebaseapp.com",
+            projectId: "celer-ai-companion",
+            storageBucket: "celer-ai-companion.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abcdef123456"
+        };
+
+        let db = null;
+        try {
+            if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+                firebase.initializeApp(FIREBASE_CONFIG);
+                db = firebase.firestore();
+            } else if (firebase.apps.length) {
+                db = firebase.firestore();
+            }
+        } catch (e) {
+            console.warn("Firebase init failed, using localStorage fallback", e);
+        }
+
+        const FirestoreHelper = {
+            uid: "satnam_default",
+            
+            async getDecks() {
+                if (!db) return [];
+                try {
+                    const snapshot = await db.collection("users").doc(this.uid).collection("decks").get();
+                    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                } catch (e) {
+                    console.warn("Firestore read failed", e);
+                    return [];
+                }
+            },
+
+            async saveDeck(deck) {
+                if (!db) return false;
+                try {
+                    await db.collection("users").doc(this.uid).collection("decks").doc(deck.id).set({
+                        ...deck,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    return true;
+                } catch (e) {
+                    console.warn("Firestore write failed", e);
+                    return false;
+                }
+            },
+
+            async deleteDeck(deckId) {
+                if (!db) return false;
+                try {
+                    await db.collection("users").doc(this.uid).collection("decks").doc(deckId).update({
+                        deletedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    return true;
+                } catch (e) {
+                    console.warn("Firestore delete failed", e);
+                    return false;
+                }
+            },
+
+            async migrateLegacyDecks(legacyDecksArray) {
+                if (!db || !legacyDecksArray || legacyDecksArray.length === 0) return;
+                try {
+                    const batch = db.batch();
+                    legacyDecksArray.forEach(deck => {
+                        const docRef = db.collection("users").doc(this.uid).collection("decks").doc(deck.id);
+                        batch.set(docRef, {
+                            ...deck,
+                            migratedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    });
+                    await batch.commit();
+                    console.log(`Migrated ${legacyDecksArray.length} decks to Firestore`);
+                    return true;
+                } catch (e) {
+                    console.warn("Migration failed", e);
+                    return false;
+                }
+            }
+        };
+
         class GlobalErrorBoundary extends React.Component { constructor(props) { super(props); this.state = { hasError: false, error: null }; } static getDerivedStateFromError(error) { return { hasError: true, error }; } render() { if (this.state.hasError) return <div className="flex flex-col items-center justify-center h-screen bg-red-900 p-6 text-center text-white"><button onClick={() => window.location.reload()}>Reload</button></div>; return this.props.children; } }
         class ComponentSandbox extends React.Component { constructor(props) { super(props); this.state = { hasError: false }; } static getDerivedStateFromError(error) { return { hasError: true }; } render() { if (this.state.hasError) return <button onClick={() => window.location.reload()}>Reload</button>; return this.props.children; } }
 
