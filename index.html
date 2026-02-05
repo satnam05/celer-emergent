@@ -822,7 +822,7 @@
 
 
         // 3. Layout Components
-        const Dashboard = ({ active, stats, timer, progressData, streak, totalDecks, pressureMode, onTogglePressure }) => {
+        const Dashboard = ({ active, stats, timer, progressData, streak, totalDecks, pressureMode, onTogglePressure, sessionLimit, onSessionLimitChange }) => {
             const accuracy = stats.completed > 0 ? Math.round((stats.correct / stats.completed) * 100) : 0;
             const completedCount = Object.values(progressData).filter(p => p.status === 'Completed').length;
             const globalCompletion = totalDecks > 0 ? Math.round((completedCount / totalDecks) * 100) : 0;
@@ -842,6 +842,14 @@
                             <h4 className="text-[10px] font-bold text-gray-400 uppercase mb-2 font-mono tracking-wider">Daily Briefing</h4>
                             <div className="flex justify-between items-center mb-1"><span className="text-xs text-white">Review Due</span><span className={`text-xs font-bold ${staleDecks > 0 ? 'text-red-400 animate-pulse' : 'text-green-400'}`}>{staleDecks}</span></div>
                             <div className="flex justify-between items-center"><span className="text-xs text-white">Pending Resume</span><span className="text-xs font-bold text-amber-400">{resumeDecks}</span></div>
+                        </div>
+                        <div className="bg-slate-800/80 p-3 rounded-xl border-l-4 border-jpm-accent shadow-md">
+                            <h4 className="text-[10px] font-bold text-gray-400 uppercase mb-2 font-mono tracking-wider">Session Limit</h4>
+                            <select value={sessionLimit} onChange={(e) => onSessionLimitChange(Number(e.target.value))} className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white text-xs font-mono focus:border-jpm-accent focus:outline-none">
+                                <option value={10}>Review 10 Cards</option>
+                                <option value={20}>Review 20 Cards</option>
+                                <option value={-1}>Review All</option>
+                            </select>
                         </div>
                         <div className="bg-slate-800 p-4 rounded-xl border-l-4 border-jpm-accent shadow-sm flex items-center justify-between">
                             <div><p className="text-xs text-gray-400 font-bold uppercase tracking-wider font-mono">Current Streak</p><p className="text-3xl font-bold text-white font-mono">{streak} <span className="text-sm font-medium text-gray-500">Days</span></p></div>
