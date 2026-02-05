@@ -2042,29 +2042,45 @@
                                 </select>
                             </div>
 
-                            {/* FORK: INTERVIEW PATH (Legacy) */}
+                            {/* FORK: INTERVIEW PATH (Legacy - FULLY RESTORED) */}
                             {isInterview && (
                                 <div className="space-y-4 border-t border-slate-800 pt-4">
                                     <p className="text-xs text-jpm-accent uppercase font-bold">Interview Configuration</p>
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-gray-400 font-bold uppercase">Short Description</label>
+                                        <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g., Backend interview prep" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-jpm-accent" />
+                                    </div>
                                     <div className="space-y-2">
                                         <label className="text-xs text-gray-400 font-bold uppercase">Company Name</label>
                                         <div className="flex gap-2">
                                             <input type="text" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="e.g., Google" className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-jpm-accent" />
                                             <button onClick={handleFetchCompany} className="px-4 py-3 bg-slate-700 text-white rounded-xl text-xs font-bold border border-slate-600 hover:bg-slate-600">{isCompanyFetching ? 'Fetching...' : 'Fetch'}</button>
                                         </div>
-                                        <textarea value={companySummary} onChange={(e) => setCompanySummary(e.target.value)} placeholder="Company summary" rows={3} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
+                                        <textarea value={companySummary} onChange={(e) => setCompanySummary(e.target.value)} placeholder="Company summary (auto-filled from Wikipedia or edit manually)" rows={3} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-xs text-gray-400 font-bold uppercase">CV Text</label>
-                                        <textarea value={cvText} onChange={(e) => setCvText(e.target.value)} rows={4} placeholder="Paste CV" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
+                                        <label className="text-xs text-gray-400 font-bold uppercase">CV (Text)</label>
+                                        <textarea value={cvText} onChange={(e) => setCvText(e.target.value)} rows={4} placeholder="Paste CV text" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-xs text-gray-400 font-bold uppercase">Job Description</label>
-                                        <textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} rows={4} placeholder="Paste JD" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
+                                        <label className="text-xs text-gray-400 font-bold uppercase">Job Description (Text)</label>
+                                        <textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} rows={4} placeholder="Paste job description" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-xs text-gray-400 font-bold uppercase">Context</label>
+                                        <label className="text-xs text-gray-400 font-bold uppercase">Context / Notes</label>
                                         <textarea value={contextText} onChange={(e) => setContextText(e.target.value)} rows={3} placeholder="Additional context" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-gray-400 font-bold uppercase">System Instruction</label>
+                                        <textarea value={systemInstruction} onChange={(e) => setSystemInstruction(e.target.value)} rows={4} placeholder="Generated system instruction will appear here" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
+                                        <div className="flex gap-2">
+                                            <button onClick={handleGenerateInstruction} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-bold border border-slate-600 py-2">{isGenerating ? 'Generating...' : 'Generate with Gemini'}</button>
+                                            <button onClick={handleRefineInstruction} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-bold border border-slate-600 py-2">Refine</button>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-gray-400 font-bold uppercase">Question Set</label>
+                                        <textarea value={questionSet} onChange={(e) => setQuestionSet(e.target.value)} rows={3} placeholder="Optional question set" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
                                     </div>
                                 </div>
                             )}
