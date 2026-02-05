@@ -2890,7 +2890,7 @@
                     companySummary: cardForm.companySummary,
                     cvText: cardForm.cvText,
                     jobDescription: cardForm.jobDescription,
-                    contextText: cardForm.contextText,
+                    contextText: contextText,
                     systemInstruction: cardForm.systemInstruction,
                     questionSet: cardForm.questionSet
                 };
@@ -2908,6 +2908,16 @@
                 setShowCardCreator(false);
                 setActiveTileForCard(null);
                 resetCardForm(activeTileForCard.defaultType || 'flashcard');
+            };
+
+            // NEW: Handle Save Deck from AddDeckModal
+            const handleSaveDeck = async (deck) => {
+                const success = await FirestoreHelper.saveDeck(deck);
+                if (success) {
+                    // Reload decks from Firestore
+                    const updatedDecks = await FirestoreHelper.getDecks();
+                    setDecks(updatedDecks.filter(d => !d.deletedAt));
+                }
             };
 
             const handleCustomCardClick = (card) => {
