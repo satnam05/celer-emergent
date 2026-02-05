@@ -2051,6 +2051,86 @@
                 localStorage.setItem('celer_csv_base', normalizedCsvBase);
             }, [normalizedCsvBase]);
 
+            // --- NEW: LAZY MIGRATION & DECK LOADING FROM FIRESTORE ---
+            useEffect(() => {
+                const loadAndMigrateDecks = async () => {
+                    if (!isAuthenticated) return;
+                    
+                    // Step 1: Load from Firestore
+                    const firestoreDecks = await FirestoreHelper.getDecks();
+                    setDecks(firestoreDecks.filter(d => !d.deletedAt));
+
+                    // Step 2: Check for legacy decks in localStorage
+                    const legacyCustomTiles = localStorage.getItem('celer_custom_tiles_v1');
+                    const legacyCustomCards = localStorage.getItem('celer_custom_cards_v1');
+                    
+                    if (legacyCustomTiles || legacyCustomCards) {
+                        try {
+                            const tiles = legacyCustomTiles ? JSON.parse(legacyCustomTiles) : [];
+                            const cardsByTile = legacyCustomCards ? JSON.parse(legacyCustomCards) : {};
+                            
+                            // Convert to new deck format
+                            const legacyDecks = [];
+                            
+                            // Convert customTiles
+                            tiles.forEach(tile => {
+                                (tile.cards || []).forEach(card => {
+                                    legacyDecks.push({
+                                        id: card.id || `deck-${Date.now()}-${Math.random()}`,
+                                        name: card.name,
+                                        type: card.type || 'flashcard',
+                                        csvFile: card.csvFile || '',
+                                        description: card.description || '',
+                                        companyName: card.companyName || '',
+                                        companySummary: card.companySummary || '',
+                                        cvText: card.cvText || '',
+                                        jobDescription: card.jobDescription || '',
+                                        contextText: card.contextText || '',
+                                        systemInstruction: card.systemInstruction || '',
+                                        questionSet: card.questionSet || '',
+                                        cards: [] // Will be populated from CSV
+                                    });
+                                });
+                            });
+                            
+                            // Convert customCardsByTile
+                            Object.values(cardsByTile).flat().forEach(card => {
+                                legacyDecks.push({
+                                    id: card.id || `deck-${Date.now()}-${Math.random()}`,
+                                    name: card.name,
+                                    type: card.type || 'flashcard',
+                                    csvFile: card.csvFile || '',
+                                    description: card.description || '',
+                                    companyName: card.companyName || '',
+                                    companySummary: card.companySummary || '',
+                                    cvText: card.cvText || '',
+                                    jobDescription: card.jobDescription || '',
+                                    contextText: card.contextText || '',
+                                    systemInstruction: card.systemInstruction || '',
+                                    questionSet: card.questionSet || '',
+                                    cards: []
+                                });
+                            });
+                            
+                            // Migrate to Firestore
+                            if (legacyDecks.length > 0) {
+                                await FirestoreHelper.migrateLegacyDecks(legacyDecks);
+                                // Clear old localStorage
+                                localStorage.setItem('celer_custom_tiles_v1', JSON.stringify([]));
+                                localStorage.setItem('celer_custom_cards_v1', JSON.stringify({}));
+                                // Reload decks
+                                const updatedDecks = await FirestoreHelper.getDecks();
+                                setDecks(updatedDecks.filter(d => !d.deletedAt));
+                            }
+                        } catch (e) {
+                            console.warn("Migration parsing failed", e);
+                        }
+                    }
+                };
+                
+                loadAndMigrateDecks();
+            }, [isAuthenticated]);
+
             // --- 5. CLOUD SYNC: PUSH (Debounced) ---
             useEffect(() => {
                 const syncToCloud = async () => {
