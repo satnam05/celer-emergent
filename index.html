@@ -2047,7 +2047,9 @@
                     });
                     const json = await res.json();
                     if (json.system_instruction) {
-                        setSystemInstruction(json.system_instruction);
+                        setSystemInstruction(typeof json.system_instruction === 'string' 
+                            ? json.system_instruction 
+                            : JSON.stringify(json.system_instruction, null, 2));
                     }
                 } catch (e) {
                     console.warn("AI refinement failed", e);
