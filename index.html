@@ -1761,6 +1761,383 @@
 
         //END AI MODE
 
+        // --- 5. CODE GAME COMPONENT (Syntax-Preserving Flashcards) ---
+        const CodeGame = ({ deckData, onEnd, onStatsUpdate, pressureMode, toggleFocus, isFocusMode }) => {
+            const [currentIndex, setCurrentIndex] = useState(0);
+            const [flipped, setFlipped] = useState(false);
+            const [results, setResults] = useState({});
+
+            if (!deckData || deckData.length === 0) return <div className="p-10 text-center text-gray-500">No code snippets.</div>;
+            const current = deckData[currentIndex];
+            const currentRating = results[current.id];
+
+            const handleRate = (rating) => {
+                const newResults = { ...results, [current.id]: rating };
+                setResults(newResults);
+                const done = Object.keys(newResults).length;
+                const correct = Object.values(newResults).filter(r => r === 'easy').length;
+                onStatsUpdate({ completed: done, correct });
+                setFlipped(false);
+                if (currentIndex < deckData.length - 1) {
+                    setCurrentIndex(currentIndex + 1);
+                } else {
+                    const hardCards = deckData.filter(item => newResults[item.id] === 'hard');
+                    const accuracy = Math.round((correct / deckData.length) * 100);
+                    const finalScore = hardCards.length === 0 ? 100 : accuracy;
+                    onEnd(finalScore, hardCards);
+                }
+            };
+
+            const getBtnStyle = (type) => {
+                const isActive = currentRating === type;
+                const base = "flex-1 py-4 rounded-xl font-bold shadow-md transition-all duration-200 border border-[#C59D5F]/30 bg-[#C59D5F]/10 text-white";
+                if (type === 'hard') return isActive ? `flex-1 py-4 rounded-xl font-bold shadow-lg shadow-red-500/50 bg-red-900 border-red-500 text-white scale-105` : `${base} hover:bg-red-900/50 hover:border-red-500`;
+                else return isActive ? `flex-1 py-4 rounded-xl font-bold shadow-lg shadow-green-500/50 bg-green-900 border-green-500 text-white scale-105` : `${base} hover:bg-green-900/50 hover:border-green-500`;
+            };
+
+            return (
+                <div className="flex flex-col items-center h-full w-full px-4 pt-4 md:pb-safe text-white">
+                    <div className="w-full max-w-4xl flex justify-between items-center mb-4 text-gray-400 font-bold text-sm uppercase flex-shrink-0">
+                        <span className="font-quote text-lg text-white">Code / Syntax</span>
+                        <div className="flex items-center gap-4">
+                            <span className="font-mono">{currentIndex + 1} / {deckData.length}</span>
+                            <button onClick={toggleFocus} className="p-2 hover:bg-slate-700 rounded-full transition"><i className={isFocusMode ? "fas fa-compress" : "fas fa-expand"}></i></button>
+                        </div>
+                    </div>
+                    <div className="card-scene mb-6 w-full max-w-4xl flex-grow relative flex flex-col" style={{ minHeight: '0' }}>
+                        <div className={`card-object ${flipped ? 'is-flipped' : ''}`} onClick={() => setFlipped(!flipped)} role="button">
+                            <div className="card-face front">
+                                <div className="card-content relative flex flex-col items-center justify-center">
+                                    <h3 className="text-2xl font-bold text-white leading-snug tracking-tight mb-6 font-sans">{current.Question}</h3>
+                                    <div className="absolute bottom-6 text-gray-500 text-xs uppercase tracking-widest font-bold">Tap to Reveal Code</div>
+                                </div>
+                            </div>
+                            <div className="card-face back">
+                                <div className="card-content flex flex-col items-start justify-center overflow-x-auto">
+                                    <pre className="text-sm text-gray-200 whitespace-pre font-mono leading-relaxed bg-slate-950 p-4 rounded-lg border border-slate-700 w-full overflow-x-auto"><code>{current.Answer}</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="w-full max-w-4xl z-10 flex gap-4 items-center flex-shrink-0 py-6">
+                        <button onClick={() => { setCurrentIndex(p => Math.max(0, p - 1)); setFlipped(false); }} disabled={currentIndex === 0} className="px-6 py-4 bg-slate-800 text-white rounded-xl font-bold shadow-sm hover:bg-slate-700 disabled:opacity-50 transition-colors border border-slate-700"><i className="fas fa-arrow-left"></i></button>
+                        {flipped ? (
+                            <div className="flex-1 flex gap-4">
+                                <button onClick={() => handleRate('hard')} className={getBtnStyle('hard')}>{currentRating === 'hard' && <i className="fas fa-check mr-2"></i>} Hard</button>
+                                <button onClick={() => handleRate('easy')} className={getBtnStyle('easy')}>{currentRating === 'easy' && <i className="fas fa-check mr-2"></i>} Easy</button>
+                            </div>
+                        ) : (
+                            <button onClick={() => setFlipped(true)} className="flex-1 px-8 py-4 bg-jpm-accent text-slate-900 rounded-xl font-bold shadow-lg shadow-[#C59D5F]/50 hover:bg-[#b08d55] transition active:scale-95 transform">Show Code</button>
+                        )}
+                        <button onClick={() => { const n = currentIndex + 1; if (n < deckData.length) setCurrentIndex(n); setFlipped(false); }} disabled={currentIndex === deckData.length - 1} className="px-6 py-4 bg-slate-800 text-white rounded-xl font-bold shadow-sm hover:bg-slate-700 disabled:opacity-50 transition-colors border border-slate-700"><i className="fas fa-arrow-right"></i></button>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- 6. FORKED ADD DECK MODAL (Unified Builder) ---
+        const AddDeckModal = ({ onClose, onSave, apiUrl }) => {
+            const [deckType, setDeckType] = useState('flashcard');
+            const [deckName, setDeckName] = useState('');
+            const [description, setDescription] = useState('');
+            
+            // LEGACY INTERVIEW FIELDS (Preserved)
+            const [companyName, setCompanyName] = useState('');
+            const [companySummary, setCompanySummary] = useState('');
+            const [cvText, setCvText] = useState('');
+            const [jobDescription, setJobDescription] = useState('');
+            const [contextText, setContextText] = useState('');
+            const [systemInstruction, setSystemInstruction] = useState('');
+            const [questionSet, setQuestionSet] = useState('');
+            const [isCompanyFetching, setIsCompanyFetching] = useState(false);
+            const [isGenerating, setIsGenerating] = useState(false);
+
+            // UNIFIED BUILDER STATE
+            const [builderTab, setBuilderTab] = useState('manual'); // manual | csv | ai
+            const [draftCards, setDraftCards] = useState([]);
+            
+            // Manual Entry
+            const [manualForm, setManualForm] = useState({
+                question: '', answer: '', 
+                option1: '', option2: '', option3: '', option4: '',
+                url: ''
+            });
+
+            // CSV Upload
+            const [csvText, setCsvText] = useState('');
+            
+            // AI Assist
+            const [aiTopic, setAiTopic] = useState('');
+
+            const isInterview = deckType === 'interview';
+
+            const resetForm = () => {
+                setManualForm({ question: '', answer: '', option1: '', option2: '', option3: '', option4: '', url: '' });
+            };
+
+            const handleAddManualCard = () => {
+                if (!manualForm.question.trim()) return alert('Question/Prompt is required');
+                
+                const newCard = {
+                    id: `card-${Date.now()}-${Math.random()}`,
+                    Question: manualForm.question.trim(),
+                    Answer: manualForm.answer.trim(),
+                    Deck: deckName || 'Untitled'
+                };
+
+                if (deckType === 'mcq') {
+                    newCard.Options = [
+                        manualForm.option1.trim() || manualForm.answer.trim(),
+                        manualForm.option2.trim() || 'Option 2',
+                        manualForm.option3.trim() || 'Option 3',
+                        manualForm.option4.trim() || 'Option 4'
+                    ];
+                }
+
+                if (deckType === 'link') {
+                    newCard.Link = manualForm.url.trim();
+                }
+
+                setDraftCards(prev => [...prev, newCard]);
+                resetForm();
+            };
+
+            const handleParseCSV = () => {
+                if (!csvText.trim()) return alert('Paste CSV content first');
+                try {
+                    const parsed = parseCSV(csvText);
+                    const normalized = parsed.map(row => ({
+                        id: row.id || `card-${Date.now()}-${Math.random()}`,
+                        Question: row.Question || row.question || row.Prompt || '',
+                        Answer: row.Answer || row.answer || '',
+                        Options: deckType === 'mcq' ? (row.Options ? row.Options.split('|') : [row.Answer, 'Option 2', 'Option 3', 'Option 4']) : undefined,
+                        Link: deckType === 'link' ? (row.Link || row.URL || '') : undefined,
+                        Deck: deckName || 'Untitled'
+                    }));
+                    setDraftCards(prev => [...prev, ...normalized]);
+                    setCsvText('');
+                    alert(`Added ${normalized.length} cards from CSV`);
+                } catch (e) {
+                    console.error(e);
+                    alert('CSV parsing failed. Check format.');
+                }
+            };
+
+            const handleAIGenerate = async () => {
+                if (!aiTopic.trim()) return alert('Enter a topic first');
+                if (!apiUrl) return alert('Configure backend URL in Settings first');
+                
+                setIsGenerating(true);
+                try {
+                    const prompt = `Generate 5 ${deckType} cards for the topic: "${aiTopic}". 
+                    Output ONLY valid JSON array: [{ question: "...", answer: "..."${deckType === 'mcq' ? ', options: ["a", "b", "c", "d"]' : ''} }]`;
+                    
+                    const res = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            data: {
+                                action: 'generateCards',
+                                message: prompt,
+                                deckType
+                            }
+                        })
+                    });
+                    const json = await res.json();
+                    const aiResponse = json.data?.text || '';
+                    
+                    // Parse JSON from AI response
+                    const match = aiResponse.match(/\[[\s\S]*\]/);
+                    if (match) {
+                        const cardsArray = JSON.parse(match[0]);
+                        const normalized = cardsArray.map(c => ({
+                            id: `card-${Date.now()}-${Math.random()}`,
+                            Question: c.question || c.Question || '',
+                            Answer: c.answer || c.Answer || '',
+                            Options: c.options || c.Options,
+                            Deck: deckName || 'Untitled'
+                        }));
+                        setDraftCards(prev => [...prev, ...normalized]);
+                        setAiTopic('');
+                        alert(`AI generated ${normalized.length} cards`);
+                    } else {
+                        throw new Error('Invalid JSON response from AI');
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert('AI generation failed: ' + e.message);
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            const handleFetchCompany = async () => {
+                if (!companyName.trim()) return;
+                setIsCompanyFetching(true);
+                try {
+                    const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(companyName)}`);
+                    if (!res.ok) throw new Error('Not found');
+                    const json = await res.json();
+                    setCompanySummary(json.extract || '');
+                } catch (e) {
+                    alert('Company not found on Wikipedia');
+                } finally {
+                    setIsCompanyFetching(false);
+                }
+            };
+
+            const handleSave = async () => {
+                if (!deckName.trim()) return alert('Deck name is required');
+
+                const deck = {
+                    id: `deck-${Date.now()}-${Math.random()}`,
+                    name: deckName.trim(),
+                    type: deckType,
+                    description: description.trim(),
+                    cards: isInterview ? [] : draftCards,
+                    createdAt: Date.now()
+                };
+
+                if (isInterview) {
+                    deck.companyName = companyName;
+                    deck.companySummary = companySummary;
+                    deck.cvText = cvText;
+                    deck.jobDescription = jobDescription;
+                    deck.contextText = contextText;
+                    deck.systemInstruction = systemInstruction;
+                    deck.questionSet = questionSet;
+                }
+
+                const saved = await FirestoreHelper.saveDeck(deck);
+                if (saved) {
+                    alert('Deck saved to Firestore!');
+                    onSave && onSave(deck);
+                    onClose();
+                } else {
+                    alert('Save failed. Check console.');
+                }
+            };
+
+            return (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                    <div className="bg-slate-900 w-full max-w-3xl rounded-2xl shadow-2xl border border-slate-700 flex flex-col max-h-[90dvh] animate-slide-in">
+                        <div className="p-6 border-b border-slate-800">
+                            <h3 className="text-2xl font-bold text-white font-quote">Create Deck</h3>
+                            <p className="text-xs text-slate-500 mt-1 font-mono">Build your learning deck</p>
+                        </div>
+                        <div className="p-6 space-y-4 overflow-y-auto">
+                            <div className="space-y-2">
+                                <label className="text-xs text-gray-400 font-bold uppercase">Deck Name</label>
+                                <input type="text" value={deckName} onChange={(e) => setDeckName(e.target.value)} placeholder="e.g., System Design Fundamentals" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-jpm-accent" />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs text-gray-400 font-bold uppercase">Deck Type</label>
+                                <select value={deckType} onChange={(e) => setDeckType(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-jpm-accent">
+                                    <option value="interview">Interview Simulator</option>
+                                    <option value="flashcard">Flashcard</option>
+                                    <option value="mcq">MCQ</option>
+                                    <option value="type">Type Answer</option>
+                                    <option value="code">Code / Syntax</option>
+                                    <option value="link">Link / Resource</option>
+                                </select>
+                            </div>
+
+                            {/* FORK: INTERVIEW PATH (Legacy) */}
+                            {isInterview && (
+                                <div className="space-y-4 border-t border-slate-800 pt-4">
+                                    <p className="text-xs text-jpm-accent uppercase font-bold">Interview Configuration</p>
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-gray-400 font-bold uppercase">Company Name</label>
+                                        <div className="flex gap-2">
+                                            <input type="text" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="e.g., Google" className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-jpm-accent" />
+                                            <button onClick={handleFetchCompany} className="px-4 py-3 bg-slate-700 text-white rounded-xl text-xs font-bold border border-slate-600 hover:bg-slate-600">{isCompanyFetching ? 'Fetching...' : 'Fetch'}</button>
+                                        </div>
+                                        <textarea value={companySummary} onChange={(e) => setCompanySummary(e.target.value)} placeholder="Company summary" rows={3} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-gray-400 font-bold uppercase">CV Text</label>
+                                        <textarea value={cvText} onChange={(e) => setCvText(e.target.value)} rows={4} placeholder="Paste CV" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-gray-400 font-bold uppercase">Job Description</label>
+                                        <textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} rows={4} placeholder="Paste JD" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-gray-400 font-bold uppercase">Context</label>
+                                        <textarea value={contextText} onChange={(e) => setContextText(e.target.value)} rows={3} placeholder="Additional context" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* FORK: UNIFIED BUILDER PATH (Non-Interview) */}
+                            {!isInterview && (
+                                <div className="space-y-4 border-t border-slate-800 pt-4">
+                                    {/* Tab Selector */}
+                                    <div className="flex gap-2 border-b border-slate-800 pb-2">
+                                        <button onClick={() => setBuilderTab('manual')} className={`flex-1 py-2 px-4 rounded-lg text-xs font-bold transition ${builderTab === 'manual' ? 'bg-jpm-accent text-black' : 'bg-slate-800 text-gray-400'}`}><i className="fas fa-plus mr-1"></i> Manual</button>
+                                        <button onClick={() => setBuilderTab('csv')} className={`flex-1 py-2 px-4 rounded-lg text-xs font-bold transition ${builderTab === 'csv' ? 'bg-jpm-accent text-black' : 'bg-slate-800 text-gray-400'}`}><i className="fas fa-file-csv mr-1"></i> CSV</button>
+                                        <button onClick={() => setBuilderTab('ai')} className={`flex-1 py-2 px-4 rounded-lg text-xs font-bold transition ${builderTab === 'ai' ? 'bg-jpm-accent text-black' : 'bg-slate-800 text-gray-400'}`}><i className="fas fa-robot mr-1"></i> AI Assist</button>
+                                    </div>
+
+                                    {/* Manual Tab */}
+                                    {builderTab === 'manual' && (
+                                        <div className="space-y-3">
+                                            <input type="text" value={manualForm.question} onChange={(e) => setManualForm(p => ({ ...p, question: e.target.value }))} placeholder={deckType === 'link' ? 'Resource Title' : 'Question / Prompt'} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-jpm-accent" />
+                                            {deckType !== 'link' && <textarea value={manualForm.answer} onChange={(e) => setManualForm(p => ({ ...p, answer: e.target.value }))} placeholder="Answer" rows={3} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-jpm-accent" />}
+                                            {deckType === 'mcq' && (
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <input type="text" value={manualForm.option1} onChange={(e) => setManualForm(p => ({ ...p, option1: e.target.value }))} placeholder="Option 1" className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-white text-xs focus:outline-none focus:border-jpm-accent" />
+                                                    <input type="text" value={manualForm.option2} onChange={(e) => setManualForm(p => ({ ...p, option2: e.target.value }))} placeholder="Option 2" className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-white text-xs focus:outline-none focus:border-jpm-accent" />
+                                                    <input type="text" value={manualForm.option3} onChange={(e) => setManualForm(p => ({ ...p, option3: e.target.value }))} placeholder="Option 3" className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-white text-xs focus:outline-none focus:border-jpm-accent" />
+                                                    <input type="text" value={manualForm.option4} onChange={(e) => setManualForm(p => ({ ...p, option4: e.target.value }))} placeholder="Option 4" className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-white text-xs focus:outline-none focus:border-jpm-accent" />
+                                                </div>
+                                            )}
+                                            {deckType === 'link' && <input type="url" value={manualForm.url} onChange={(e) => setManualForm(p => ({ ...p, url: e.target.value }))} placeholder="https://..." className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-jpm-accent" />}
+                                            <button onClick={handleAddManualCard} className="w-full bg-slate-700 hover:bg-slate-600 text-white rounded-xl py-2 text-xs font-bold">Add to Draft ({draftCards.length})</button>
+                                        </div>
+                                    )}
+
+                                    {/* CSV Tab */}
+                                    {builderTab === 'csv' && (
+                                        <div className="space-y-3">
+                                            <p className="text-xs text-slate-500">Expected format: <code className="font-mono bg-slate-950 px-2 py-1 rounded">Question, Answer{deckType === 'mcq' ? ', Options (pipe-separated)' : ''}</code></p>
+                                            <textarea value={csvText} onChange={(e) => setCsvText(e.target.value)} rows={6} placeholder="Paste CSV content here..." className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
+                                            <button onClick={handleParseCSV} className="w-full bg-slate-700 hover:bg-slate-600 text-white rounded-xl py-2 text-xs font-bold">Parse & Add to Draft ({draftCards.length})</button>
+                                        </div>
+                                    )}
+
+                                    {/* AI Tab */}
+                                    {builderTab === 'ai' && (
+                                        <div className="space-y-3">
+                                            <textarea value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} rows={3} placeholder="Enter topic or context (e.g., 'JavaScript closures')" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-jpm-accent" />
+                                            <button onClick={handleAIGenerate} disabled={isGenerating} className="w-full bg-purple-700 hover:bg-purple-600 text-white rounded-xl py-2 text-xs font-bold disabled:opacity-50">{isGenerating ? 'Generating...' : `Generate ${deckType} cards with AI`}</button>
+                                            <p className="text-xs text-slate-500">Draft: {draftCards.length} cards</p>
+                                        </div>
+                                    )}
+
+                                    {/* Draft Preview */}
+                                    {draftCards.length > 0 && (
+                                        <div className="border-t border-slate-800 pt-3">
+                                            <p className="text-xs text-jpm-accent font-bold uppercase mb-2">Draft Preview ({draftCards.length} cards)</p>
+                                            <div className="space-y-1 max-h-32 overflow-y-auto">
+                                                {draftCards.slice(-5).map((card, i) => (
+                                                    <div key={i} className="bg-slate-800/50 p-2 rounded text-xs text-gray-300">{card.Question}</div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-6 pt-0 flex gap-2 border-t border-slate-800">
+                            <button onClick={onClose} className="flex-1 bg-slate-800 text-gray-300 py-3 rounded-xl font-bold hover:bg-slate-700 border border-slate-700">Cancel</button>
+                            <button onClick={handleSave} className="flex-1 bg-jpm-accent text-slate-900 py-3 rounded-xl font-bold hover:bg-[#b08d55]">Save Deck</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         // --- MOVED OUTSIDE APP TO FIX SCROLL JUMPING ---
         const getDecks = (items) => [...new Set(items.map(i => i.Deck))].filter(Boolean);
 
