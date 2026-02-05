@@ -1862,6 +1862,10 @@
             const [authInput, setAuthInput] = useState("");
             const [authError, setAuthError] = useState(false);
 
+            // --- NEW: FIRESTORE DECKS STATE ---
+            const [decks, setDecks] = useState([]);
+            const [sessionLimit, setSessionLimit] = useState(20); // Session limit for Leitner system
+
             const [mode, setMode] = useState('menu');
             const [activeDeck, setActiveDeck] = useState(null);
             const [activeAiCard, setActiveAiCard] = useState(null);
