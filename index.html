@@ -2789,7 +2789,7 @@
                         )}
 
                         <div className="flex flex-grow overflow-hidden relative">
-                            {!focusMode && <Dashboard active={mode !== 'menu' && mode !== 'ai_interview'} stats={stats} timer={timer} progressData={progress} streak={streak} totalDecks={getTotalDecks()} pressureMode={pressureMode} onTogglePressure={togglePressureMode} />}
+                            {!focusMode && <Dashboard active={mode !== 'menu' && mode !== 'ai_interview'} stats={stats} timer={timer} progressData={progress} streak={streak} totalDecks={getTotalDecks()} pressureMode={pressureMode} onTogglePressure={togglePressureMode} sessionLimit={sessionLimit} onSessionLimitChange={setSessionLimit} />}
 
                             <main className={`flex-grow overflow-y-auto transition-all duration-300 relative ${!focusMode && mode !== 'menu' && mode !== 'ai_interview' ? 'md:ml-64' : ''} ${focusMode ? 'fixed inset-0 z-50 bg-slate-950 w-full h-full' : ''} scroll-touch stable-scroll pb-16 md:pb-safe`}>
                                 {focusMode && (<button onClick={() => setFocusMode(false)} className="fixed top-4 right-4 z-[60] bg-slate-800/80 text-white px-4 py-2 rounded-full shadow-lg backdrop-blur-sm text-sm font-bold hover:bg-slate-700 transition border border-slate-700 hover:shadow-[0_0_15px_rgba(197,157,95,0.4)]"><i className="fas fa-compress mr-2"></i>Exit Focus</button>)}
