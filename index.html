@@ -1986,6 +1986,57 @@
                 }
             };
 
+            const handleGenerateInstruction = async () => {
+                if (!apiUrl) return alert('Please configure the backend URL in Settings.');
+                setIsGenerating(true);
+                try {
+                    const res = await fetch(`${apiUrl}/api/ai/generate`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            name: deckName,
+                            description: description,
+                            companyName: companyName,
+                            companySummary: companySummary,
+                            cvText: cvText,
+                            jobDescription: jobDescription,
+                            contextText: contextText
+                        })
+                    });
+                    const json = await res.json();
+                    if (json.system_instruction) {
+                        setSystemInstruction(json.system_instruction);
+                        setQuestionSet(json.question_set || questionSet);
+                    }
+                } catch (e) {
+                    console.warn("AI generation failed", e);
+                    alert("AI generation failed. Please try again once the backend is ready.");
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            const handleRefineInstruction = async () => {
+                if (!apiUrl) return alert('Please configure the backend URL in Settings.');
+                setIsGenerating(true);
+                try {
+                    const res = await fetch(`${apiUrl}/api/ai/refine`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ systemInstruction: systemInstruction })
+                    });
+                    const json = await res.json();
+                    if (json.system_instruction) {
+                        setSystemInstruction(json.system_instruction);
+                    }
+                } catch (e) {
+                    console.warn("AI refinement failed", e);
+                    alert("Refinement failed. Please try again once the backend is ready.");
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
             const handleSave = async () => {
                 if (!deckName.trim()) return alert('Deck name is required');
 
