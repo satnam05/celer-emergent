@@ -2062,32 +2062,61 @@
             const handleSave = async () => {
                 if (!deckName.trim()) return alert('Deck name is required');
 
-                const deck = {
+                // FORK: PATH A - INTERVIEW SIMULATOR (Legacy Data)
+                if (deckType === 'interview') {
+                    // Validate Interview-specific fields
+                    if (!companyName.trim()) return alert('Company Name is required for Interview Simulator');
+                    if (!jobDescription.trim()) return alert('Job Description is required for Interview Simulator');
+                    if (!systemInstruction.trim()) return alert('System Instruction is required. Click "Generate with Gemini" first.');
+
+                    const interviewDeck = {
+                        id: `deck-${Date.now()}-${Math.random()}`,
+                        name: deckName.trim(),
+                        type: 'interview',
+                        description: description.trim(),
+                        companyName: companyName.trim(),
+                        companySummary: companySummary.trim(),
+                        cvText: cvText.trim(),
+                        jobDescription: jobDescription.trim(),
+                        contextText: contextText.trim(),
+                        systemInstruction: systemInstruction.trim(),
+                        questionSet: questionSet.trim(),
+                        cards: [], // Interviews don't use draftCards
+                        createdAt: Date.now()
+                    };
+
+                    const saved = await FirestoreHelper.saveDeck(interviewDeck);
+                    if (saved) {
+                        alert('Interview Simulator deck saved to Firestore!');
+                        onSave && onSave(interviewDeck);
+                        onClose();
+                    } else {
+                        alert('Save failed. Check console for errors.');
+                    }
+                    return;
+                }
+
+                // FORK: PATH B - UNIFIED BUILDER (New Data)
+                if (draftCards.length === 0) {
+                    return alert('Please add at least one card using Manual, CSV, or AI tabs.');
+                }
+
+                const unifiedDeck = {
                     id: `deck-${Date.now()}-${Math.random()}`,
                     name: deckName.trim(),
                     type: deckType,
                     description: description.trim(),
-                    cards: isInterview ? [] : draftCards,
+                    cards: draftCards,
                     createdAt: Date.now()
                 };
 
-                if (isInterview) {
-                    deck.companyName = companyName;
-                    deck.companySummary = companySummary;
-                    deck.cvText = cvText;
-                    deck.jobDescription = jobDescription;
-                    deck.contextText = contextText;
-                    deck.systemInstruction = systemInstruction;
-                    deck.questionSet = questionSet;
-                }
-
-                const saved = await FirestoreHelper.saveDeck(deck);
+                const saved = await FirestoreHelper.saveDeck(unifiedDeck);
                 if (saved) {
-                    alert('Deck saved to Firestore!');
-                    onSave && onSave(deck);
+                    alert(`${deckType.toUpperCase()} deck saved with ${draftCards.length} cards!`);
+                    onSave && onSave(unifiedDeck);
                     onClose();
                 } else {
-                    alert('Save failed. Check console.');
+                    alert('Save failed. Check console for errors.');
                 }
             };
 
