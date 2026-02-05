@@ -2588,6 +2588,13 @@
                 if (deck.length === 0) return;
                 if (m === 'study' || m === 'skill') { const link = deck[0].Link || deck[0].Links; if (link) window.open(link, '_blank'); saveProgress(m, deckName, 'In Progress', 0); setModalDeck(null); return; }
                 if (m === 'vocab') deck = deck.map(item => ({ ...item, Question: item.Word, Answer: item.Meaning, ModeTitle: 'Vocabulary' }));
+                
+                // Apply session limit for Leitner review modes (Flashcard, MCQ, Type Answer, Code)
+                const leitnerModes = ['flashcard', 'mcq', 'type', 'code', 'vocab'];
+                if (leitnerModes.includes(m) && sessionLimit > 0) {
+                    deck = deck.slice(0, sessionLimit);
+                }
+                
                 setActiveDeck({ name: deckName, items: deck }); setMode(m); setStats({ correct: 0, completed: 0, total: deck.length }); setModalDeck(null); setSessionKey(p => p + 1); setFocusMode(false);
                 if (!progress[`${m}-${deckName}`]) saveProgress(m, deckName, 'In Progress', 0);
             };
