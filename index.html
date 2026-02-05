@@ -2004,9 +2004,29 @@
                         })
                     });
                     const json = await res.json();
+                    
+                    // Handle system_instruction (should be string)
                     if (json.system_instruction) {
-                        setSystemInstruction(json.system_instruction);
-                        setQuestionSet(json.question_set || questionSet);
+                        setSystemInstruction(typeof json.system_instruction === 'string' 
+                            ? json.system_instruction 
+                            : JSON.stringify(json.system_instruction, null, 2));
+                    }
+                    
+                    // Handle question_set (might be object/array)
+                    if (json.question_set) {
+                        let questionText = '';
+                        if (typeof json.question_set === 'string') {
+                            questionText = json.question_set;
+                        } else if (Array.isArray(json.question_set)) {
+                            // If it's an array of question objects
+                            questionText = json.question_set.map((q, i) => 
+                                `Q${i + 1}: ${q.question || q.text || JSON.stringify(q)}`
+                            ).join('\n\n');
+                        } else if (typeof json.question_set === 'object') {
+                            // If it's a single object, stringify it nicely
+                            questionText = JSON.stringify(json.question_set, null, 2);
+                        }
+                        setQuestionSet(questionText);
                     }
                 } catch (e) {
                     console.warn("AI generation failed", e);
