@@ -15,6 +15,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
+    <!-- Firebase SDK v10 -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap"
         rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -453,6 +457,90 @@
 
         const shuffleArray = (array) => { let arr = [...array]; for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
 
+        // --- 2. FIREBASE INITIALIZATION & SUB-COLLECTION HELPERS ---
+        const FIREBASE_CONFIG = {
+            apiKey: "AIzaSyBXxVFElVBLz_R_8cQh4x8JiX8wOvnYGLs",
+            authDomain: "celer-ai-companion.firebaseapp.com",
+            projectId: "celer-ai-companion",
+            storageBucket: "celer-ai-companion.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abcdef123456"
+        };
+
+        let db = null;
+        try {
+            if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+                firebase.initializeApp(FIREBASE_CONFIG);
+                db = firebase.firestore();
+            } else if (firebase.apps.length) {
+                db = firebase.firestore();
+            }
+        } catch (e) {
+            console.warn("Firebase init failed, using localStorage fallback", e);
+        }
+
+        const FirestoreHelper = {
+            uid: "satnam_default",
+            
+            async getDecks() {
+                if (!db) return [];
+                try {
+                    const snapshot = await db.collection("users").doc(this.uid).collection("decks").get();
+                    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                } catch (e) {
+                    console.warn("Firestore read failed", e);
+                    return [];
+                }
+            },
+
+            async saveDeck(deck) {
+                if (!db) return false;
+                try {
+                    await db.collection("users").doc(this.uid).collection("decks").doc(deck.id).set({
+                        ...deck,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    return true;
+                } catch (e) {
+                    console.warn("Firestore write failed", e);
+                    return false;
+                }
+            },
+
+            async deleteDeck(deckId) {
+                if (!db) return false;
+                try {
+                    await db.collection("users").doc(this.uid).collection("decks").doc(deckId).update({
+                        deletedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    return true;
+                } catch (e) {
+                    console.warn("Firestore delete failed", e);
+                    return false;
+                }
+            },
+
+            async migrateLegacyDecks(legacyDecksArray) {
+                if (!db || !legacyDecksArray || legacyDecksArray.length === 0) return;
+                try {
+                    const batch = db.batch();
+                    legacyDecksArray.forEach(deck => {
+                        const docRef = db.collection("users").doc(this.uid).collection("decks").doc(deck.id);
+                        batch.set(docRef, {
+                            ...deck,
+                            migratedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    });
+                    await batch.commit();
+                    console.log(`Migrated ${legacyDecksArray.length} decks to Firestore`);
+                    return true;
+                } catch (e) {
+                    console.warn("Migration failed", e);
+                    return false;
+                }
+            }
+        };
+
         class GlobalErrorBoundary extends React.Component { constructor(props) { super(props); this.state = { hasError: false, error: null }; } static getDerivedStateFromError(error) { return { hasError: true, error }; } render() { if (this.state.hasError) return <div className="flex flex-col items-center justify-center h-screen bg-red-900 p-6 text-center text-white"><button onClick={() => window.location.reload()}>Reload</button></div>; return this.props.children; } }
         class ComponentSandbox extends React.Component { constructor(props) { super(props); this.state = { hasError: false }; } static getDerivedStateFromError(error) { return { hasError: true }; } render() { if (this.state.hasError) return <button onClick={() => window.location.reload()}>Reload</button>; return this.props.children; } }
 
@@ -734,7 +822,7 @@
 
 
         // 3. Layout Components
-        const Dashboard = ({ active, stats, timer, progressData, streak, totalDecks, pressureMode, onTogglePressure }) => {
+        const Dashboard = ({ active, stats, timer, progressData, streak, totalDecks, pressureMode, onTogglePressure, sessionLimit, onSessionLimitChange }) => {
             const accuracy = stats.completed > 0 ? Math.round((stats.correct / stats.completed) * 100) : 0;
             const completedCount = Object.values(progressData).filter(p => p.status === 'Completed').length;
             const globalCompletion = totalDecks > 0 ? Math.round((completedCount / totalDecks) * 100) : 0;
@@ -754,6 +842,14 @@
                             <h4 className="text-[10px] font-bold text-gray-400 uppercase mb-2 font-mono tracking-wider">Daily Briefing</h4>
                             <div className="flex justify-between items-center mb-1"><span className="text-xs text-white">Review Due</span><span className={`text-xs font-bold ${staleDecks > 0 ? 'text-red-400 animate-pulse' : 'text-green-400'}`}>{staleDecks}</span></div>
                             <div className="flex justify-between items-center"><span className="text-xs text-white">Pending Resume</span><span className="text-xs font-bold text-amber-400">{resumeDecks}</span></div>
+                        </div>
+                        <div className="bg-slate-800/80 p-3 rounded-xl border-l-4 border-jpm-accent shadow-md">
+                            <h4 className="text-[10px] font-bold text-gray-400 uppercase mb-2 font-mono tracking-wider">Session Limit</h4>
+                            <select value={sessionLimit} onChange={(e) => onSessionLimitChange(Number(e.target.value))} className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white text-xs font-mono focus:border-jpm-accent focus:outline-none">
+                                <option value={10}>Review 10 Cards</option>
+                                <option value={20}>Review 20 Cards</option>
+                                <option value={-1}>Review All</option>
+                            </select>
                         </div>
                         <div className="bg-slate-800 p-4 rounded-xl border-l-4 border-jpm-accent shadow-sm flex items-center justify-between">
                             <div><p className="text-xs text-gray-400 font-bold uppercase tracking-wider font-mono">Current Streak</p><p className="text-3xl font-bold text-white font-mono">{streak} <span className="text-sm font-medium text-gray-500">Days</span></p></div>
@@ -1665,6 +1761,501 @@
 
         //END AI MODE
 
+        // --- 5. CODE GAME COMPONENT (Syntax-Preserving Flashcards) ---
+        const CodeGame = ({ deckData, onEnd, onStatsUpdate, pressureMode, toggleFocus, isFocusMode }) => {
+            const [currentIndex, setCurrentIndex] = useState(0);
+            const [flipped, setFlipped] = useState(false);
+            const [results, setResults] = useState({});
+
+            if (!deckData || deckData.length === 0) return <div className="p-10 text-center text-gray-500">No code snippets.</div>;
+            const current = deckData[currentIndex];
+            const currentRating = results[current.id];
+
+            const handleRate = (rating) => {
+                const newResults = { ...results, [current.id]: rating };
+                setResults(newResults);
+                const done = Object.keys(newResults).length;
+                const correct = Object.values(newResults).filter(r => r === 'easy').length;
+                onStatsUpdate({ completed: done, correct });
+                setFlipped(false);
+                if (currentIndex < deckData.length - 1) {
+                    setCurrentIndex(currentIndex + 1);
+                } else {
+                    const hardCards = deckData.filter(item => newResults[item.id] === 'hard');
+                    const accuracy = Math.round((correct / deckData.length) * 100);
+                    const finalScore = hardCards.length === 0 ? 100 : accuracy;
+                    onEnd(finalScore, hardCards);
+                }
+            };
+
+            const getBtnStyle = (type) => {
+                const isActive = currentRating === type;
+                const base = "flex-1 py-4 rounded-xl font-bold shadow-md transition-all duration-200 border border-[#C59D5F]/30 bg-[#C59D5F]/10 text-white";
+                if (type === 'hard') return isActive ? `flex-1 py-4 rounded-xl font-bold shadow-lg shadow-red-500/50 bg-red-900 border-red-500 text-white scale-105` : `${base} hover:bg-red-900/50 hover:border-red-500`;
+                else return isActive ? `flex-1 py-4 rounded-xl font-bold shadow-lg shadow-green-500/50 bg-green-900 border-green-500 text-white scale-105` : `${base} hover:bg-green-900/50 hover:border-green-500`;
+            };
+
+            return (
+                <div className="flex flex-col items-center h-full w-full px-4 pt-4 md:pb-safe text-white">
+                    <div className="w-full max-w-4xl flex justify-between items-center mb-4 text-gray-400 font-bold text-sm uppercase flex-shrink-0">
+                        <span className="font-quote text-lg text-white">Code / Syntax</span>
+                        <div className="flex items-center gap-4">
+                            <span className="font-mono">{currentIndex + 1} / {deckData.length}</span>
+                            <button onClick={toggleFocus} className="p-2 hover:bg-slate-700 rounded-full transition"><i className={isFocusMode ? "fas fa-compress" : "fas fa-expand"}></i></button>
+                        </div>
+                    </div>
+                    <div className="card-scene mb-6 w-full max-w-4xl flex-grow relative flex flex-col" style={{ minHeight: '0' }}>
+                        <div className={`card-object ${flipped ? 'is-flipped' : ''}`} onClick={() => setFlipped(!flipped)} role="button">
+                            <div className="card-face front">
+                                <div className="card-content relative flex flex-col items-center justify-center">
+                                    <h3 className="text-2xl font-bold text-white leading-snug tracking-tight mb-6 font-sans">{current.Question}</h3>
+                                    <div className="absolute bottom-6 text-gray-500 text-xs uppercase tracking-widest font-bold">Tap to Reveal Code</div>
+                                </div>
+                            </div>
+                            <div className="card-face back">
+                                <div className="card-content flex flex-col items-start justify-center overflow-x-auto">
+                                    <pre className="text-sm text-gray-200 whitespace-pre font-mono leading-relaxed bg-slate-950 p-4 rounded-lg border border-slate-700 w-full overflow-x-auto"><code>{current.Answer}</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="w-full max-w-4xl z-10 flex gap-4 items-center flex-shrink-0 py-6">
+                        <button onClick={() => { setCurrentIndex(p => Math.max(0, p - 1)); setFlipped(false); }} disabled={currentIndex === 0} className="px-6 py-4 bg-slate-800 text-white rounded-xl font-bold shadow-sm hover:bg-slate-700 disabled:opacity-50 transition-colors border border-slate-700"><i className="fas fa-arrow-left"></i></button>
+                        {flipped ? (
+                            <div className="flex-1 flex gap-4">
+                                <button onClick={() => handleRate('hard')} className={getBtnStyle('hard')}>{currentRating === 'hard' && <i className="fas fa-check mr-2"></i>} Hard</button>
+                                <button onClick={() => handleRate('easy')} className={getBtnStyle('easy')}>{currentRating === 'easy' && <i className="fas fa-check mr-2"></i>} Easy</button>
+                            </div>
+                        ) : (
+                            <button onClick={() => setFlipped(true)} className="flex-1 px-8 py-4 bg-jpm-accent text-slate-900 rounded-xl font-bold shadow-lg shadow-[#C59D5F]/50 hover:bg-[#b08d55] transition active:scale-95 transform">Show Code</button>
+                        )}
+                        <button onClick={() => { const n = currentIndex + 1; if (n < deckData.length) setCurrentIndex(n); setFlipped(false); }} disabled={currentIndex === deckData.length - 1} className="px-6 py-4 bg-slate-800 text-white rounded-xl font-bold shadow-sm hover:bg-slate-700 disabled:opacity-50 transition-colors border border-slate-700"><i className="fas fa-arrow-right"></i></button>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- 6. FORKED ADD DECK MODAL (Unified Builder) ---
+        const AddDeckModal = ({ onClose, onSave, apiUrl }) => {
+            const [deckType, setDeckType] = useState('flashcard');
+            const [deckName, setDeckName] = useState('');
+            const [description, setDescription] = useState('');
+            
+            // LEGACY INTERVIEW FIELDS (Preserved)
+            const [companyName, setCompanyName] = useState('');
+            const [companySummary, setCompanySummary] = useState('');
+            const [cvText, setCvText] = useState('');
+            const [jobDescription, setJobDescription] = useState('');
+            const [contextText, setContextText] = useState('');
+            const [systemInstruction, setSystemInstruction] = useState('');
+            const [questionSet, setQuestionSet] = useState('');
+            const [isCompanyFetching, setIsCompanyFetching] = useState(false);
+            const [isGenerating, setIsGenerating] = useState(false);
+
+            // UNIFIED BUILDER STATE
+            const [builderTab, setBuilderTab] = useState('manual'); // manual | csv | ai
+            const [draftCards, setDraftCards] = useState([]);
+            
+            // Manual Entry
+            const [manualForm, setManualForm] = useState({
+                question: '', answer: '', 
+                option1: '', option2: '', option3: '', option4: '',
+                url: ''
+            });
+
+            // CSV Upload
+            const [csvText, setCsvText] = useState('');
+            
+            // AI Assist
+            const [aiTopic, setAiTopic] = useState('');
+
+            const isInterview = deckType === 'interview';
+
+            const resetForm = () => {
+                setManualForm({ question: '', answer: '', option1: '', option2: '', option3: '', option4: '', url: '' });
+            };
+
+            const handleAddManualCard = () => {
+                if (!manualForm.question.trim()) return alert('Question/Prompt is required');
+                
+                const newCard = {
+                    id: `card-${Date.now()}-${Math.random()}`,
+                    Question: manualForm.question.trim(),
+                    Answer: manualForm.answer.trim(),
+                    Deck: deckName || 'Untitled'
+                };
+
+                if (deckType === 'mcq') {
+                    newCard.Options = [
+                        manualForm.option1.trim() || manualForm.answer.trim(),
+                        manualForm.option2.trim() || 'Option 2',
+                        manualForm.option3.trim() || 'Option 3',
+                        manualForm.option4.trim() || 'Option 4'
+                    ];
+                }
+
+                if (deckType === 'link') {
+                    newCard.Link = manualForm.url.trim();
+                }
+
+                setDraftCards(prev => [...prev, newCard]);
+                resetForm();
+            };
+
+            const handleParseCSV = () => {
+                if (!csvText.trim()) return alert('Paste CSV content first');
+                try {
+                    const parsed = parseCSV(csvText);
+                    const normalized = parsed.map(row => ({
+                        id: row.id || `card-${Date.now()}-${Math.random()}`,
+                        Question: row.Question || row.question || row.Prompt || '',
+                        Answer: row.Answer || row.answer || '',
+                        Options: deckType === 'mcq' ? (row.Options ? row.Options.split('|') : [row.Answer, 'Option 2', 'Option 3', 'Option 4']) : undefined,
+                        Link: deckType === 'link' ? (row.Link || row.URL || '') : undefined,
+                        Deck: deckName || 'Untitled'
+                    }));
+                    setDraftCards(prev => [...prev, ...normalized]);
+                    setCsvText('');
+                    alert(`Added ${normalized.length} cards from CSV`);
+                } catch (e) {
+                    console.error(e);
+                    alert('CSV parsing failed. Check format.');
+                }
+            };
+
+            const handleAIGenerate = async () => {
+                if (!aiTopic.trim()) return alert('Enter a topic first');
+                if (!apiUrl) return alert('Configure backend URL in Settings first');
+                
+                setIsGenerating(true);
+                try {
+                    const prompt = `Generate 5 ${deckType} cards for the topic: "${aiTopic}". 
+                    Output ONLY valid JSON array: [{ question: "...", answer: "..."${deckType === 'mcq' ? ', options: ["a", "b", "c", "d"]' : ''} }]`;
+                    
+                    const res = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            data: {
+                                action: 'generateCards',
+                                message: prompt,
+                                deckType
+                            }
+                        })
+                    });
+                    const json = await res.json();
+                    const aiResponse = json.data?.text || '';
+                    
+                    // Parse JSON from AI response
+                    const match = aiResponse.match(/\[[\s\S]*\]/);
+                    if (match) {
+                        const cardsArray = JSON.parse(match[0]);
+                        const normalized = cardsArray.map(c => ({
+                            id: `card-${Date.now()}-${Math.random()}`,
+                            Question: c.question || c.Question || '',
+                            Answer: c.answer || c.Answer || '',
+                            Options: c.options || c.Options,
+                            Deck: deckName || 'Untitled'
+                        }));
+                        setDraftCards(prev => [...prev, ...normalized]);
+                        setAiTopic('');
+                        alert(`AI generated ${normalized.length} cards`);
+                    } else {
+                        throw new Error('Invalid JSON response from AI');
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert('AI generation failed: ' + e.message);
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            const handleFetchCompany = async () => {
+                if (!companyName.trim()) return;
+                setIsCompanyFetching(true);
+                try {
+                    const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(companyName)}`);
+                    if (!res.ok) throw new Error('Not found');
+                    const json = await res.json();
+                    setCompanySummary(json.extract || '');
+                } catch (e) {
+                    alert('Company not found on Wikipedia');
+                } finally {
+                    setIsCompanyFetching(false);
+                }
+            };
+
+            const handleGenerateInstruction = async () => {
+                if (!apiUrl) return alert('Please configure the backend URL in Settings.');
+                setIsGenerating(true);
+                try {
+                    const res = await fetch(`${apiUrl}/api/ai/generate`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            name: deckName,
+                            description: description,
+                            companyName: companyName,
+                            companySummary: companySummary,
+                            cvText: cvText,
+                            jobDescription: jobDescription,
+                            contextText: contextText
+                        })
+                    });
+                    const json = await res.json();
+                    
+                    // Handle system_instruction (should be string)
+                    if (json.system_instruction) {
+                        setSystemInstruction(typeof json.system_instruction === 'string' 
+                            ? json.system_instruction 
+                            : JSON.stringify(json.system_instruction, null, 2));
+                    }
+                    
+                    // Handle question_set (might be object/array)
+                    if (json.question_set) {
+                        let questionText = '';
+                        if (typeof json.question_set === 'string') {
+                            questionText = json.question_set;
+                        } else if (Array.isArray(json.question_set)) {
+                            // If it's an array of question objects
+                            questionText = json.question_set.map((q, i) => 
+                                `Q${i + 1}: ${q.question || q.text || JSON.stringify(q)}`
+                            ).join('\n\n');
+                        } else if (typeof json.question_set === 'object') {
+                            // If it's a single object, stringify it nicely
+                            questionText = JSON.stringify(json.question_set, null, 2);
+                        }
+                        setQuestionSet(questionText);
+                    }
+                } catch (e) {
+                    console.warn("AI generation failed", e);
+                    alert("AI generation failed. Please try again once the backend is ready.");
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            const handleRefineInstruction = async () => {
+                if (!apiUrl) return alert('Please configure the backend URL in Settings.');
+                setIsGenerating(true);
+                try {
+                    const res = await fetch(`${apiUrl}/api/ai/refine`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ systemInstruction: systemInstruction })
+                    });
+                    const json = await res.json();
+                    if (json.system_instruction) {
+                        setSystemInstruction(typeof json.system_instruction === 'string' 
+                            ? json.system_instruction 
+                            : JSON.stringify(json.system_instruction, null, 2));
+                    }
+                } catch (e) {
+                    console.warn("AI refinement failed", e);
+                    alert("Refinement failed. Please try again once the backend is ready.");
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            const handleSave = async () => {
+                if (!deckName.trim()) return alert('Deck name is required');
+
+                // FORK: PATH A - INTERVIEW SIMULATOR (Legacy Data)
+                if (deckType === 'interview') {
+                    // Validate Interview-specific fields
+                    if (!companyName.trim()) return alert('Company Name is required for Interview Simulator');
+                    if (!jobDescription.trim()) return alert('Job Description is required for Interview Simulator');
+                    if (!systemInstruction.trim()) return alert('System Instruction is required. Click "Generate with Gemini" first.');
+
+                    const interviewDeck = {
+                        id: `deck-${Date.now()}-${Math.random()}`,
+                        name: deckName.trim(),
+                        type: 'interview',
+                        description: description.trim(),
+                        companyName: companyName.trim(),
+                        companySummary: companySummary.trim(),
+                        cvText: cvText.trim(),
+                        jobDescription: jobDescription.trim(),
+                        contextText: contextText.trim(),
+                        systemInstruction: systemInstruction.trim(),
+                        questionSet: questionSet.trim(),
+                        cards: [], // Interviews don't use draftCards
+                        createdAt: Date.now()
+                    };
+
+                    const saved = await FirestoreHelper.saveDeck(interviewDeck);
+                    if (saved) {
+                        alert('Interview Simulator deck saved to Firestore!');
+                        onSave && onSave(interviewDeck);
+                        onClose();
+                    } else {
+                        alert('Save failed. Check console for errors.');
+                    }
+                    return;
+                }
+
+                // FORK: PATH B - UNIFIED BUILDER (New Data)
+                if (draftCards.length === 0) {
+                    return alert('Please add at least one card using Manual, CSV, or AI tabs.');
+                }
+
+                const unifiedDeck = {
+                    id: `deck-${Date.now()}-${Math.random()}`,
+                    name: deckName.trim(),
+                    type: deckType,
+                    description: description.trim(),
+                    cards: draftCards,
+                    createdAt: Date.now()
+                };
+
+                const saved = await FirestoreHelper.saveDeck(unifiedDeck);
+                if (saved) {
+                    alert(`${deckType.toUpperCase()} deck saved with ${draftCards.length} cards!`);
+                    onSave && onSave(unifiedDeck);
+                    onClose();
+                } else {
+                    alert('Save failed. Check console for errors.');
+                }
+            };
+
+            return (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                    <div className="bg-slate-900 w-full max-w-3xl rounded-2xl shadow-2xl border border-slate-700 flex flex-col max-h-[90dvh] animate-slide-in">
+                        <div className="p-6 border-b border-slate-800">
+                            <h3 className="text-2xl font-bold text-white font-quote">Create Deck</h3>
+                            <p className="text-xs text-slate-500 mt-1 font-mono">Build your learning deck</p>
+                        </div>
+                        <div className="p-6 space-y-4 overflow-y-auto">
+                            <div className="space-y-2">
+                                <label className="text-xs text-gray-400 font-bold uppercase">Deck Name</label>
+                                <input type="text" value={deckName} onChange={(e) => setDeckName(e.target.value)} placeholder="e.g., System Design Fundamentals" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-jpm-accent" />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs text-gray-400 font-bold uppercase">Deck Type</label>
+                                <select value={deckType} onChange={(e) => setDeckType(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-jpm-accent">
+                                    <option value="interview">Interview Simulator</option>
+                                    <option value="flashcard">Flashcard</option>
+                                    <option value="mcq">MCQ</option>
+                                    <option value="type">Type Answer</option>
+                                    <option value="code">Code / Syntax</option>
+                                    <option value="link">Link / Resource</option>
+                                </select>
+                            </div>
+
+                            {/* FORK: INTERVIEW PATH (Legacy - FULLY RESTORED) */}
+                            {isInterview && (
+                                <div className="space-y-4 border-t border-slate-800 pt-4">
+                                    <p className="text-xs text-jpm-accent uppercase font-bold">Interview Configuration</p>
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-gray-400 font-bold uppercase">Short Description</label>
+                                        <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g., Backend interview prep" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-jpm-accent" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-gray-400 font-bold uppercase">Company Name</label>
+                                        <div className="flex gap-2">
+                                            <input type="text" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="e.g., Google" className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-jpm-accent" />
+                                            <button onClick={handleFetchCompany} className="px-4 py-3 bg-slate-700 text-white rounded-xl text-xs font-bold border border-slate-600 hover:bg-slate-600">{isCompanyFetching ? 'Fetching...' : 'Fetch'}</button>
+                                        </div>
+                                        <textarea value={companySummary} onChange={(e) => setCompanySummary(e.target.value)} placeholder="Company summary (auto-filled from Wikipedia or edit manually)" rows={3} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-gray-400 font-bold uppercase">CV (Text)</label>
+                                        <textarea value={cvText} onChange={(e) => setCvText(e.target.value)} rows={4} placeholder="Paste CV text" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-gray-400 font-bold uppercase">Job Description (Text)</label>
+                                        <textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} rows={4} placeholder="Paste job description" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-gray-400 font-bold uppercase">Context / Notes</label>
+                                        <textarea value={contextText} onChange={(e) => setContextText(e.target.value)} rows={3} placeholder="Additional context" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-gray-400 font-bold uppercase">System Instruction</label>
+                                        <textarea value={systemInstruction} onChange={(e) => setSystemInstruction(e.target.value)} rows={4} placeholder="Generated system instruction will appear here" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
+                                        <div className="flex gap-2">
+                                            <button onClick={handleGenerateInstruction} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-bold border border-slate-600 py-2">{isGenerating ? 'Generating...' : 'Generate with Gemini'}</button>
+                                            <button onClick={handleRefineInstruction} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-bold border border-slate-600 py-2">Refine</button>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-gray-400 font-bold uppercase">Question Set</label>
+                                        <textarea value={questionSet} onChange={(e) => setQuestionSet(e.target.value)} rows={3} placeholder="Optional question set" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* FORK: UNIFIED BUILDER PATH (Non-Interview) */}
+                            {!isInterview && (
+                                <div className="space-y-4 border-t border-slate-800 pt-4">
+                                    {/* Tab Selector */}
+                                    <div className="flex gap-2 border-b border-slate-800 pb-2">
+                                        <button onClick={() => setBuilderTab('manual')} className={`flex-1 py-2 px-4 rounded-lg text-xs font-bold transition ${builderTab === 'manual' ? 'bg-jpm-accent text-black' : 'bg-slate-800 text-gray-400'}`}><i className="fas fa-plus mr-1"></i> Manual</button>
+                                        <button onClick={() => setBuilderTab('csv')} className={`flex-1 py-2 px-4 rounded-lg text-xs font-bold transition ${builderTab === 'csv' ? 'bg-jpm-accent text-black' : 'bg-slate-800 text-gray-400'}`}><i className="fas fa-file-csv mr-1"></i> CSV</button>
+                                        <button onClick={() => setBuilderTab('ai')} className={`flex-1 py-2 px-4 rounded-lg text-xs font-bold transition ${builderTab === 'ai' ? 'bg-jpm-accent text-black' : 'bg-slate-800 text-gray-400'}`}><i className="fas fa-robot mr-1"></i> AI Assist</button>
+                                    </div>
+
+                                    {/* Manual Tab */}
+                                    {builderTab === 'manual' && (
+                                        <div className="space-y-3">
+                                            <input type="text" value={manualForm.question} onChange={(e) => setManualForm(p => ({ ...p, question: e.target.value }))} placeholder={deckType === 'link' ? 'Resource Title' : 'Question / Prompt'} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-jpm-accent" />
+                                            {deckType !== 'link' && <textarea value={manualForm.answer} onChange={(e) => setManualForm(p => ({ ...p, answer: e.target.value }))} placeholder="Answer" rows={3} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-jpm-accent" />}
+                                            {deckType === 'mcq' && (
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <input type="text" value={manualForm.option1} onChange={(e) => setManualForm(p => ({ ...p, option1: e.target.value }))} placeholder="Option 1" className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-white text-xs focus:outline-none focus:border-jpm-accent" />
+                                                    <input type="text" value={manualForm.option2} onChange={(e) => setManualForm(p => ({ ...p, option2: e.target.value }))} placeholder="Option 2" className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-white text-xs focus:outline-none focus:border-jpm-accent" />
+                                                    <input type="text" value={manualForm.option3} onChange={(e) => setManualForm(p => ({ ...p, option3: e.target.value }))} placeholder="Option 3" className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-white text-xs focus:outline-none focus:border-jpm-accent" />
+                                                    <input type="text" value={manualForm.option4} onChange={(e) => setManualForm(p => ({ ...p, option4: e.target.value }))} placeholder="Option 4" className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-white text-xs focus:outline-none focus:border-jpm-accent" />
+                                                </div>
+                                            )}
+                                            {deckType === 'link' && <input type="url" value={manualForm.url} onChange={(e) => setManualForm(p => ({ ...p, url: e.target.value }))} placeholder="https://..." className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-jpm-accent" />}
+                                            <button onClick={handleAddManualCard} className="w-full bg-slate-700 hover:bg-slate-600 text-white rounded-xl py-2 text-xs font-bold">Add to Draft ({draftCards.length})</button>
+                                        </div>
+                                    )}
+
+                                    {/* CSV Tab */}
+                                    {builderTab === 'csv' && (
+                                        <div className="space-y-3">
+                                            <p className="text-xs text-slate-500">Expected format: <code className="font-mono bg-slate-950 px-2 py-1 rounded">Question, Answer{deckType === 'mcq' ? ', Options (pipe-separated)' : ''}</code></p>
+                                            <textarea value={csvText} onChange={(e) => setCsvText(e.target.value)} rows={6} placeholder="Paste CSV content here..." className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
+                                            <button onClick={handleParseCSV} className="w-full bg-slate-700 hover:bg-slate-600 text-white rounded-xl py-2 text-xs font-bold">Parse & Add to Draft ({draftCards.length})</button>
+                                        </div>
+                                    )}
+
+                                    {/* AI Tab */}
+                                    {builderTab === 'ai' && (
+                                        <div className="space-y-3">
+                                            <textarea value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} rows={3} placeholder="Enter topic or context (e.g., 'JavaScript closures')" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-jpm-accent" />
+                                            <button onClick={handleAIGenerate} disabled={isGenerating} className="w-full bg-purple-700 hover:bg-purple-600 text-white rounded-xl py-2 text-xs font-bold disabled:opacity-50">{isGenerating ? 'Generating...' : `Generate ${deckType} cards with AI`}</button>
+                                            <p className="text-xs text-slate-500">Draft: {draftCards.length} cards</p>
+                                        </div>
+                                    )}
+
+                                    {/* Draft Preview */}
+                                    {draftCards.length > 0 && (
+                                        <div className="border-t border-slate-800 pt-3">
+                                            <p className="text-xs text-jpm-accent font-bold uppercase mb-2">Draft Preview ({draftCards.length} cards)</p>
+                                            <div className="space-y-1 max-h-32 overflow-y-auto">
+                                                {draftCards.slice(-5).map((card, i) => (
+                                                    <div key={i} className="bg-slate-800/50 p-2 rounded text-xs text-gray-300">{card.Question}</div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-6 pt-0 flex gap-2 border-t border-slate-800">
+                            <button onClick={onClose} className="flex-1 bg-slate-800 text-gray-300 py-3 rounded-xl font-bold hover:bg-slate-700 border border-slate-700">Cancel</button>
+                            <button onClick={handleSave} className="flex-1 bg-jpm-accent text-slate-900 py-3 rounded-xl font-bold hover:bg-[#b08d55]">Save Deck</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         // --- MOVED OUTSIDE APP TO FIX SCROLL JUMPING ---
         const getDecks = (items) => [...new Set(items.map(i => i.Deck))].filter(Boolean);
 
@@ -1773,6 +2364,10 @@
             const [isAuthenticated, setIsAuthenticated] = useState(false);
             const [authInput, setAuthInput] = useState("");
             const [authError, setAuthError] = useState(false);
+
+            // --- NEW: FIRESTORE DECKS STATE ---
+            const [decks, setDecks] = useState([]);
+            const [sessionLimit, setSessionLimit] = useState(20); // Session limit for Leitner system
 
             const [mode, setMode] = useState('menu');
             const [activeDeck, setActiveDeck] = useState(null);
@@ -1958,6 +2553,86 @@
             useEffect(() => {
                 localStorage.setItem('celer_csv_base', normalizedCsvBase);
             }, [normalizedCsvBase]);
+
+            // --- NEW: LAZY MIGRATION & DECK LOADING FROM FIRESTORE ---
+            useEffect(() => {
+                const loadAndMigrateDecks = async () => {
+                    if (!isAuthenticated) return;
+                    
+                    // Step 1: Load from Firestore
+                    const firestoreDecks = await FirestoreHelper.getDecks();
+                    setDecks(firestoreDecks.filter(d => !d.deletedAt));
+
+                    // Step 2: Check for legacy decks in localStorage
+                    const legacyCustomTiles = localStorage.getItem('celer_custom_tiles_v1');
+                    const legacyCustomCards = localStorage.getItem('celer_custom_cards_v1');
+                    
+                    if (legacyCustomTiles || legacyCustomCards) {
+                        try {
+                            const tiles = legacyCustomTiles ? JSON.parse(legacyCustomTiles) : [];
+                            const cardsByTile = legacyCustomCards ? JSON.parse(legacyCustomCards) : {};
+                            
+                            // Convert to new deck format
+                            const legacyDecks = [];
+                            
+                            // Convert customTiles
+                            tiles.forEach(tile => {
+                                (tile.cards || []).forEach(card => {
+                                    legacyDecks.push({
+                                        id: card.id || `deck-${Date.now()}-${Math.random()}`,
+                                        name: card.name,
+                                        type: card.type || 'flashcard',
+                                        csvFile: card.csvFile || '',
+                                        description: card.description || '',
+                                        companyName: card.companyName || '',
+                                        companySummary: card.companySummary || '',
+                                        cvText: card.cvText || '',
+                                        jobDescription: card.jobDescription || '',
+                                        contextText: card.contextText || '',
+                                        systemInstruction: card.systemInstruction || '',
+                                        questionSet: card.questionSet || '',
+                                        cards: [] // Will be populated from CSV
+                                    });
+                                });
+                            });
+                            
+                            // Convert customCardsByTile
+                            Object.values(cardsByTile).flat().forEach(card => {
+                                legacyDecks.push({
+                                    id: card.id || `deck-${Date.now()}-${Math.random()}`,
+                                    name: card.name,
+                                    type: card.type || 'flashcard',
+                                    csvFile: card.csvFile || '',
+                                    description: card.description || '',
+                                    companyName: card.companyName || '',
+                                    companySummary: card.companySummary || '',
+                                    cvText: card.cvText || '',
+                                    jobDescription: card.jobDescription || '',
+                                    contextText: card.contextText || '',
+                                    systemInstruction: card.systemInstruction || '',
+                                    questionSet: card.questionSet || '',
+                                    cards: []
+                                });
+                            });
+                            
+                            // Migrate to Firestore
+                            if (legacyDecks.length > 0) {
+                                await FirestoreHelper.migrateLegacyDecks(legacyDecks);
+                                // Clear old localStorage
+                                localStorage.setItem('celer_custom_tiles_v1', JSON.stringify([]));
+                                localStorage.setItem('celer_custom_cards_v1', JSON.stringify({}));
+                                // Reload decks
+                                const updatedDecks = await FirestoreHelper.getDecks();
+                                setDecks(updatedDecks.filter(d => !d.deletedAt));
+                            }
+                        } catch (e) {
+                            console.warn("Migration parsing failed", e);
+                        }
+                    }
+                };
+                
+                loadAndMigrateDecks();
+            }, [isAuthenticated]);
 
             // --- 5. CLOUD SYNC: PUSH (Debounced) ---
             useEffect(() => {
@@ -2337,7 +3012,7 @@
                     companySummary: cardForm.companySummary,
                     cvText: cardForm.cvText,
                     jobDescription: cardForm.jobDescription,
-                    contextText: cardForm.contextText,
+                    contextText: contextText,
                     systemInstruction: cardForm.systemInstruction,
                     questionSet: cardForm.questionSet
                 };
@@ -2355,6 +3030,16 @@
                 setShowCardCreator(false);
                 setActiveTileForCard(null);
                 resetCardForm(activeTileForCard.defaultType || 'flashcard');
+            };
+
+            // NEW: Handle Save Deck from AddDeckModal
+            const handleSaveDeck = async (deck) => {
+                const success = await FirestoreHelper.saveDeck(deck);
+                if (success) {
+                    // Reload decks from Firestore
+                    const updatedDecks = await FirestoreHelper.getDecks();
+                    setDecks(updatedDecks.filter(d => !d.deletedAt));
+                }
             };
 
             const handleCustomCardClick = (card) => {
@@ -2412,6 +3097,13 @@
                 if (deck.length === 0) return;
                 if (m === 'study' || m === 'skill') { const link = deck[0].Link || deck[0].Links; if (link) window.open(link, '_blank'); saveProgress(m, deckName, 'In Progress', 0); setModalDeck(null); return; }
                 if (m === 'vocab') deck = deck.map(item => ({ ...item, Question: item.Word, Answer: item.Meaning, ModeTitle: 'Vocabulary' }));
+                
+                // Apply session limit for Leitner review modes (Flashcard, MCQ, Type Answer, Code)
+                const leitnerModes = ['flashcard', 'mcq', 'type', 'code', 'vocab'];
+                if (leitnerModes.includes(m) && sessionLimit > 0) {
+                    deck = deck.slice(0, sessionLimit);
+                }
+                
                 setActiveDeck({ name: deckName, items: deck }); setMode(m); setStats({ correct: 0, completed: 0, total: deck.length }); setModalDeck(null); setSessionKey(p => p + 1); setFocusMode(false);
                 if (!progress[`${m}-${deckName}`]) saveProgress(m, deckName, 'In Progress', 0);
             };
@@ -2606,7 +3298,7 @@
                         )}
 
                         <div className="flex flex-grow overflow-hidden relative">
-                            {!focusMode && <Dashboard active={mode !== 'menu' && mode !== 'ai_interview'} stats={stats} timer={timer} progressData={progress} streak={streak} totalDecks={getTotalDecks()} pressureMode={pressureMode} onTogglePressure={togglePressureMode} />}
+                            {!focusMode && <Dashboard active={mode !== 'menu' && mode !== 'ai_interview'} stats={stats} timer={timer} progressData={progress} streak={streak} totalDecks={getTotalDecks()} pressureMode={pressureMode} onTogglePressure={togglePressureMode} sessionLimit={sessionLimit} onSessionLimitChange={setSessionLimit} />}
 
                             <main className={`flex-grow overflow-y-auto transition-all duration-300 relative ${!focusMode && mode !== 'menu' && mode !== 'ai_interview' ? 'md:ml-64' : ''} ${focusMode ? 'fixed inset-0 z-50 bg-slate-950 w-full h-full' : ''} scroll-touch stable-scroll pb-16 md:pb-safe`}>
                                 {focusMode && (<button onClick={() => setFocusMode(false)} className="fixed top-4 right-4 z-[60] bg-slate-800/80 text-white px-4 py-2 rounded-full shadow-lg backdrop-blur-sm text-sm font-bold hover:bg-slate-700 transition border border-slate-700 hover:shadow-[0_0_15px_rgba(197,157,95,0.4)]"><i className="fas fa-compress mr-2"></i>Exit Focus</button>)}
@@ -2708,6 +3400,7 @@
                                 {(mode === 'flashcard' || mode === 'vocab') && activeDeck && (<ComponentSandbox> <FlashcardMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} pressureMode={pressureMode} toggleFocus={() => setFocusMode(!focusMode)} isFocusMode={focusMode} /> </ComponentSandbox>)}
                                 {(mode === 'type') && activeDeck && (<ComponentSandbox> <TypeMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} pressureMode={pressureMode} toggleFocus={() => setFocusMode(!focusMode)} isFocusMode={focusMode} /> </ComponentSandbox>)}
                                 {(mode === 'mcq') && activeDeck && (<ComponentSandbox> <MCQMode key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} pressureMode={pressureMode} toggleFocus={() => setFocusMode(!focusMode)} isFocusMode={focusMode} /> </ComponentSandbox>)}
+                                {(mode === 'code') && activeDeck && (<ComponentSandbox> <CodeGame key={sessionKey} deckData={activeDeck.items} onEnd={endSession} onStatsUpdate={updateStats} pressureMode={pressureMode} toggleFocus={() => setFocusMode(!focusMode)} isFocusMode={focusMode} /> </ComponentSandbox>)}
                                 {(mode === 'ai_interview') && (<ComponentSandbox> <AIMode key={sessionKey} onEnd={endSession} onStatsUpdate={updateStats} toggleFocus={() => setFocusMode(!focusMode)} isFocusMode={focusMode} activeAiCard={activeAiCard} gender={gender} speed={speed} region={region} setGender={setGender} setSpeed={setSpeed} setRegion={setRegion} /> </ComponentSandbox>)}
                             </main>
 
@@ -2820,83 +3513,7 @@
                                 </div>
                             </div>
                         )}
-                        {showCardCreator && (
-                            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-                                <div className="bg-slate-900 w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-700 flex flex-col max-h-[90dvh] animate-slide-in">
-                                    <div className="p-6 border-b border-slate-800">
-                                        <h3 className="text-2xl font-bold text-white font-quote">Add Card</h3>
-                                        <p className="text-xs text-slate-500 mt-1 font-mono">{activeTileForCard?.title || 'Tile'} · Configure card details</p>
-                                    </div>
-                                    <div className="p-6 space-y-4 overflow-y-auto">
-                                        <div className="space-y-2">
-                                            <label className="text-xs text-gray-400 font-bold uppercase">Card Name</label>
-                                            <input data-testid="new-card-name-input" type="text" value={cardForm.name} onChange={(e) => setCardForm(prev => ({ ...prev, name: e.target.value }))} placeholder="e.g., Distributed Systems" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-jpm-accent" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs text-gray-400 font-bold uppercase">Card Type</label>
-                                            <select data-testid="new-card-type-select" value={cardForm.type} onChange={(e) => setCardForm(prev => ({ ...prev, type: e.target.value }))} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-jpm-accent">
-                                                <option value="ai">AI</option>
-                                                <option value="flashcard">Flashcard</option>
-                                                <option value="mcq">MCQ</option>
-                                                <option value="type">TypeAnswer</option>
-                                                <option value="link">Link</option>
-                                            </select>
-                                        </div>
-                                        {['flashcard', 'mcq', 'type', 'link'].includes(cardForm.type) && (
-                                            <div className="space-y-2">
-                                                <label className="text-xs text-gray-400 font-bold uppercase">CSV File Name</label>
-                                                <input data-testid="new-card-csv-input" type="text" value={cardForm.csvFile} onChange={(e) => setCardForm(prev => ({ ...prev, csvFile: e.target.value }))} placeholder="e.g., my_cards.csv" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-jpm-accent" />
-                                                <p className="text-[10px] text-slate-500">CSV must exist in the Celer repo data source.</p>
-                                            </div>
-                                        )}
-                                        {cardForm.type === 'ai' && (
-                                            <div className="space-y-4">
-                                                <div className="space-y-2">
-                                                    <label className="text-xs text-gray-400 font-bold uppercase">Short Description</label>
-                                                    <input data-testid="ai-card-description-input" type="text" value={cardForm.description} onChange={(e) => setCardForm(prev => ({ ...prev, description: e.target.value }))} placeholder="e.g., Backend interview prep" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-jpm-accent" />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-xs text-gray-400 font-bold uppercase">Company Name</label>
-                                                    <div className="flex gap-2">
-                                                        <input data-testid="ai-card-company-input" type="text" value={cardForm.companyName} onChange={(e) => setCardForm(prev => ({ ...prev, companyName: e.target.value }))} placeholder="e.g., Google" className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-jpm-accent" />
-                                                        <button data-testid="ai-card-company-fetch-button" onClick={fetchCompanySummary} className="px-4 py-3 bg-slate-700 text-white rounded-xl text-xs font-bold border border-slate-600 hover:bg-slate-600">{isCompanyFetching ? 'Fetching...' : 'Fetch'}</button>
-                                                    </div>
-                                                    <textarea data-testid="ai-card-company-summary-input" value={cardForm.companySummary} onChange={(e) => setCardForm(prev => ({ ...prev, companySummary: e.target.value }))} placeholder="Company summary (auto-filled from Wikipedia or edit manually)" rows={3} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-xs text-gray-400 font-bold uppercase">CV (Text)</label>
-                                                    <textarea data-testid="ai-card-cv-input" value={cardForm.cvText} onChange={(e) => setCardForm(prev => ({ ...prev, cvText: e.target.value }))} rows={4} placeholder="Paste CV text" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-xs text-gray-400 font-bold uppercase">Job Description (Text)</label>
-                                                    <textarea data-testid="ai-card-job-input" value={cardForm.jobDescription} onChange={(e) => setCardForm(prev => ({ ...prev, jobDescription: e.target.value }))} rows={4} placeholder="Paste job description" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-xs text-gray-400 font-bold uppercase">Context / Notes</label>
-                                                    <textarea data-testid="ai-card-context-input" value={cardForm.contextText} onChange={(e) => setCardForm(prev => ({ ...prev, contextText: e.target.value }))} rows={3} placeholder="Additional context" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-xs text-gray-400 font-bold uppercase">System Instruction</label>
-                                                    <textarea data-testid="ai-card-system-instruction-input" value={cardForm.systemInstruction} onChange={(e) => setCardForm(prev => ({ ...prev, systemInstruction: e.target.value }))} rows={4} placeholder="Generated system instruction will appear here" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
-                                                    <div className="flex gap-2">
-                                                        <button data-testid="ai-card-generate-button" onClick={generateSystemInstruction} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-bold border border-slate-600 py-2">{isInstructionGenerating ? 'Generating...' : 'Generate with Gemini'}</button>
-                                                        <button data-testid="ai-card-refine-button" onClick={refineSystemInstruction} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-bold border border-slate-600 py-2">Refine</button>
-                                                    </div>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-xs text-gray-400 font-bold uppercase">Question Set</label>
-                                                    <textarea data-testid="ai-card-question-set-input" value={cardForm.questionSet} onChange={(e) => setCardForm(prev => ({ ...prev, questionSet: e.target.value }))} rows={3} placeholder="Optional question set" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="p-6 pt-0 flex gap-2">
-                                        <button data-testid="create-card-cancel" onClick={() => { setShowCardCreator(false); setActiveTileForCard(null); resetCardForm(); }} className="flex-1 bg-slate-800 text-gray-300 py-3 rounded-xl font-bold hover:bg-slate-700 border border-slate-700">Cancel</button>
-                                        <button data-testid="create-card-submit" onClick={handleCreateCard} className="flex-1 bg-jpm-accent text-slate-900 py-3 rounded-xl font-bold hover:bg-[#b08d55]">Save Card</button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+                        {showCardCreator && <AddDeckModal onClose={() => { setShowCardCreator(false); setActiveTileForCard(null); resetCardForm(); }} onSave={handleSaveDeck} apiUrl={apiUrl} />}
                         {showPrompts && (<div className="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm z-[100] flex items-center justify-center p-4"> <div className="bg-slate-900 rounded-2xl shadow-2xl p-6 max-w-lg w-full animate-slide-in border border-slate-700"> <h3 className="text-2xl font-bold mb-4 text-white font-quote"><i className="fas fa-robot mr-2 text-jpm-accent"></i>AI Prompts</h3> <div className="space-y-3 mb-6"> {data.prompts.map((p, i) => (<a key={i} href={p.Link || p.Links} target="_blank" className="flex items-center p-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition group hover:shadow-[0_0_15px_rgba(197,157,95,0.2)]"> <i className="fas fa-file-alt text-jpm-accent mr-3"></i> <span className="font-semibold text-gray-200 group-hover:text-white">{p.Deck}</span> <i className="fas fa-external-link-alt ml-auto text-gray-500 group-hover:text-jpm-accent"></i> </a>))} </div> <button onClick={() => setShowPrompts(false)} className="w-full bg-slate-800 text-gray-400 py-3 rounded-xl font-bold hover:bg-slate-700 border border-slate-700">Close</button> </div> </div>)}
                         {testResults && (<div className="fixed inset-0 bg-black bg-opacity-80 z-[10000] flex items-center justify-center p-4"> <div className="bg-slate-900 rounded-xl shadow-2xl p-6 max-w-lg w-full animate-slide-in border border-slate-700"> <h3 className="text-2xl font-bold mb-4 text-white font-quote">Regression Suite ({testResults.length} Tests)</h3> <div className="space-y-2 mb-6 max-h-96 overflow-y-auto"> {testResults.map(r => (<div key={r.id} className="flex justify-between items-center p-2 border-b dark:border-slate-700"> <span className="text-sm font-medium dark:text-gray-300"><span className="font-mono text-xs opacity-50 mr-2">#{r.id}</span>{r.name}</span> <span className={`font-bold text-xs px-2 py-1 rounded ${r.pass ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{r.pass ? 'PASS' : 'FAIL'}</span> </div>))} </div> <button onClick={() => setTestResults(null)} className="w-full bg-blue-600 text-white py-2 rounded font-bold">Close</button> </div> </div>)}
                         {modalDeck && (
