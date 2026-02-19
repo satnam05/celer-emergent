@@ -492,7 +492,7 @@
             },
 
             _saveLocalDecks(decks) {
-                try { localStorage.setItem(DECKS_LOCAL_KEY, JSON.stringify(decks)); } catch (e) {}
+                try { localStorage.setItem(DECKS_LOCAL_KEY, JSON.stringify(decks)); } catch (e) { }
             },
 
             async getDecks() {
@@ -1561,7 +1561,9 @@
                             thinking_level: thinkingMode,
                             interviewMode: interviewMode,
                             systemInstruction: activeAiCard?.systemInstruction || null,
-                            questionSet: activeAiCard?.questionSet || null
+                            questionSet: activeAiCard?.questionSet || null,
+                            technicalQuestions: activeAiCard?.technicalQuestions || [],
+                            behavioralQuestions: activeAiCard?.behavioralQuestions || []
                         }
                     };
                     const response = await fetch(url, {
@@ -1874,7 +1876,7 @@
             const [deckType, setDeckType] = useState('flashcard');
             const [deckName, setDeckName] = useState('');
             const [description, setDescription] = useState('');
-            
+
             // LEGACY INTERVIEW FIELDS (Preserved)
             const [companyName, setCompanyName] = useState('');
             const [companySummary, setCompanySummary] = useState('');
@@ -1882,24 +1884,27 @@
             const [jobDescription, setJobDescription] = useState('');
             const [contextText, setContextText] = useState('');
             const [systemInstruction, setSystemInstruction] = useState('');
-            const [questionSet, setQuestionSet] = useState('');
+            const [technicalQuestions, setTechnicalQuestions] = useState([]);
+            const [behavioralQuestions, setBehavioralQuestions] = useState([]);
+            const [editingTechIdx, setEditingTechIdx] = useState(null);
+            const [editingBehIdx, setEditingBehIdx] = useState(null);
             const [isCompanyFetching, setIsCompanyFetching] = useState(false);
             const [isGenerating, setIsGenerating] = useState(false);
 
             // UNIFIED BUILDER STATE
             const [builderTab, setBuilderTab] = useState('manual'); // manual | csv | ai
             const [draftCards, setDraftCards] = useState([]);
-            
+
             // Manual Entry
             const [manualForm, setManualForm] = useState({
-                question: '', answer: '', 
+                question: '', answer: '',
                 option1: '', option2: '', option3: '', option4: '',
                 url: ''
             });
 
             // CSV Upload
             const [csvText, setCsvText] = useState('');
-            
+
             // AI Assist
             const [aiTopic, setAiTopic] = useState('');
 
@@ -1911,7 +1916,7 @@
 
             const handleAddManualCard = () => {
                 if (!manualForm.question.trim()) return alert('Question/Prompt is required');
-                
+
                 const newCard = {
                     id: `card-${Date.now()}-${Math.random()}`,
                     Question: manualForm.question.trim(),
@@ -1960,12 +1965,12 @@
             const handleAIGenerate = async () => {
                 if (!aiTopic.trim()) return alert('Enter a topic first');
                 if (!apiUrl) return alert('Configure backend URL in Settings first');
-                
+
                 setIsGenerating(true);
                 try {
                     const prompt = `Generate 5 ${deckType} cards for the topic: "${aiTopic}". 
                     Output ONLY valid JSON array: [{ question: "...", answer: "..."${deckType === 'mcq' ? ', options: ["a", "b", "c", "d"]' : ''} }]`;
-                    
+
                     const res = await fetch(apiUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1979,7 +1984,7 @@
                     });
                     const json = await res.json();
                     const aiResponse = json.data?.text || '';
-                    
+
                     // Parse JSON from AI response
                     const match = aiResponse.match(/\[[\s\S]*\]/);
                     if (match) {
@@ -2038,29 +2043,24 @@
                         })
                     });
                     const json = await res.json();
-                    
-                    // Handle system_instruction (should be string)
+
                     if (json.system_instruction) {
-                        setSystemInstruction(typeof json.system_instruction === 'string' 
-                            ? json.system_instruction 
+                        setSystemInstruction(typeof json.system_instruction === 'string'
+                            ? json.system_instruction
                             : JSON.stringify(json.system_instruction, null, 2));
                     }
-                    
-                    // Handle question_set (might be object/array)
-                    if (json.question_set) {
-                        let questionText = '';
-                        if (typeof json.question_set === 'string') {
-                            questionText = json.question_set;
-                        } else if (Array.isArray(json.question_set)) {
-                            // If it's an array of question objects
-                            questionText = json.question_set.map((q, i) => 
-                                `Q${i + 1}: ${q.question || q.text || JSON.stringify(q)}`
-                            ).join('\n\n');
-                        } else if (typeof json.question_set === 'object') {
-                            // If it's a single object, stringify it nicely
-                            questionText = JSON.stringify(json.question_set, null, 2);
-                        }
-                        setQuestionSet(questionText);
+
+                    // NEW: Handle structured question arrays
+                    if (Array.isArray(json.technical_questions) && json.technical_questions.length > 0) {
+                        setTechnicalQuestions(json.technical_questions.filter(Boolean));
+                    }
+                    if (Array.isArray(json.behavioral_questions) && json.behavioral_questions.length > 0) {
+                        setBehavioralQuestions(json.behavioral_questions.filter(Boolean));
+                    }
+                    // Backward compat: old question_set string
+                    if (!json.technical_questions && json.question_set) {
+                        const lines = json.question_set.split('\n').map(l => l.trim()).filter(l => l.length > 5);
+                        setTechnicalQuestions(lines);
                     }
                 } catch (e) {
                     console.warn("AI generation failed", e);
@@ -2081,8 +2081,8 @@
                     });
                     const json = await res.json();
                     if (json.system_instruction) {
-                        setSystemInstruction(typeof json.system_instruction === 'string' 
-                            ? json.system_instruction 
+                        setSystemInstruction(typeof json.system_instruction === 'string'
+                            ? json.system_instruction
                             : JSON.stringify(json.system_instruction, null, 2));
                     }
                 } catch (e) {
@@ -2096,12 +2096,11 @@
             const handleSave = async () => {
                 if (!deckName.trim()) return alert('Deck name is required');
 
-                // FORK: PATH A - INTERVIEW SIMULATOR (Legacy Data)
+                // FORK: PATH A - INTERVIEW SIMULATOR
                 if (deckType === 'interview') {
-                    // Validate Interview-specific fields
                     if (!companyName.trim()) return alert('Company Name is required for Interview Simulator');
                     if (!jobDescription.trim()) return alert('Job Description is required for Interview Simulator');
-                    if (!systemInstruction.trim()) return alert('System Instruction is required. Click "Generate with Gemini" first.');
+                    if (!systemInstruction.trim()) return alert('System Instruction is required. Click "Generate with AI" first.');
 
                     const interviewDeck = {
                         id: `deck-${Date.now()}-${Math.random()}`,
@@ -2114,8 +2113,9 @@
                         jobDescription: jobDescription.trim(),
                         contextText: contextText.trim(),
                         systemInstruction: systemInstruction.trim(),
-                        questionSet: questionSet.trim(),
-                        cards: [], // Interviews don't use draftCards
+                        technicalQuestions: technicalQuestions,
+                        behavioralQuestions: behavioralQuestions,
+                        cards: [],
                         createdAt: Date.now()
                     };
 
@@ -2200,14 +2200,58 @@
                                         <label className="text-xs text-gray-400 font-bold uppercase">System Instruction</label>
                                         <textarea value={systemInstruction} onChange={(e) => setSystemInstruction(e.target.value)} rows={4} placeholder="Generated system instruction will appear here" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
                                         <div className="flex gap-2">
-                                            <button onClick={handleGenerateInstruction} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-bold border border-slate-600 py-2">{isGenerating ? 'Generating...' : 'Generate with Gemini'}</button>
-                                            <button onClick={handleRefineInstruction} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-bold border border-slate-600 py-2">Refine</button>
+                                            <button onClick={handleGenerateInstruction} disabled={isGenerating} className="flex-1 bg-jpm-accent hover:bg-[#b08d55] text-slate-900 rounded-xl text-xs font-bold border border-jpm-accent py-2 disabled:opacity-50">{isGenerating ? '✨ Generating...' : '✨ Generate with AI'}</button>
+                                            <button onClick={handleRefineInstruction} disabled={isGenerating || !systemInstruction} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-bold border border-slate-600 py-2 disabled:opacity-50">Refine</button>
                                         </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="text-xs text-gray-400 font-bold uppercase">Question Set</label>
-                                        <textarea value={questionSet} onChange={(e) => setQuestionSet(e.target.value)} rows={3} placeholder="Optional question set" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-xs font-mono focus:outline-none focus:border-jpm-accent" />
-                                    </div>
+                                    {/* REPLACED: Split Question Lists */}
+                                    {(technicalQuestions.length > 0 || behavioralQuestions.length > 0) && (
+                                        <div className="space-y-3 border-t border-slate-800 pt-4">
+                                            {/* Technical Questions */}
+                                            <div>
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <label className="text-xs text-blue-400 font-bold uppercase flex items-center gap-1"><i className="fas fa-code"></i> Technical Questions ({technicalQuestions.length})</label>
+                                                    <button onClick={() => setTechnicalQuestions(prev => [...prev, 'New technical question?'])} className="text-xs text-blue-400 hover:text-blue-300 font-bold"><i className="fas fa-plus mr-1"></i>Add</button>
+                                                </div>
+                                                <div className="space-y-1 max-h-48 overflow-y-auto">
+                                                    {technicalQuestions.map((q, i) => (
+                                                        <div key={i} className="flex items-start gap-2 bg-slate-800/70 rounded-lg p-2 border border-blue-900/30">
+                                                            <span className="text-blue-400 font-mono text-xs mt-1 shrink-0">{i + 1}.</span>
+                                                            {editingTechIdx === i ? (
+                                                                <input autoFocus defaultValue={q} onBlur={(e) => { const newQ = [...technicalQuestions]; newQ[i] = e.target.value; setTechnicalQuestions(newQ); setEditingTechIdx(null); }} onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} className="flex-1 bg-slate-900 text-white text-xs rounded px-2 py-1 border border-blue-500 focus:outline-none" />
+                                                            ) : (
+                                                                <span onClick={() => setEditingTechIdx(i)} className="flex-1 text-xs text-gray-200 cursor-pointer hover:text-white leading-snug">{q}</span>
+                                                            )}
+                                                            <button onClick={() => setTechnicalQuestions(prev => prev.filter((_, idx) => idx !== i))} className="text-red-500/60 hover:text-red-400 shrink-0"><i className="fas fa-times text-xs"></i></button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            {/* Behavioral Questions */}
+                                            <div>
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <label className="text-xs text-purple-400 font-bold uppercase flex items-center gap-1"><i className="fas fa-user-tie"></i> Behavioral Questions ({behavioralQuestions.length})</label>
+                                                    <button onClick={() => setBehavioralQuestions(prev => [...prev, 'New behavioral question?'])} className="text-xs text-purple-400 hover:text-purple-300 font-bold"><i className="fas fa-plus mr-1"></i>Add</button>
+                                                </div>
+                                                <div className="space-y-1 max-h-48 overflow-y-auto">
+                                                    {behavioralQuestions.map((q, i) => (
+                                                        <div key={i} className="flex items-start gap-2 bg-slate-800/70 rounded-lg p-2 border border-purple-900/30">
+                                                            <span className="text-purple-400 font-mono text-xs mt-1 shrink-0">{i + 1}.</span>
+                                                            {editingBehIdx === i ? (
+                                                                <input autoFocus defaultValue={q} onBlur={(e) => { const newQ = [...behavioralQuestions]; newQ[i] = e.target.value; setBehavioralQuestions(newQ); setEditingBehIdx(null); }} onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} className="flex-1 bg-slate-900 text-white text-xs rounded px-2 py-1 border border-purple-500 focus:outline-none" />
+                                                            ) : (
+                                                                <span onClick={() => setEditingBehIdx(i)} className="flex-1 text-xs text-gray-200 cursor-pointer hover:text-white leading-snug">{q}</span>
+                                                            )}
+                                                            <button onClick={() => setBehavioralQuestions(prev => prev.filter((_, idx) => idx !== i))} className="text-red-500/60 hover:text-red-400 shrink-0"><i className="fas fa-times text-xs"></i></button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {technicalQuestions.length === 0 && behavioralQuestions.length === 0 && (
+                                        <p className="text-xs text-slate-500 italic">Click "Generate with AI" above to populate technical and behavioral questions.</p>
+                                    )}
                                 </div>
                             )}
 
@@ -2582,7 +2626,7 @@
             useEffect(() => {
                 const loadAndMigrateDecks = async () => {
                     if (!isAuthenticated) return;
-                    
+
                     // Step 1: Load from Firestore
                     const firestoreDecks = await FirestoreHelper.getDecks();
                     setDecks(firestoreDecks.filter(d => !d.deletedAt));
@@ -2590,15 +2634,15 @@
                     // Step 2: Check for legacy decks in localStorage
                     const legacyCustomTiles = localStorage.getItem('celer_custom_tiles_v1');
                     const legacyCustomCards = localStorage.getItem('celer_custom_cards_v1');
-                    
+
                     if (legacyCustomTiles || legacyCustomCards) {
                         try {
                             const tiles = legacyCustomTiles ? JSON.parse(legacyCustomTiles) : [];
                             const cardsByTile = legacyCustomCards ? JSON.parse(legacyCustomCards) : {};
-                            
+
                             // Convert to new deck format
                             const legacyDecks = [];
-                            
+
                             // Convert customTiles
                             tiles.forEach(tile => {
                                 (tile.cards || []).forEach(card => {
@@ -2619,7 +2663,7 @@
                                     });
                                 });
                             });
-                            
+
                             // Convert customCardsByTile
                             Object.values(cardsByTile).flat().forEach(card => {
                                 legacyDecks.push({
@@ -2638,7 +2682,7 @@
                                     cards: []
                                 });
                             });
-                            
+
                             // Migrate to Firestore
                             if (legacyDecks.length > 0) {
                                 await FirestoreHelper.migrateLegacyDecks(legacyDecks);
@@ -2654,7 +2698,7 @@
                         }
                     }
                 };
-                
+
                 loadAndMigrateDecks();
             }, [isAuthenticated]);
 
@@ -3056,12 +3100,46 @@
                 resetCardForm(activeTileForCard.defaultType || 'flashcard');
             };
 
+            // Load decks from Firestore/localStorage when authenticated
+            useEffect(() => {
+                if (!isAuthenticated) return;
+                const loadDecks = async () => {
+                    const allDecks = await FirestoreHelper.getDecks();
+                    setDecks(allDecks.filter(d => !d.deletedAt));
+                };
+                loadDecks();
+            }, [isAuthenticated]);
+
             // NEW: Handle Save Deck from AddDeckModal
             const handleSaveDeck = async (deck) => {
                 await FirestoreHelper.saveDeck(deck);
                 // Reload decks (will use localStorage fallback if Firestore is unavailable)
                 const updatedDecks = await FirestoreHelper.getDecks();
                 setDecks(updatedDecks.filter(d => !d.deletedAt));
+            };
+
+            // NEW: Handle Delete Deck
+            const handleDeleteDeck = async (deckId) => {
+                if (!window.confirm('Delete this interview deck? This cannot be undone.')) return;
+                await FirestoreHelper.deleteDeck(deckId);
+                setDecks(prev => prev.filter(d => d.id !== deckId));
+            };
+
+            // NEW: Launch interview session with a specific deck
+            const handleLaunchInterviewDeck = (deck) => {
+                setActiveAiCard({
+                    id: deck.id,
+                    name: deck.name,
+                    type: 'interview',
+                    systemInstruction: deck.systemInstruction || '',
+                    technicalQuestions: deck.technicalQuestions || [],
+                    behavioralQuestions: deck.behavioralQuestions || [],
+                    questionSet: deck.questionSet || ''
+                });
+                setActiveDeck({ name: deck.name, items: [] });
+                setMode('ai_interview');
+                setSessionKey(p => p + 1);
+                setFocusMode(false);
             };
 
             const handleCustomCardClick = (card) => {
@@ -3119,13 +3197,13 @@
                 if (deck.length === 0) return;
                 if (m === 'study' || m === 'skill') { const link = deck[0].Link || deck[0].Links; if (link) window.open(link, '_blank'); saveProgress(m, deckName, 'In Progress', 0); setModalDeck(null); return; }
                 if (m === 'vocab') deck = deck.map(item => ({ ...item, Question: item.Word, Answer: item.Meaning, ModeTitle: 'Vocabulary' }));
-                
+
                 // Apply session limit for Leitner review modes (Flashcard, MCQ, Type Answer, Code)
                 const leitnerModes = ['flashcard', 'mcq', 'type', 'code', 'vocab'];
                 if (leitnerModes.includes(m) && sessionLimit > 0) {
                     deck = deck.slice(0, sessionLimit);
                 }
-                
+
                 setActiveDeck({ name: deckName, items: deck }); setMode(m); setStats({ correct: 0, completed: 0, total: deck.length }); setModalDeck(null); setSessionKey(p => p + 1); setFocusMode(false);
                 if (!progress[`${m}-${deckName}`]) saveProgress(m, deckName, 'In Progress', 0);
             };
@@ -3398,6 +3476,40 @@
                                                                 onCardClick={handleCustomCardClick}
                                                                 onMarkComplete={handleCustomCardMarkDone}
                                                             />
+                                                        )}
+                                                        {m.id === 'ai_interview' && decks.length > 0 && (
+                                                            <div className="bg-slate-900/50 border-t border-slate-800 p-3">
+                                                                <h4 className="text-[10px] font-bold text-jpm-accent uppercase tracking-widest mb-2 font-mono">Saved Interview Decks</h4>
+                                                                <div className="space-y-2">
+                                                                    {decks.map(deck => (
+                                                                        <div key={deck.id} className="flex items-center gap-2 bg-slate-800/60 border border-slate-700 rounded-xl p-2 hover:border-jpm-accent/40 transition group">
+                                                                            <button
+                                                                                onClick={() => handleLaunchInterviewDeck(deck)}
+                                                                                className="flex-grow text-left"
+                                                                            >
+                                                                                <div className="font-semibold text-sm text-gray-200 group-hover:text-white truncate">{deck.name}</div>
+                                                                                <div className="text-[10px] text-gray-500 font-mono mt-0.5">
+                                                                                    {(deck.technicalQuestions?.length || 0)}T · {(deck.behavioralQuestions?.length || 0)}B questions
+                                                                                </div>
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => handleLaunchInterviewDeck(deck)}
+                                                                                className="flex-shrink-0 w-7 h-7 rounded-lg bg-jpm-accent/10 border border-jpm-accent/30 text-jpm-accent hover:bg-jpm-accent hover:text-slate-900 transition flex items-center justify-center"
+                                                                                title="Start Interview"
+                                                                            >
+                                                                                <i className="fas fa-play text-[10px]"></i>
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => handleDeleteDeck(deck.id)}
+                                                                                className="flex-shrink-0 w-7 h-7 rounded-lg bg-red-900/20 border border-red-800/40 text-red-500 hover:bg-red-900/60 hover:text-red-300 transition flex items-center justify-center"
+                                                                                title="Delete Deck"
+                                                                            >
+                                                                                <i className="fas fa-trash text-[10px]"></i>
+                                                                            </button>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
                                                         )}
                                                     </div>
                                                 );
