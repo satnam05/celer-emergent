@@ -2286,10 +2286,14 @@
                     const json = await res.json();
                     if (json.system_instruction) {
                         setCardForm(prev => ({ ...prev, systemInstruction: json.system_instruction, questionSet: json.question_set || prev.questionSet }));
+                    } else if (json.error) {
+                        alert(`Generation failed: ${json.error}`);
+                    } else {
+                        alert("Generation failed: No system instruction returned. Check your backend URL and API key.");
                     }
                 } catch (e) {
                     console.warn("AI generation failed", e);
-                    alert("AI generation failed. Please try again once the backend is ready.");
+                    alert("AI generation failed. Check that your backend URL is correctly set in Settings.");
                 } finally {
                     setIsInstructionGenerating(false);
                 }
@@ -2319,7 +2323,7 @@
             const handleCreateCard = () => {
                 if (!activeTileForCard) return;
                 const trimmedName = cardForm.name.trim();
-                if (!trimmedName) return;
+                if (!trimmedName) { alert("Please enter a Card Name before saving."); return; }
                 if (['flashcard', 'mcq', 'type', 'link'].includes(cardForm.type) && !cardForm.csvFile.trim()) {
                     return alert("CSV file name is required for this card type.");
                 }
