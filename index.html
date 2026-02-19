@@ -479,22 +479,45 @@
             console.warn("Firebase init failed, using localStorage fallback", e);
         }
 
+        const DECKS_LOCAL_KEY = 'celer_decks_v1';
+
         const FirestoreHelper = {
             uid: "satnam_default",
-            
+
+            _getLocalDecks() {
+                try {
+                    const stored = localStorage.getItem(DECKS_LOCAL_KEY);
+                    return stored ? JSON.parse(stored) : [];
+                } catch (e) { return []; }
+            },
+
+            _saveLocalDecks(decks) {
+                try { localStorage.setItem(DECKS_LOCAL_KEY, JSON.stringify(decks)); } catch (e) {}
+            },
+
             async getDecks() {
-                if (!db) return [];
+                const localDecks = this._getLocalDecks();
+                if (!db) return localDecks;
                 try {
                     const snapshot = await db.collection("users").doc(this.uid).collection("decks").get();
-                    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    const firestoreDecks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    // Keep local copy in sync
+                    this._saveLocalDecks(firestoreDecks);
+                    return firestoreDecks;
                 } catch (e) {
-                    console.warn("Firestore read failed", e);
-                    return [];
+                    console.warn("Firestore read failed, using localStorage fallback", e);
+                    return localDecks;
                 }
             },
 
             async saveDeck(deck) {
-                if (!db) return false;
+                // Always save to localStorage first so the app works offline/blocked
+                const localDecks = this._getLocalDecks();
+                const idx = localDecks.findIndex(d => d.id === deck.id);
+                if (idx >= 0) localDecks[idx] = deck; else localDecks.push(deck);
+                this._saveLocalDecks(localDecks);
+
+                if (!db) return true; // Saved locally, that's enough
                 try {
                     await db.collection("users").doc(this.uid).collection("decks").doc(deck.id).set({
                         ...deck,
@@ -502,26 +525,37 @@
                     });
                     return true;
                 } catch (e) {
-                    console.warn("Firestore write failed", e);
-                    return false;
+                    console.warn("Firestore write failed, saved to localStorage only", e);
+                    return true; // Return true because we saved locally
                 }
             },
 
             async deleteDeck(deckId) {
-                if (!db) return false;
+                // Remove from localStorage
+                const localDecks = this._getLocalDecks().filter(d => d.id !== deckId);
+                this._saveLocalDecks(localDecks);
+
+                if (!db) return true;
                 try {
                     await db.collection("users").doc(this.uid).collection("decks").doc(deckId).update({
                         deletedAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
                     return true;
                 } catch (e) {
-                    console.warn("Firestore delete failed", e);
-                    return false;
+                    console.warn("Firestore delete failed, removed from localStorage only", e);
+                    return true;
                 }
             },
 
             async migrateLegacyDecks(legacyDecksArray) {
-                if (!db || !legacyDecksArray || legacyDecksArray.length === 0) return;
+                if (!legacyDecksArray || legacyDecksArray.length === 0) return;
+                // Save to localStorage
+                const existing = this._getLocalDecks();
+                const existingIds = new Set(existing.map(d => d.id));
+                const merged = [...existing, ...legacyDecksArray.filter(d => !existingIds.has(d.id))];
+                this._saveLocalDecks(merged);
+
+                if (!db) return true;
                 try {
                     const batch = db.batch();
                     legacyDecksArray.forEach(deck => {
@@ -535,8 +569,8 @@
                     console.log(`Migrated ${legacyDecksArray.length} decks to Firestore`);
                     return true;
                 } catch (e) {
-                    console.warn("Migration failed", e);
-                    return false;
+                    console.warn("Migration to Firestore failed, data kept in localStorage", e);
+                    return true;
                 }
             }
         };
@@ -2085,14 +2119,9 @@
                         createdAt: Date.now()
                     };
 
-                    const saved = await FirestoreHelper.saveDeck(interviewDeck);
-                    if (saved) {
-                        alert('Interview Simulator deck saved to Firestore!');
-                        onSave && onSave(interviewDeck);
-                        onClose();
-                    } else {
-                        alert('Save failed. Check console for errors.');
-                    }
+                    await FirestoreHelper.saveDeck(interviewDeck);
+                    onSave && onSave(interviewDeck);
+                    onClose();
                     return;
                 }
 
@@ -2110,14 +2139,9 @@
                     createdAt: Date.now()
                 };
 
-                const saved = await FirestoreHelper.saveDeck(unifiedDeck);
-                if (saved) {
-                    alert(`${deckType.toUpperCase()} deck saved with ${draftCards.length} cards!`);
-                    onSave && onSave(unifiedDeck);
-                    onClose();
-                } else {
-                    alert('Save failed. Check console for errors.');
-                }
+                await FirestoreHelper.saveDeck(unifiedDeck);
+                onSave && onSave(unifiedDeck);
+                onClose();
             };
 
             return (
@@ -3034,12 +3058,10 @@
 
             // NEW: Handle Save Deck from AddDeckModal
             const handleSaveDeck = async (deck) => {
-                const success = await FirestoreHelper.saveDeck(deck);
-                if (success) {
-                    // Reload decks from Firestore
-                    const updatedDecks = await FirestoreHelper.getDecks();
-                    setDecks(updatedDecks.filter(d => !d.deletedAt));
-                }
+                await FirestoreHelper.saveDeck(deck);
+                // Reload decks (will use localStorage fallback if Firestore is unavailable)
+                const updatedDecks = await FirestoreHelper.getDecks();
+                setDecks(updatedDecks.filter(d => !d.deletedAt));
             };
 
             const handleCustomCardClick = (card) => {
