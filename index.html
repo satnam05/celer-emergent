@@ -2029,17 +2029,20 @@
                 if (!apiUrl) return alert('Please configure the backend URL in Settings.');
                 setIsGenerating(true);
                 try {
-                    const res = await fetch(`${apiUrl}/api/ai/generate`, {
+                    const res = await fetch(apiUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            name: deckName,
-                            description: description,
-                            companyName: companyName,
-                            companySummary: companySummary,
-                            cvText: cvText,
-                            jobDescription: jobDescription,
-                            contextText: contextText
+                            data: {
+                                action: 'generateInstruction',
+                                name: deckName,
+                                description: description,
+                                companyName: companyName,
+                                companySummary: companySummary,
+                                cvText: cvText,
+                                jobDescription: jobDescription,
+                                contextText: contextText
+                            }
                         })
                     });
                     const json = await res.json();
@@ -2074,10 +2077,15 @@
                 if (!apiUrl) return alert('Please configure the backend URL in Settings.');
                 setIsGenerating(true);
                 try {
-                    const res = await fetch(`${apiUrl}/api/ai/refine`, {
+                    const res = await fetch(apiUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ systemInstruction: systemInstruction })
+                        body: JSON.stringify({
+                            data: {
+                                action: 'refineInstruction',
+                                systemInstruction: systemInstruction
+                            }
+                        })
                     });
                     const json = await res.json();
                     if (json.system_instruction) {
@@ -3013,17 +3021,20 @@
                 if (!apiUrl) return alert("Please configure the backend URL in Settings.");
                 setIsInstructionGenerating(true);
                 try {
-                    const res = await fetch(`${apiUrl}/api/ai/generate`, {
+                    const res = await fetch(apiUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            name: cardForm.name,
-                            description: cardForm.description,
-                            companyName: cardForm.companyName,
-                            companySummary: cardForm.companySummary,
-                            cvText: cardForm.cvText,
-                            jobDescription: cardForm.jobDescription,
-                            contextText: cardForm.contextText
+                            data: {
+                                action: 'generateInstruction',
+                                name: cardForm.name,
+                                description: cardForm.description,
+                                companyName: cardForm.companyName,
+                                companySummary: cardForm.companySummary,
+                                cvText: cardForm.cvText,
+                                jobDescription: cardForm.jobDescription,
+                                contextText: cardForm.contextText
+                            }
                         })
                     });
                     const json = await res.json();
@@ -3046,10 +3057,15 @@
                 if (!apiUrl) return alert("Please configure the backend URL in Settings.");
                 setIsInstructionGenerating(true);
                 try {
-                    const res = await fetch(`${apiUrl}/api/ai/refine`, {
+                    const res = await fetch(apiUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ systemInstruction: cardForm.systemInstruction })
+                        body: JSON.stringify({
+                            data: {
+                                action: 'refineInstruction',
+                                systemInstruction: cardForm.systemInstruction
+                            }
+                        })
                     });
                     const json = await res.json();
                     if (json.system_instruction) {
