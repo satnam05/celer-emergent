@@ -499,13 +499,17 @@
                 const localDecks = this._getLocalDecks();
                 if (!db) return localDecks;
                 try {
-                    const snapshot = await db.collection("users").doc(this.uid).collection("decks").get();
+                    // Use Promise.race to timeout after 2 seconds if Firebase is hanging
+                    const snapshotPromise = db.collection("users").doc(this.uid).collection("decks").get();
+                    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000));
+                    const snapshot = await Promise.race([snapshotPromise, timeoutPromise]);
+
                     const firestoreDecks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     // Keep local copy in sync
                     this._saveLocalDecks(firestoreDecks);
                     return firestoreDecks;
                 } catch (e) {
-                    console.warn("Firestore read failed, using localStorage fallback", e);
+                    console.warn("Firestore read failed or timed out, using localStorage fallback", e);
                     return localDecks;
                 }
             },
@@ -518,16 +522,14 @@
                 this._saveLocalDecks(localDecks);
 
                 if (!db) return true; // Saved locally, that's enough
-                try {
-                    await db.collection("users").doc(this.uid).collection("decks").doc(deck.id).set({
-                        ...deck,
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    return true;
-                } catch (e) {
-                    console.warn("Firestore write failed, saved to localStorage only", e);
-                    return true; // Return true because we saved locally
-                }
+
+                // Fire and forget remote save to prevent UI freezing
+                db.collection("users").doc(this.uid).collection("decks").doc(deck.id).set({
+                    ...deck,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }).catch(e => console.warn("Background Firestore write failed", e));
+
+                return true;
             },
 
             async deleteDeck(deckId) {
@@ -536,15 +538,13 @@
                 this._saveLocalDecks(localDecks);
 
                 if (!db) return true;
-                try {
-                    await db.collection("users").doc(this.uid).collection("decks").doc(deckId).update({
-                        deletedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    return true;
-                } catch (e) {
-                    console.warn("Firestore delete failed, removed from localStorage only", e);
-                    return true;
-                }
+
+                // Fire and forget remote delete
+                db.collection("users").doc(this.uid).collection("decks").doc(deckId).update({
+                    deletedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }).catch(e => console.warn("Background Firestore delete failed", e));
+
+                return true;
             },
 
             async migrateLegacyDecks(legacyDecksArray) {
